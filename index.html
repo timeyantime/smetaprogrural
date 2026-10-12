@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>СметаПро — ресурсный метод</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="js/money.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <div x-data="smeta()" x-init="init()" class="app">
+
+    <!-- ===== Верхняя панель (как Airtable: иконки Базы/Таблицы + название) ===== -->
+    <header class="at-topbar">
+      <div class="at-crumb">
+        <span class="at-db-icon">🗄️</span>
+        <span class="at-db-name">СметаПро</span>
+        <span class="at-sep">/</span>
+        <input class="at-title-input" x-model="data.title" placeholder="Наименование сметы" />
+      </div>
+      <div class="at-actions">
+        <button class="at-btn at-btn-primary" @click="saveLocal()">💾 Сохранить</button>
+        <button class="at-btn" @click="$refs.fileImport.click()">Импорт JSON</button>
+        <button class="at-btn" @click="exportJson()">Экспорт JSON</button>
+        <button class="at-btn" @click="exportCsv()">Экспорт CSV</button>
+        <button class="at-btn" @click="printPage()">🖨 Печать</button>
+        <input type="file" x-ref="fileImport" accept=".json" hidden @change="importJson($event)" />
+      </div>
+    </header>
+
+    <!-- ===== Панель вкладок разделов (как вкладки таблиц Airtable) ===== -->
+    <nav class="at-tabs-bar">
+      <div class="at-tabs">
+        <button class="at-tab" :class="{ active: activeTab === null }" @click="activeTab = null">
+          <span class="at-tab-icon">📋</span> Все разделы
+        </button>
+        <template x-for="(section, si) in data.sections" :key="section.id">
+          <button class="at-tab" :class="{ active: activeTab === si }"
+                  @click="selectTab(si)" @dblclick="startRenameSection(si)"
+                  draggable="true" @dragstart="tabDragFrom = si" @dragover.prevent
+                  @drop="moveSectionByDrag(si)">
+            <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
+            <span x-show="renamingSection !== si" x-text="section.name"></span>
+            <input x-show="renamingSection === si" x-ref="renameInput" class="at-tab-rename"
+                   x-model="section.name" @blur="renamingSection = null"
+                   @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
+          </button>
+        </template>
+        <button class="at-tab at-tab-add" @click="addSection()" title="Добавить раздел">＋</button>
+      </div>
+      <div class="at-toolbar">
+        <div class="at-search">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+          <input x-model="filter" placeholder="Поиск записей…" />
+        </div>
+        <div class="at-group" x-show="groupBy !== 'none'">
+          <span class="at-chip-label">Группировка: <b x-text="groupByLabel()"></b></span>
+          <button class="at-mini-x" @click="groupBy = 'none'">✕</button>
+        </div>
+        <div style="position:relative" x-show="groupBy === 'none'">
+          <button class="at-btn at-btn-ghost" @click="toggleGroupMenu = !toggleGroupMenu">
+            <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1 3h14v2H1zM3 7h10v2H3zM5 11h6v2H5z"/></svg>
+            Группировать ▾
+          </button>
+          <div class="at-menu" x-show="toggleGroupMenu" @click.outside="toggleGroupMenu = false" x-transition>
+            <button @click="setGroupBy('none')">Без группировки</button>
+            <button @click="setGroupBy('type')">По типу ресурса</button>
+            <button @click="setGroupBy('unit')">По единице измерения</button>
+          </div>
+        </div>
+        <span class="at-count" x-text="visibleCount() + ' записей'"></span>
+      </div>
+    </nav>
+
+    <!-- ===== Основная таблица ===== -->
+    <main class="at-main">
+      <div class="at-table-wrap">
+        <table class="at-table">
+          <colgroup>
+            <col style="width:44px"><col style="width:90px"><col style="width:300px">
+            <col style="width:150px"><col style="width:90px"><col style="width:100px">
+            <col style="width:120px"><col style="width:130px"><col style="width:190px"><col style="width:44px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="at-th-num">#</th>
+              <th class="at-th"><span class="at-col-type">T</span> Обоснование</th>
+              <th class="at-th"><span class="at-col-type">T</span> Наименование работ и затрат</th>
+              <th class="at-th"><span class="at-col-type">⬡</span> Тип затрат</th>
+              <th class="at-th"><span class="at-col-type">T</span> Ед. изм.</th>
+              <th class="at-th at-th-right"><span class="at-col-type">#</span> Кол-во</th>
+              <th class="at-th at-th-right"><span class="at-col-type">$</span> Текущая цена, ₽</th>
+              <th class="at-th at-th-right"><span class="at-col-type">∑</span> Стоимость, ₽</th>
+              <th class="at-th"><span class="at-col-type">T</span> Примечание</th>
+              <th class="at-th"></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <!-- Плоский список строк текущей области просмотра -->
+            <template x-for="item in flatRows" :key="item.row.id">
+              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id) }">
+                <td class="at-cell-num" @dblclick="openRowModal(item)" @click="toggleSelect(item.row.id)" x-text="item.index"></td>
+
+                <td class="at-cell" @dblclick="openCell('basis', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|basis'">
+                    <input class="at-edit" x-model="item.row.basis" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|basis')">
+                    <div class="at-cellval" x-text="item.row.basis || '—'"></div>
+                  </template>
+                </td>
+
+                <td class="at-cell" @dblclick="openCell('name', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|name'">
+                    <input class="at-edit" x-model="item.row.name" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|name')">
+                    <div class="at-cellval strong" x-text="item.row.name || 'Новая запись'"></div>
+                  </template>
+                </td>
+
+                <!-- Тип затрат: цветной чип, как single select в Airtable -->
+                <td class="at-cell" @click="selectOnly(item.row.id)"
+                    x-data="{ open: false }" @click.outside="open = false">
+                  <button class="at-chip" :class="'chip-' + item.row.type" @click.stop="open = !open"
+                          x-text="typeLabel(item.row)"></button>
+                  <label x-show="item.row.type === 'machine'" class="at-tmr" @click.stop>
+                    <input type="checkbox" x-model="item.row.operator" /> Тмр
+                  </label>
+                  <div class="at-chip-menu" x-show="open" x-transition>
+                    <button @click.stop="setType(item.row, 'labor'); open = false">
+                      <span class="at-dot dot-labor"></span> ЗТ — затраты труда</button>
+                    <button @click.stop="setType(item.row, 'machine'); open = false">
+                      <span class="at-dot dot-machine"></span> ОМ — эксплуатация машин</button>
+                    <button @click.stop="setType(item.row, 'material'); open = false">
+                      <span class="at-dot dot-material"></span> М — материалы</button>
+                  </div>
+                </td>
+
+                <td class="at-cell" @dblclick="openCell('unit', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|unit'">
+                    <input class="at-edit" x-model="item.row.unit" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|unit')">
+                    <div class="at-cellval" x-text="item.row.unit || '—'"></div>
+                  </template>
+                </td>
+
+                <td class="at-cell at-right" @dblclick="openCell('qty', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|qty'">
+                    <input class="at-edit at-num" type="number" step="any" min="0" x-model.number="item.row.qty" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|qty')">
+                    <div class="at-cellval num" x-text="fmtNum(item.row.qty)"></div>
+                  </template>
+                </td>
+
+                <td class="at-cell at-right" @dblclick="openCell('price', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|price'">
+                    <input class="at-edit at-num" type="number" step="any" min="0" x-model.number="item.row.price" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|price')">
+                    <div class="at-cellval num" x-money="Number(item.row.price) || 0"></div>
+                  </template>
+                </td>
+
+                <!-- Вычисляемое поле (формула) -->
+                <td class="at-cell at-right at-formula">
+                  <div class="at-cellval num" x-money="rowTotal(item.row)"></div>
+                </td>
+
+                <td class="at-cell" @dblclick="openCell('note', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|note'">
+                    <input class="at-edit" x-model="item.row.note" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|note')">
+                    <div class="at-cellval muted" x-text="item.row.note || ''"></div>
+                  </template>
+                </td>
+
+                <td class="at-cell-actions">
+                  <button class="at-row-x" @click.stop="removeRowById(item.si, item.row.id)" title="Удалить запись">✕</button>
+                </td>
+              </tr>
+            </template>
+
+            <!-- Итоги по группам / разделам -->
+            <template x-for="g in visibleGroups" :key="g.key">
+              <tr class="at-group-total">
+                <td colspan="7" class="at-right">
+                  <span class="at-group-total-label" x-text="'Итого — ' + g.label + ':'"></span>
+                </td>
+                <td class="at-right at-formula"><b x-money="g.total"></b></td>
+                <td colspan="2"></td>
+              </tr>
+            </template>
+
+            <!-- Строка добавления записи -->
+            <tr class="at-add-row">
+              <td class="at-cell-num add" @click="addRow(currentTargetSection())">＋</td>
+              <td colspan="9" @click="addRow(currentTargetSection())">
+                <span class="at-add-hint">Нажмите, чтобы добавить запись…</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===== Боковая панель сводки ===== -->
+      <aside class="at-sidebar" :class="{ collapsed: sidebarCollapsed }">
+        <button class="at-sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed"
+                :title="sidebarCollapsed ? 'Развернуть сводку' : 'Свернуть сводку'"
+                x-text="sidebarCollapsed ? '◀' : '▶'"></button>
+        <div class="at-sidebar-inner" x-show="!sidebarCollapsed">
+          <h3 class="at-side-title">Сводная стоимость</h3>
+
+          <div class="at-stat-grid">
+            <div class="at-stat"><span class="at-stat-label">ЗТ — труд</span>
+              <span class="at-stat-value chip-text-labor" x-money="sums.labor"></span></div>
+            <div class="at-stat"><span class="at-stat-label">ОМ — машины</span>
+              <span class="at-stat-value chip-text-machine" x-money="sums.machine"></span></div>
+            <div class="at-stat sub"><span class="at-stat-label">в т.ч. Тмр</span>
+              <span class="at-stat-value" x-money="sums.operator"></span></div>
+            <div class="at-stat"><span class="at-stat-label">М — материалы</span>
+              <span class="at-stat-value chip-text-material" x-money="sums.material"></span></div>
+          </div>
+
+          <div class="at-side-section">
+            <div class="at-side-row total"><span>Прямые затраты (ПЗ)</span><b x-money="sums.pz"></b></div>
+
+            <div class="at-side-row">
+              <span>Накладные (НР)</span>
+              <span class="at-rate">
+                <input class="at-pct" type="number" step="0.1" x-model.number="data.rates.overheadPct" />% от
+                <select class="at-base" x-model="data.rates.overheadBase">
+                  <option value="labor">ФОТ</option><option value="pz">ПЗ</option>
+                </select>
+              </span>
+            </div>
+            <div class="at-side-row indent"><span></span><b x-money="sums.nr"></b></div>
+
+            <div class="at-side-row">
+              <span>Сметная прибыль (СП)</span>
+              <span class="at-rate">
+                <input class="at-pct" type="number" step="0.1" x-model.number="data.rates.profitPct" />% от
+                <select class="at-base" x-model="data.rates.profitBase">
+                  <option value="labor">ФОТ</option><option value="pz">ПЗ</option>
+                </select>
+              </span>
+            </div>
+            <div class="at-side-row indent"><span></span><b x-money="sums.sp"></b></div>
+
+            <div class="at-side-row">
+              <span>НДС</span>
+              <span class="at-rate">
+                <input class="at-pct" type="number" step="0.1" x-model.number="data.rates.vatPct" />%
+              </span>
+            </div>
+            <div class="at-side-row indent"><span></span><b x-money="sums.vat"></b></div>
+
+            <div class="at-side-row grand"><span>ИТОГО ПО СМЕТЕ</span><b x-money="sums.grand"></b></div>
+          </div>
+
+          <div class="at-side-section" x-show="selectedIds.size > 0">
+            <div class="at-side-row"><span>Выделено записей: <b x-text="selectedIds.size"></b></span></div>
+            <div class="at-side-row"><span>Стоимость выделения</span><b x-money="selectionTotal()"></b></div>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- ===== Нижний статус-бар ===== -->
+    <footer class="at-statusbar">
+      <span>Разделов: <b x-text="data.sections.length"></b></span>
+      <span>Записей: <b x-text="totalCount()"></b></span>
+      <span x-show="selectedIds.size">Выделено: <b x-text="selectedIds.size"></b></span>
+      <span class="spacer"></span>
+      <span x-show="filter" x-text="'Скрыто фильтром: ' + hiddenCount()"></span>
+      <span>ПЗ: <b x-money="sums.pz"></b> ₽</span>
+      <span class="at-grand">Итого: <b x-money="sums.grand"></b> ₽</span>
+      <span class="muted">localStorage ✓</span>
+    </footer>
+
+    <!-- Модальное окно записи -->
+    <div class="at-modal-backdrop" x-show="expandedRow" x-cloak @click.self="expandedRow = null">
+      <div class="at-modal" x-show="expandedRow" x-transition>
+        <template x-if="expandedRow">
+          <div>
+            <div class="at-modal-head">
+              <span class="at-modal-title">Запись № <b x-text="expandedRow.index"></b></span>
+              <button class="at-btn" @click="expandedRow = null">✕</button>
+            </div>
+            <div class="at-modal-body">
+              <label class="at-field"><span>Обоснование</span>
+                <input x-model="expandedRow.row.basis" /></label>
+              <label class="at-field"><span>Наименование работ и затрат</span>
+                <input x-model="expandedRow.row.name" /></label>
+              <label class="at-field"><span>Тип затрат</span>
+                <select x-model="expandedRow.row.type">
+                  <option value="labor">ЗТ — затраты труда</option>
+                  <option value="machine">ОМ — эксплуатация машин</option>
+                  <option value="material">М — материалы</option>
+                </select></label>
+              <label class="at-field" x-show="expandedRow.row.type === 'machine'">
+                <span>Оплата труда машинистов (Тмр)</span>
+                <input type="checkbox" x-model="expandedRow.row.operator" style="width:auto" /></label>
+              <label class="at-field"><span>Ед. изм.</span>
+                <input x-model="expandedRow.row.unit" /></label>
+              <label class="at-field"><span>Кол-во</span>
+                <input type="number" step="any" min="0" x-model.number="expandedRow.row.qty" /></label>
+              <label class="at-field"><span>Текущая цена, ₽</span>
+                <input type="number" step="any" min="0" x-model.number="expandedRow.row.price" /></label>
+              <label class="at-field"><span>Стоимость, ₽ (вычисляется)</span>
+                <input :value="fmtMoney(rowTotal(expandedRow.row))" disabled /></label>
+              <label class="at-field"><span>Примечание</span>
+                <textarea rows="3" x-model="expandedRow.row.note"></textarea></label>
+            </div>
+            <div class="at-modal-foot">
+              <button class="at-btn" @click="duplicateRowById(expandedRow.si, expandedRow.row.id); expandedRow = null">⧉ Дублировать</button>
+              <button class="at-btn danger" @click="removeRowById(expandedRow.si, expandedRow.row.id); expandedRow = null">✕ Удалить</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>СметаПро — ресурсный метод</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="js/money.js"></script>
+  <script defer src="js/app.js"></script>
+</head>
+<body>
+  <div x-data="smeta()" class="app">
+
+    <!-- Шапка -->
+    <header class="topbar">
+      <div class="brand">📐 СметаПро</div>
+      <input class="title-input" x-model="data.title" placeholder="Наименование сметы" />
+      <div class="actions">
+        <button @click="saveLocal()">💾 Сохранить</button>
+        <button @click="$refs.fileImport.click()">📂 Импорт JSON</button>
+        <button @click="exportJson()">📥 Экспорт JSON</button>
+        <button @click="exportCsv()">📄 Экспорт CSV</button>
+        <button @click="printPage()">🖨 Печать</button>
+        <input type="file" x-ref="fileImport" accept=".json" hidden @change="importJson($event)" />
+      </div>
+    </header>
+
+    <main>
+      <!-- Разделы сметы -->
+      <template x-for="(section, si) in data.sections" :key="section.id">
+        <section class="section-card">
+          <div class="section-head">
+            <span class="section-num" x-text="si + 1"></span>
+            <input class="section-name" x-model="section.name" placeholder="Наименование раздела" />
+            <div class="section-sum">
+              Итого по разделу: <b x-money="sectionTotal(section)"></b> ₽
+            </div>
+            <button class="danger" @click="removeSection(si)" title="Удалить раздел">✕</button>
+          </div>
+
+          <table class="res-table">
+            <thead>
+              <tr>
+                <th>№ п/п</th>
+                <th>Обоснование</th>
+                <th>Наименование работ и затрат</th>
+                <th>Тип</th>
+                <th>Ед. изм.</th>
+                <th>Кол-во</th>
+                <th>Текущая цена, ₽</th>
+                <th>Стоимость, ₽</th>
+                <th>Примечание</th>
+                <th>Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="(row, ri) in section.resources" :key="row.id">
+                <tr x-show="matchesFilter(row)">
+                  <td class="idx" x-text="globalIndex(si, ri)"></td>
+                  <td><input x-model="row.basis" placeholder="ГЭСН …" /></td>
+                  <td><input x-model="row.name" placeholder="Наименование ресурса" /></td>
+                  <td>
+                    <select x-model="row.type">
+                      <option value="labor">ЗТ — труд</option>
+                      <option value="machine">ОМ — машины</option>
+                      <option value="material">М — материалы</option>
+                    </select>
+                    <label x-show="row.type === 'machine'" class="op-label" title="Оплата труда машинистов">
+                      <input type="checkbox" x-model="row.operator" /> Тмр
+                    </label>
+                  </td>
+                  <td><input class="w-unit" x-model="row.unit" placeholder="чел.-ч" /></td>
+                  <td><input class="w-num" type="number" step="any" min="0" x-model.number="row.qty" /></td>
+                  <td><input class="w-num" type="number" step="any" min="0" x-model.number="row.price" /></td>
+                  <td class="cost" x-money="rowTotal(row)"></td>
+                  <td><input x-model="row.note" placeholder="Источник цены…" /></td>
+                  <td class="row-actions">
+                    <button @click="moveRow(si, ri, -1)" title="Вверх">↑</button>
+                    <button @click="moveRow(si, ri, 1)" title="Вниз">↓</button>
+                    <button @click="duplicateRow(si, ri)" title="Дублировать">⧉</button>
+                    <button class="danger" @click="removeRow(si, ri)" title="Удалить">✕</button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="7" class="right"><b>Итого по разделу:</b></td>
+                <td class="cost"><b x-money="sectionTotal(section)"></b></td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <button class="add-row" @click="addRow(si)">+ Добавить ресурс</button>
+        </section>
+      </template>
+
+      <button class="add-section" @click="addSection()">+ Добавить раздел</button>
+
+      <!-- Фильтр -->
+      <div class="filter-bar" x-show="data.sections.length">
+        🔍 <input x-model="filter" placeholder="Поиск по обоснованию / наименованию…" />
+        <span class="muted" x-show="hiddenCount() > 0" x-text="hiddenCount() + ' строк(и) скрыто'"></span>
+      </div>
+
+      <!-- Сводка -->
+      <section class="summary-card" x-show="data.sections.length">
+        <h2>Сводная стоимость</h2>
+        <table class="summary-table">
+          <tbody>
+            <tr><td>Затраты труда рабочих (ЗТ)</td><td x-money="sums.labor"></td></tr>
+            <tr><td>Эксплуатация машин (ОМ)</td><td x-money="sums.machine"></td></tr>
+            <tr class="sub"><td>&nbsp;&nbsp;в т.ч. оплата труда машинистов (Тмр)</td><td x-money="sums.operator"></td></tr>
+            <tr><td>Материалы (М)</td><td x-money="sums.material"></td></tr>
+            <tr class="total"><td><b>Итого прямые затраты (ПЗ)</b></td><td><b x-money="sums.pz"></b></td></tr>
+            <tr>
+              <td>
+                Накладные расходы (НР),
+                <input class="w-pct" type="number" step="0.1" x-model.number="data.rates.overheadPct" /> %
+                от
+                <select x-model="data.rates.overheadBase">
+                  <option value="labor">ЗТ</option>
+                  <option value="pz">ПЗ</option>
+                </select>
+              </td>
+              <td x-money="sums.nr"></td>
+            </tr>
+            <tr>
+              <td>
+                Сметная прибыль (СП),
+                <input class="w-pct" type="number" step="0.1" x-model.number="data.rates.profitPct" /> %
+                от
+                <select x-model="data.rates.profitBase">
+                  <option value="labor">ЗТ</option>
+                  <option value="pz">ПЗ</option>
+                </select>
+              </td>
+              <td x-money="sums.sp"></td>
+            </tr>
+            <tr>
+              <td>НДС, <input class="w-pct" type="number" step="0.1" x-model.number="data.rates.vatPct" /> %</td>
+              <td x-money="sums.vat"></td>
+            </tr>
+            <tr class="total"><td><b>Итого по смете</b></td><td><b x-money="sums.grand"></b></td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Данные хранятся в localStorage браузера. Ресурсный метод: строка = ресурс, количество × текущая цена.
+    </footer>
+  </div>
+</body>
+</html>

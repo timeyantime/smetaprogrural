@@ -2,7 +2,23 @@
    Интерфейс в стиле Airtable: вкладки-разделы, ячейки с inline-редактированием,
    чипы single-select, группировка, выделение записей, боковая сводка, статус-бар. */
 
-const LS_KEY = 'smetapro.v2';
+const LS_KEY = 'smetapro.v3';
+const LS_NSB_KEY = 'smetapro.nsb.v1';
+
+/* Нормативно-справочная база (НСБ) — стартовые расценки */
+function defaultNsb() {
+  return [
+    { id: uid(), basis: 'ГЭСН 81-02-01-01-01', name: 'Разработка грунта экскаватором под фундаменты', type: 'labor', unit: 'чел.-ч', price: 250, note: 'Средний разряд работ' },
+    { id: uid(), basis: 'ГЭСНр 81-02-01-01-01', name: 'Экскаватор одноковшовый 0,4 м³', type: 'machine', unit: 'маш.-ч', price: 1450, note: 'Вкл. Тмр машиниста' },
+    { id: uid(), basis: 'ГЭСН 81-02-03-01-01', name: 'Устройство бетонных подготовки', type: 'labor', unit: 'чел.-ч', price: 275, note: '' },
+    { id: uid(), basis: 'ФЕР 81-02-05-01-01', name: 'Монтаж фундаментных блоков', type: 'labor', unit: 'чел.-ч', price: 310, note: '' },
+    { id: uid(), basis: 'Ресурс-01', name: 'Бетон В22.5 (М300)', type: 'material', unit: 'м3', price: 6200, note: 'ГОСТ 7473-2010' },
+    { id: uid(), basis: 'Ресурс-02', name: 'Песок строительный', type: 'material', unit: 'т', price: 890, note: 'Карьер' },
+    { id: uid(), basis: 'Ресурс-03', name: 'Щебень фр. 5-20 мм', type: 'material', unit: 'т', price: 1650, note: '' },
+    { id: uid(), basis: 'Ресурс-04', name: 'Арматура А500С Ø12', type: 'material', unit: 'т', price: 62000, note: '' },
+    { id: uid(), basis: 'ГЭСНм 81-03', name: 'Кран стреловой 25 т', type: 'machine', unit: 'маш.-ч', price: 3800, note: 'Вкл. Тмр' },
+  ];
+}
 
 let uidCounter = 0;
 const uid = () => `id-${Date.now().toString(36)}-${(uidCounter++).toString(36)}`;
@@ -18,8 +34,16 @@ function newRow(partial = {}) {
     qty: 0,           // Кол-во
     price: 0,         // Текущая цена, руб.
     note: '',         // Примечание
+    days: null,       // Длительность, дни (для диаграммы Ганта)
     ...partial,
   };
+}
+
+/* Дата начала работ сметы (для диаграммы Ганта) */
+function defaultStartDate() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
 }
 
 function newSection(name = 'Новый раздел') {
@@ -42,6 +66,7 @@ function defaultData() {
             qty: 10.5,
             price: 250,
             note: 'Слесарь 4 разр.',
+            days: 3,
           }),
           newRow({
             basis: 'ГЭСНр 81-02-01-01-01',
@@ -52,6 +77,7 @@ function defaultData() {
             qty: 5.2,
             price: 1450,
             note: '',
+            days: 2,
           }),
           newRow({
             basis: '',
@@ -61,6 +87,7 @@ function defaultData() {
             qty: 12,
             price: 890,
             note: 'Прайс поставщика №14',
+            days: 1,
           }),
         ],
       },
@@ -76,6 +103,7 @@ function defaultData() {
             qty: 24,
             price: 275,
             note: '',
+            days: 4,
           }),
           newRow({
             basis: '',
@@ -85,10 +113,12 @@ function defaultData() {
             qty: 18.4,
             price: 6200,
             note: 'ГОСТ 7473-2010',
+            days: 2,
           }),
         ],
       },
     ],
+    startDate: defaultStartDate(),
     rates: {
       overheadPct: 15,
       overheadBase: 'labor', // labor | pz
@@ -123,15 +153,43 @@ window.smeta = function smeta() {
     savedFlash: false,         // подсветка кнопки «Сохранено»
     lastSavedAt: null,         // время последнего автосохранения
 
+    /* UI v3: колонки, печать, вью-табы, модалки справочника и НСБ */
+    columns: [                 // ширины столбцов — можно менять мышью за границы заголовков
+      { key: 'num',      label: '#',              width: 44,  min: 34,  sortable: false },
+      { key: 'basis',    label: 'Обоснование',    width: 120, min: 70,  sortable: true },
+      { key: 'name',     label: 'Наименование работ и затрат', width: 300, min: 140, sortable: true },
+      { key: 'type',     label: 'Тип затрат',     width: 150, min: 110, sortable: true },
+      { key: 'unit',     label: 'Ед. изм.',       width: 90,  min: 60,  sortable: true },
+      { key: 'qty',      label: 'Кол-во',         width: 100, min: 70,  sortable: true },
+      { key: 'price',    label: 'Текущая цена, ₽',width: 120, min: 80,  sortable: true },
+      { key: 'total',    label: 'Стоимость, ₽',   width: 130, min: 90,  sortable: true },
+      { key: 'note',     label: 'Примечание',     width: 190, min: 90,  sortable: true },
+      { key: 'days',     label: 'Длит., дн.',     width: 90,  min: 60,  sortable: true },
+      { key: 'actions',  label: '',               width: 118, min: 118, sortable: false },
+    ],
+    printOrientation: 'landscape', // landscape | portrait
+    printModalOpen: false,
+    viewTab: 'table',              // table | gantt
+    helpModalOpen: false,
+    nsbModalOpen: false,
+    nsbSearch: '',
+    nsbItems: loadNsb(),
+    nsbEditId: null,               // id редактируемой записи НСБ (null — не редактируется)
+    nsbDraft: null,                // копия записи для редактирования
+
     /* ---------- инициализация / хранение ---------- */
 
     init() {
       this.$watch('data', () => this.saveLocal(), { deep: true });
+      this.$watch('columns', () => this.saveColWidths(), { deep: true });
       // Ctrl+A — выделить все видимые, Esc — снять выделение/редактирование
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           this.editing = null; this.expandedRow = null; this.selectedIds = new Set();
           this.sectionModalOpen = false; this.fieldMenuFor = null;
+          this.helpModalOpen = false; this.printModalOpen = false;
+          if (this.nsbModalOpen) this.cancelNsbEdit();
+          this.nsbModalOpen = false;
           if (this.recordModalOpen) this.cancelRecordModal();
         }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
@@ -143,6 +201,51 @@ window.smeta = function smeta() {
           if (item) this.duplicateRowById(item.si, item.row.id);
         }
       });
+      this.loadColWidths();
+    },
+
+    /* ---------- ширины столбцов (drag за границу заголовка, как в Airtable) ---------- */
+
+    saveColWidths() {
+      try {
+        const map = {};
+        for (const c of this.columns) map[c.key] = c.width;
+        localStorage.setItem(LS_KEY + '.cols', JSON.stringify(map));
+      } catch (e) { /* ignore */ }
+    },
+
+    loadColWidths() {
+      try {
+        const raw = localStorage.getItem(LS_KEY + '.cols');
+        if (!raw) return;
+        const map = JSON.parse(raw);
+        for (const c of this.columns) {
+          if (typeof map[c.key] === 'number' && map[c.key] >= c.min) c.width = map[c.key];
+        }
+      } catch (e) { /* ignore */ }
+    },
+
+    resetColWidths() {
+      localStorage.removeItem(LS_KEY + '.cols');
+      location.reload();
+    },
+
+    startResize(e, col) {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = col.width;
+      document.body.style.userSelect = 'none';
+      const onMove = (ev) => {
+        col.width = Math.max(col.min, startW + ev.clientX - startX);
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = '';
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
     },
 
     saveLocal() {
@@ -607,6 +710,214 @@ window.smeta = function smeta() {
       }
     },
 
+    /* ---------- печать: выбор ориентации ---------- */
+
+    openPrintModal() { this.printModalOpen = true; },
+
+    doPrint() {
+      // применяем ориентацию через @page (переопределяем правило в <style>)
+      const style = document.getElementById('print-orientation-style');
+      if (style) {
+        style.textContent = `@media print { @page { size: A4 ${this.printOrientation}; margin: 10mm; } }`;
+      }
+      document.body.classList.add('printing');
+      this.printModalOpen = false;
+      // небольшая задержка — чтобы стиль успел примениться
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => document.body.classList.remove('printing'), 300);
+      }, 60);
+    },
+
+    /* ---------- диаграмма Ганта ---------- */
+
+    toggleGantt() {
+      this.viewTab = this.viewTab === 'gantt' ? 'table' : 'gantt';
+    },
+
+    get ganttData() {
+      const DAY = 86400000;
+      const start = new Date(this.data.startDate || defaultStartDate()).getTime();
+      const rows = [];
+      let cursorBySection = {};
+      let maxEnd = start + DAY; // минимум одна неделя
+      for (const [si, sec] of this.data.sections.entries()) {
+        let secStart = start;
+        // разделы идут последовательно: каждый следующий начинается после конца предыдущего
+        if (si > 0 && cursorBySection[si - 1]) secStart = Math.max(secStart, cursorBySection[si - 1]);
+        let cur = secStart;
+        for (const r of sec.resources) {
+          const d = Math.max(0, Math.round(Number(r.days) || 0));
+          const dur = d > 0 ? d : 1;
+          const from = cur;
+          const to = cur + dur * DAY;
+          rows.push({
+            row: r, si, name: r.name || '(без наименования)', type: r.type,
+            total: this.rowTotal(r), days: d,
+            leftDays: Math.round((from - start) / DAY),
+            spanDays: dur,
+          });
+          cur = to;
+          if (to > maxEnd) maxEnd = to;
+        }
+        cursorBySection[si] = cur;
+      }
+      const totalDays = Math.max(7, Math.ceil((maxEnd - start) / DAY) + 1);
+      return { rows, totalDays, start };
+    },
+
+    ganttDateLabel(offsetDays) {
+      const d = new Date(this.ganttData.start + offsetDays * 86400000);
+      return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+    },
+
+    ganttTicks() {
+      // редкие подписи, чтобы шкала не сливалась
+      const step = this.ganttData.totalDays <= 15 ? 1 : this.ganttData.totalDays <= 40 ? 5 : 10;
+      const ticks = [];
+      for (let i = 0; i < this.ganttData.totalDays; i += step) ticks.push(i);
+      return ticks;
+    },
+
+    ganttDayWidth() {
+      return Math.max(26, Math.min(64, Math.floor(980 / this.ganttData.totalDays)));
+    },
+
+    totalTableWidth() {
+      return this.columns.reduce((s, c) => s + c.width, 0);
+    },
+
+    colIcon(key) {
+      return { num: '#', basis: 'T', name: 'T', type: '⬡', unit: 'T', qty: '#', price: '$', total: '∑', note: 'T', days: '🗓', actions: '' }[key] || '';
+    },
+
+    sortDescOrAsc2(field) {
+      this.sortState = { field, dir: -1 };
+      this.applySortToSections();
+      this.fieldMenuFor = null;
+    },
+
+    /* ---------- Нормативно-справочная база (НСБ) ---------- */
+
+    openNsb() {
+      this.nsbModalOpen = true;
+      this.nsbEditId = null;
+      this.nsbDraft = null;
+    },
+
+    get nsbFiltered() {
+      const f = this.nsbSearch.trim().toLowerCase();
+      if (!f) return this.nsbItems;
+      return this.nsbItems.filter((n) =>
+        (n.name || '').toLowerCase().includes(f) ||
+        (n.basis || '').toLowerCase().includes(f) ||
+        (n.unit || '').toLowerCase().includes(f));
+    },
+
+    nsbAddNew() {
+      const item = { id: uid(), basis: '', name: '', type: 'material', unit: '', price: 0, note: '' };
+      this.nsbItems.unshift(item);
+      this.nsbEditId = item.id;
+      this.nsbDraft = { ...item };
+      this.saveNsb();
+    },
+
+    nsbEdit(item) {
+      this.nsbEditId = item.id;
+      this.nsbDraft = { ...item };
+    },
+
+    nsbSaveEdit() {
+      if (!this.nsbDraft) return;
+      const idx = this.nsbItems.findIndex((n) => n.id === this.nsbEditId);
+      if (idx >= 0) {
+        this.nsbItems[idx] = { ...this.nsbItems[idx], ...this.nsbDraft };
+        this.saveNsb();
+      }
+      this.nsbEditId = null;
+      this.nsbDraft = null;
+    },
+
+    cancelNsbEdit() {
+      // если редактировали новый пустой элемент — удалить его
+      if (this.nsbEditId && this.nsbDraft && !String(this.nsbDraft.name || '').trim()) {
+        const idx = this.nsbItems.findIndex((n) => n.id === this.nsbEditId);
+        if (idx >= 0) { this.nsbItems.splice(idx, 1); this.saveNsb(); }
+      }
+      this.nsbEditId = null;
+      this.nsbDraft = null;
+    },
+
+    nsbDelete(id) {
+      const item = this.nsbItems.find((n) => n.id === id);
+      if (!item) return;
+      if (!confirm(`Удалить из НСБ «${item.name || item.basis}»?`)) return;
+      this.nsbItems = this.nsbItems.filter((n) => n.id !== id);
+      if (this.nsbEditId === id) { this.nsbEditId = null; this.nsbDraft = null; }
+      this.saveNsb();
+    },
+
+    nsbResetDefaults() {
+      if (!confirm('Восстановить стартовый набор расценок НСБ? Текущие изменения базы будут потеряны.')) return;
+      this.nsbItems = defaultNsb();
+      this.nsbEditId = null; this.nsbDraft = null;
+      this.saveNsb();
+    },
+
+    saveNsb() {
+      try { localStorage.setItem(LS_NSB_KEY, JSON.stringify(this.nsbItems)); } catch (e) { /* ignore */ }
+    },
+
+    /* подставить расценку из НСБ в запись сметы (через выделенную строку или форму) */
+    nsbApply(item) {
+      const targetId = this.selectedIds.size === 1 ? [...this.selectedIds][0] : null;
+      let appliedTo = null;
+      if (targetId) {
+        for (const sec of this.data.sections) {
+          const r = sec.resources.find((x) => x.id === targetId);
+          if (r) { appliedTo = r; break; }
+        }
+      }
+      if (!appliedTo) {
+        // создаём новую запись в текущем разделе
+        const si = this.currentTargetSection();
+        if (si == null || !this.data.sections[si]) { this.addSection(); }
+        const sIdx = this.data.sections.length - 1;
+        const row = newRow({});
+        this.data.sections[sIdx >= 0 ? sIdx : 0].resources.push(row);
+        appliedTo = row;
+        this.activeTab = sIdx >= 0 ? sIdx : 0;
+      }
+      appliedTo.basis = item.basis;
+      appliedTo.name = item.name;
+      appliedTo.type = item.type;
+      appliedTo.unit = item.unit;
+      appliedTo.price = item.price;
+      this.nsbModalOpen = false;
+    },
+
+    exportNsb() {
+      this.download('nsb.json', JSON.stringify(this.nsbItems, null, 2), 'application/json');
+    },
+
+    importNsb(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const arr = JSON.parse(reader.result);
+          if (!Array.isArray(arr)) throw new Error('ожидается массив записей');
+          this.nsbItems = arr.map((n) => ({ id: n.id || uid(), basis: n.basis || '', name: n.name || '', type: n.type || 'material', unit: n.unit || '', price: Number(n.price) || 0, note: n.note || '' }));
+          this.saveNsb();
+        } catch (e) {
+          alert('Не удалось прочитать НСБ: ' + e.message);
+        }
+      };
+      reader.readAsText(file, 'utf-8');
+      ev.target.value = '';
+    },
+
     printPage() {
       window.print();
     },
@@ -631,8 +942,21 @@ function loadLocal() {
       (sec.resources || []).forEach((r) => { r.id = r.id || uid(); });
     });
     obj.rates = { ...defaultData().rates, ...(obj.rates || {}) };
+    obj.startDate = obj.startDate || defaultStartDate();
     return obj;
   } catch (e) {
     return null;
+  }
+}
+
+function loadNsb() {
+  try {
+    const raw = localStorage.getItem(LS_NSB_KEY);
+    if (!raw) return defaultNsb();
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return defaultNsb();
+    return arr.map((n) => ({ id: n.id || uid(), basis: n.basis || '', name: n.name || '', type: n.type || 'material', unit: n.unit || '', price: Number(n.price) || 0, note: n.note || '' }));
+  } catch (e) {
+    return defaultNsb();
   }
 }

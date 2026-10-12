@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
+  <style id="print-orientation-style">@media print { @page { size: A4 landscape; margin: 10mm; } }</style>
   <!-- Порядок загрузки: сначала данные/директивы (window.smeta), затем Alpine (defer). -->
   <script src="js/money.js"></script>
   <script src="js/app.js"></script>
@@ -41,11 +42,20 @@
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
           Экспорт CSV
         </button>
-        <button class="at-btn" @click="printPage()">
+        <button class="at-btn" @click="helpModalOpen = true" title="Как считаются затраты — справочник по методике">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.9 10.6H7.1v-1.4h1.8v1.4zm0-2.6H7.1V4.6h1.8v4.4z"/></svg>
+          Справочник
+        </button>
+        <button class="at-btn" @click="openNsb()" title="Нормативно-справочная база расценок">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M2 2h5v2H2zM9 2h5v2H9zM2 7h5v2H2zM9 7h5v2H9zM2 12h12v2H2z"/></svg>
+          НСБ
+        </button>
+        <button class="at-btn" @click="openPrintModal()">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 5V1h8v4M4 12H2V6h12v6h-2M4 9h8v6H4z"/></svg>
-          Печать
+          Печать ▾
         </button>
         <input type="file" x-ref="fileImport" accept=".json" hidden @change="importJson($event)" />
+        <input type="file" x-ref="fileNsbImport" accept=".json" hidden @change="importNsb($event)" />
       </div>
     </header>
 
@@ -101,78 +111,49 @@
         </div>
         <span class="at-count" x-text="visibleCount() + ' записей'"></span>
       </div>
+
+      <!-- ===== Переключатель видов: Таблица / Диаграмма Ганта (как вью Airtable) ===== -->
+      <div class="at-views">
+        <button class="at-view-tab" :class="{ active: viewTab === 'table' }" @click="viewTab = 'table'">
+          <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M1 2h14v3H1zM1 7h14v3H1zM1 12h14v3H1z"/></svg>
+          Таблица
+        </button>
+        <button class="at-view-tab" :class="{ active: viewTab === 'gantt' }" @click="toggleGantt()">
+          <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M2 2h6v2H2zM5 6h7v2H5zM2 10h9v2H2z"/></svg>
+          Диаграмма Ганта
+        </button>
+      </div>
     </nav>
 
-    <!-- ===== Основная таблица ===== -->
+    <!-- ===== Основная таблица + вид «Диаграмма Ганта» ===== -->
     <main class="at-main">
-      <div class="at-table-wrap">
-        <table class="at-table">
+      <div class="at-table-wrap" x-show="viewTab === 'table'">
+        <table class="at-table" :style="'width:' + totalTableWidth() + 'px'">
           <colgroup>
-            <col style="width:44px"><col style="width:90px"><col style="width:300px">
-            <col style="width:150px"><col style="width:90px"><col style="width:100px">
-            <col style="width:120px"><col style="width:130px"><col style="width:190px"><col style="width:118px">
+            <template x-for="col in columns" :key="col.key">
+              <col :style="'width:' + col.width + 'px'" />
+            </template>
           </colgroup>
           <thead>
             <tr>
-              <th class="at-th-num">#</th>
-              <th class="at-th">
-                <span class="at-th-label">
-                  <span class="at-col-type">T</span> Обоснование
-                </span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'basis' ? null : 'basis'">▾</button>
-                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'basis'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('basis')">↑ Сортировать А→Я</button>
-                  <button @click="sortDescOrAsc('basis')">↓ Сортировать Я→А</button>
-                </div>
-              </th>
-              <th class="at-th">
-                <span class="at-th-label"><span class="at-col-type">T</span> Наименование работ и затрат</span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'name' ? null : 'name'">▾</button>
-                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'name'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('name')">↑ Сортировать А→Я</button>
-                  <button @click="sortDescOrAsc('name')">↓ Сортировать Я→А</button>
-                </div>
-              </th>
-              <th class="at-th">
-                <span class="at-th-label"><span class="at-col-type">⬡</span> Тип затрат</span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'type' ? null : 'type'">▾</button>
-                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'type'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('type')">↑ Сортировать по типу</button>
-                </div>
-              </th>
-              <th class="at-th">
-                <span class="at-th-label"><span class="at-col-type">T</span> Ед. изм.</span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'unit' ? null : 'unit'">▾</button>
-                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'unit'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('unit')">↑ Сортировать по ед. изм.</button>
-                </div>
-              </th>
-              <th class="at-th at-th-right">
-                <span class="at-th-label"><span class="at-col-type">#</span> Кол-во</span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'qty' ? null : 'qty'">▾</button>
-                <div class="at-menu at-menu-right" x-show="fieldMenuFor === 'qty'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('qty')">↑ По возрастанию</button>
-                  <button @click="sortDescOrAsc('qty')">↓ По убыванию</button>
-                </div>
-              </th>
-              <th class="at-th at-th-right">
-                <span class="at-th-label"><span class="at-col-type">$</span> Текущая цена, ₽</span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'price' ? null : 'price'">▾</button>
-                <div class="at-menu at-menu-right" x-show="fieldMenuFor === 'price'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('price')">↑ По возрастанию</button>
-                  <button @click="sortDescOrAsc('price')">↓ По убыванию</button>
-                </div>
-              </th>
-              <th class="at-th at-th-right">
-                <span class="at-th-label"><span class="at-col-type">∑</span> Стоимость, ₽</span>
-                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'total' ? null : 'total'">▾</button>
-                <div class="at-menu at-menu-right" x-show="fieldMenuFor === 'total'" @click.outside="fieldMenuFor = null" x-transition>
-                  <button @click="sortDescOrAsc('total')">↑ По возрастанию</button>
-                  <button @click="sortDescOrAsc('total')">↓ По убыванию</button>
-                </div>
-              </th>
-              <th class="at-th"><span class="at-th-label"><span class="at-col-type">T</span> Примечание</span></th>
-              <th class="at-th"></th>
+              <template x-for="(col, ci) in columns" :key="col.key">
+                <th class="at-th" :class="{ 'at-th-num': col.key === 'num', 'at-th-right': ['qty','price','total','days'].includes(col.key) }">
+                  <span class="at-th-label">
+                    <span class="at-col-type" x-text="colIcon(col.key)"></span>
+                    <span x-show="col.label" x-text="col.label"></span>
+                  </span>
+                  <button class="at-th-caret" x-show="col.sortable"
+                          @click.stop="fieldMenuFor = fieldMenuFor === col.key ? null : col.key">▾</button>
+                  <div class="at-menu" :class="['qty','price','total','days'].includes(col.key) ? 'at-menu-right' : 'at-menu-left'"
+                       x-show="fieldMenuFor === col.key" @click.outside="fieldMenuFor = null" x-transition>
+                    <button @click="sortDescOrAsc(col.key)">↑ Сортировать по возрастанию</button>
+                    <button @click="sortDescOrAsc2(col.key)">↓ Сортировать по убыванию</button>
+                    <hr class="at-menu-sep" />
+                    <button @click="resetColWidths()">↺ Сбросить ширины колонок</button>
+                  </div>
+                  <span class="at-resizer" @mousedown="startResize($event, col)"></span>
+                </th>
+              </template>
             </tr>
           </thead>
 
@@ -265,6 +246,17 @@
                   </template>
                 </td>
 
+                <!-- Длительность, дни (для диаграммы Ганта) -->
+                <td class="at-cell at-right" @dblclick="openCell('days', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|days'">
+                    <input class="at-edit at-num" type="number" step="1" min="0" x-model.number="item.row.days" x-focus
+                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|days')">
+                    <div class="at-cellval num" :class="{ muted: !item.row.days }" x-text="item.row.days ? item.row.days : '—'"></div>
+                  </template>
+                </td>
+
                 <td class="at-cell-actions" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
                   <div class="at-row-tools" :class="{ show: hover }">
                     <button class="at-tool-btn" @click.stop="moveRow(item, -1)" title="Выше">↑</button>
@@ -279,7 +271,7 @@
             <!-- Итоги по группам / разделам -->
             <template x-for="g in visibleGroups" :key="g.key">
               <tr class="at-group-total">
-                <td colspan="7" class="at-right">
+                <td colspan="8" class="at-right">
                   <span class="at-group-total-label" x-text="'Итого — ' + g.label + ':'"></span>
                 </td>
                 <td class="at-right at-formula"><b x-money="g.total"></b></td>
@@ -293,7 +285,7 @@
               <td colspan="4" @click="addRow(currentTargetSection())">
                 <span class="at-add-hint">Нажмите, чтобы добавить запись…</span>
               </td>
-              <td colspan="5" class="at-add-inline">
+              <td colspan="6" class="at-add-inline">
                 <button class="at-btn at-btn-sm at-btn-ghost" @click.stop="openAddRecordModal()">
                   ⤢ Добавить через форму
                 </button>
@@ -301,6 +293,55 @@
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- ===== Вид: Диаграмма Ганта ===== -->
+      <div class="at-gantt-wrap" x-show="viewTab === 'gantt'" x-cloak>
+        <div class="at-gantt-toolbar">
+          <label class="at-gantt-start">Начало работ:
+            <input type="date" x-model="data.startDate" />
+          </label>
+          <span class="at-gantt-info">Длительность задаётся в столбце «Длит., дн.» таблицы. Разделы выполняются последовательно.</span>
+          <span class="spacer"></span>
+          <span class="at-gantt-legend">
+            <i class="gb gb-labor"></i> ЗТ
+            <i class="gb gb-machine"></i> ОМ
+            <i class="gb gb-material"></i> М
+          </span>
+        </div>
+        <div class="at-gantt-scroll">
+          <div class="at-gantt" :style="'--day-w:' + ganttDayWidth() + 'px; --total-days:' + ganttData.totalDays">
+            <!-- шкала дней -->
+            <div class="at-gantt-scale">
+              <div class="at-gantt-scale-name">Работа</div>
+              <div class="at-gantt-scale-track">
+                <template x-for="t in ganttTicks()" :key="t">
+                  <span class="at-gantt-tick" :style="'left: calc(' + t + ' * var(--day-w))'"
+                        x-text="ganttDateLabel(t)"></span>
+                </template>
+              </div>
+            </div>
+            <!-- строки -->
+            <template x-for="(g, gi) in ganttData.rows" :key="g.row.id">
+              <div class="at-gantt-row" :class="{ 'is-section-start': gi === 0 || ganttData.rows[gi-1].si !== g.si }">
+                <div class="at-gantt-name" :title="g.name">
+                  <span class="at-gantt-sec" x-text="data.sections[g.si] ? (g.si + 1 + '.') : ''"></span>
+                  <span x-text="g.name"></span>
+                </div>
+                <div class="at-gantt-track">
+                  <div class="at-gantt-bar" :class="'gb-' + g.type"
+                       :style="'left: calc(' + g.leftDays + ' * var(--day-w)); width: calc(' + g.spanDays + ' * var(--day-w) - 4px)'"
+                       :title="g.name + ' · ' + g.days + ' дн. · ' + fmtMoney(g.total) + ' ₽'">
+                    <span class="at-gantt-bar-label" x-text="g.days + ' дн.'"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <div class="at-gantt-empty" x-show="!ganttData.rows.length">
+              Нет записей — добавьте записи в таблице, затем включите этот вид.
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- ===== Боковая панель сводки ===== -->
@@ -459,6 +500,8 @@
                 <input :value="fmtMoney(rowTotal(recordRow))" disabled /></label>
               <label class="at-field"><span>Примечание</span>
                 <textarea rows="2" x-model="recordRow.note"></textarea></label>
+              <label class="at-field"><span>Длительность, дни (для диаграммы Ганта)</span>
+                <input type="number" step="1" min="0" x-model.number="recordRow.days" placeholder="напр. 5" /></label>
             </div>
             <div class="at-modal-foot">
               <button class="at-btn" @click="cancelRecordModal()">Отмена</button>
@@ -497,6 +540,193 @@
               <span x-text="sectionModalMode === 'create' ? '＋ Создать раздел' : '✓ Применить'"></span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+    <!-- ===== Модалка: выбор ориентации печати ===== -->
+    <div class="at-modal-backdrop" x-show="printModalOpen" x-cloak @click.self="printModalOpen = false">
+      <div class="at-modal at-modal-sm" x-show="printModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">🖨 Печать отчёта</span>
+          <button class="at-btn" @click="printModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <div class="at-field"><span>Ориентация страницы</span>
+            <div class="at-orient-picker">
+              <label :class="{ active: printOrientation === 'landscape' }">
+                <input type="radio" value="landscape" x-model="printOrientation" />
+                <span class="at-orient-icon land"></span> Альбомная (A4 ↔)
+              </label>
+              <label :class="{ active: printOrientation === 'portrait' }">
+                <input type="radio" value="portrait" x-model="printOrientation" />
+                <span class="at-orient-icon port"></span> Книжная (A4 ↕)
+              </label>
+            </div>
+          </div>
+          <div class="at-modal-hint">
+            Печатается текущий вид: таблица (или диаграмма Ганта, если она открыта) + сводная стоимость.
+            Совет: для широкой сметы выбирайте альбомную ориентацию.
+          </div>
+        </div>
+        <div class="at-modal-foot">
+          <button class="at-btn" @click="printModalOpen = false">Отмена</button>
+          <button class="at-btn at-btn-primary" @click="doPrint()">✓ Печать</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Модалка: СПРАВОЧНИК (методика расчёта) ===== -->
+    <div class="at-modal-backdrop" x-show="helpModalOpen" x-cloak @click.self="helpModalOpen = false">
+      <div class="at-modal at-modal-lg" x-show="helpModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">📖 Справочник: как рассчитываются затраты</span>
+          <button class="at-btn" @click="helpModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body help-text">
+          <h4>1. Структура сметы (ресурсный метод)</h4>
+          <p>Смета состоит из <b>разделов</b> (вкладки сверху). Каждый раздел содержит <b>записи</b> —
+             ресурсы: труд, машины, материалы. Каждая запись: <i>Обоснование</i> (шифр расценки),
+             <i>Наименование</i>, <i>Тип затрат</i>, <i>Ед. изм.</i>, <i>Кол-во</i>, <i>Цена</i>.</p>
+
+          <h4>2. Стоимость одной записи</h4>
+          <p class="formula">Стоимость = Кол-во × Цена</p>
+
+          <h4>3. Группировка по типам затрат</h4>
+          <ul>
+            <li><span class="chip chip-labor">ЗТ · труд</span> — затраты труда рабочих (оплата, чел.-ч × ставка).</li>
+            <li><span class="chip chip-machine">ОМ · машины</span> — эксплуатация машин и механизмов
+                (маш.-ч × тариф). Флаг <b>Тмр</b> отмечает, что в стоимость включена оплата труда машинистов —
+                такие суммы дополнительно собираются в строку «в т.ч. Тмр».</li>
+            <li><span class="chip chip-material">М · материал</span> — материальные ресурсы (цена за единицу × объём).</li>
+          </ul>
+
+          <h4>4. Прямые затраты (ПЗ)</h4>
+          <p class="formula">ПЗ = Σ ЗТ + Σ ОМ + Σ М</p>
+
+          <h4>5. Накладные расходы (НР)</h4>
+          <p>Процент от базы. База выбирается в сводке справа:</p>
+          <ul>
+            <li><b>от ФОТ</b> — база = Σ ЗТ + Σ Тмр (только живая оплата труда);</li>
+            <li><b>от ПЗ</b> — база = все прямые затраты.</li>
+          </ul>
+          <p class="formula">НР = База × Над%/100</p>
+
+          <h4>6. Сметная прибыль (СП)</h4>
+          <p>Та же логика базы, что и для НР:</p>
+          <p class="formula">СП = База × Приб%/100</p>
+
+          <h4>7. НДС</h4>
+          <p class="formula">НДС = (ПЗ + НР + СП) × НДС%/100</p>
+
+          <h4>8. Итого по смете</h4>
+          <p class="formula grand">ИТОГО = ПЗ + НР + СП + НДС</p>
+
+          <h4>9. Диаграмма Ганта</h4>
+          <p>Для каждой записи задайте длительность в днях (столбец «Длит., дн.»). Работы внутри раздела
+             идут последовательно одна за другой, разделы — также последовательно. Дата начала задаётся
+             в панели над диаграммой. Полосы окрашены по типу затрат.</p>
+
+          <h4>10. Нормативно-справочная база (НСБ)</h4>
+          <p>Кнопка «НСБ» вверху открывает базу расценок: шифр, наименование, тип, ед. изм., цена.
+             Записи можно добавлять, редактировать, удалять, а также импортировать/экспортировать в JSON.
+             Кнопка «Вставить в смету» переносит расценку в выделенную строку таблицы
+             (или создаёт новую запись в текущем разделе).</p>
+
+          <h4>11. Полезные клавиши</h4>
+          <ul>
+            <li><b>Ctrl+A</b> — выделить все видимые записи; <b>Ctrl+D</b> — дублировать выделенную;</li>
+            <li><b>Esc</b> — закрыть окно/снять выделение; двойной клик по ячейке — редактирование.</li>
+          </ul>
+        </div>
+        <div class="at-modal-foot">
+          <button class="at-btn at-btn-primary" @click="helpModalOpen = false">Понятно</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Модалка: НОРМАТИВНО-СПРАВОЧНАЯ БАЗА (НСБ) ===== -->
+    <div class="at-modal-backdrop" x-show="nsbModalOpen" x-cloak @click.self="cancelNsbEdit(); nsbModalOpen = false">
+      <div class="at-modal at-modal-lg" x-show="nsbModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">📚 Нормативно-справочная база (НСБ) — расценки на работы</span>
+          <button class="at-btn" @click="cancelNsbEdit(); nsbModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <div class="nsb-toolbar">
+            <button class="at-btn at-btn-primary at-btn-sm" @click="nsbAddNew()">＋ Добавить расценку</button>
+            <button class="at-btn at-btn-sm" @click="$refs.fileNsbImport.click()">⤓ Импорт JSON</button>
+            <button class="at-btn at-btn-sm" @click="exportNsb()">⤒ Экспорт JSON</button>
+            <button class="at-btn at-btn-sm at-btn-ghost" @click="nsbResetDefaults()">↺ Стартовый набор</button>
+            <div class="at-search nsb-search">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+              <input x-model="nsbSearch" placeholder="Поиск по базе…" />
+            </div>
+            <span class="at-count" x-text="nsbFiltered.length + ' расценок'"></span>
+          </div>
+
+          <table class="nsb-table">
+            <thead>
+              <tr>
+                <th style="width:150px">Шифр / обоснование</th>
+                <th>Наименование работ и затрат</th>
+                <th style="width:110px">Тип</th>
+                <th style="width:80px">Ед. изм.</th>
+                <th style="width:110px" class="at-right">Цена, ₽</th>
+                <th style="width:150px">Примечание</th>
+                <th style="width:190px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="item in nsbFiltered" :key="item.id">
+                <tr class="nsb-row" :class="{ editing: nsbEditId === item.id }">
+                  <template x-if="nsbEditId !== item.id">
+                    <td colspan="7" style="padding:0; border:none;">
+                      <div class="nsb-inline">
+                        <span class="nsb-basis" x-text="item.basis || '—'"></span>
+                        <span class="nsb-name" x-text="item.name"></span>
+                        <span class="at-chip" :class="'chip-' + item.type" x-text="typeLabel(item)"></span>
+                        <span class="nsb-unit" x-text="item.unit"></span>
+                        <span class="nsb-price num" x-money="Number(item.price) || 0"></span>
+                        <span class="nsb-note muted" x-text="item.note"></span>
+                        <span class="nsb-actions">
+                          <button class="at-btn at-btn-sm" @click="nsbApply(item)" title="Вставить в выделенную строку сметы или создать новую запись">⇥ В смету</button>
+                          <button class="at-btn at-btn-sm at-btn-ghost" @click="nsbEdit(item)">✎ Изменить</button>
+                          <button class="at-btn at-btn-sm danger" @click="nsbDelete(item.id)">✕</button>
+                        </span>
+                      </div>
+                    </td>
+                  </template>
+                  <template x-if="nsbEditId === item.id && nsbDraft">
+                    <td colspan="7" style="padding:0; border:none;">
+                      <div class="nsb-inline nsb-edit-form">
+                        <input x-model="nsbDraft.basis" placeholder="ГЭСН …" x-focus />
+                        <input x-model="nsbDraft.name" placeholder="Наименование работ и затрат" />
+                        <select x-model="nsbDraft.type">
+                          <option value="labor">ЗТ — труд</option>
+                          <option value="machine">ОМ — машины</option>
+                          <option value="material">М — материалы</option>
+                        </select>
+                        <input x-model="nsbDraft.unit" placeholder="ед." list="unit-list" />
+                        <input type="number" step="any" min="0" x-model.number="nsbDraft.price" placeholder="Цена" />
+                        <input x-model="nsbDraft.note" placeholder="Примечание" />
+                        <span class="nsb-actions">
+                          <button class="at-btn at-btn-sm at-btn-primary" @click="nsbSaveEdit()">✓ Сохранить</button>
+                          <button class="at-btn at-btn-sm" @click="cancelNsbEdit()">✕ Отмена</button>
+                        </span>
+                      </div>
+                    </td>
+                  </template>
+                </tr>
+              </template>
+              <tr x-show="!nsbFiltered.length">
+                <td colspan="7" class="nsb-empty muted">Ничего не найдено. Нажмите «＋ Добавить расценку».</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="at-modal-foot">
+          <span class="muted" style="margin-right:auto">База хранится локально в браузере и не зависит от файла сметы.</span>
+          <button class="at-btn at-btn-primary" @click="cancelNsbEdit(); nsbModalOpen = false">Готово</button>
         </div>
       </div>
     </div>

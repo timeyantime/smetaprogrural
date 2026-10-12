@@ -23,11 +23,27 @@
         <input class="at-title-input" x-model="data.title" placeholder="Наименование сметы" />
       </div>
       <div class="at-actions">
-        <button class="at-btn at-btn-primary" @click="saveLocal()">💾 Сохранить</button>
-        <button class="at-btn" @click="$refs.fileImport.click()">Импорт JSON</button>
-        <button class="at-btn" @click="exportJson()">Экспорт JSON</button>
-        <button class="at-btn" @click="exportCsv()">Экспорт CSV</button>
-        <button class="at-btn" @click="printPage()">🖨 Печать</button>
+        <button class="at-btn at-btn-primary" :class="{ 'is-saved': savedFlash }" @click="manualSave()"
+                :title="savedTimeText()">
+          <template x-if="!savedFlash"><span>💾 Сохранить</span></template>
+          <template x-if="savedFlash"><span>✓ Сохранено</span></template>
+        </button>
+        <button class="at-btn" @click="$refs.fileImport.click()">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1l3.5 3.5H9v6H7v-6H4.5L8 1zM2 12h12v2H2z"/></svg>
+          Импорт JSON
+        </button>
+        <button class="at-btn" @click="exportJson()">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 15L4.5 11.5H7v-6h2v6h2.5L8 15zM2 3h12V1H2z"/></svg>
+          Экспорт JSON
+        </button>
+        <button class="at-btn" @click="exportCsv()">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
+          Экспорт CSV
+        </button>
+        <button class="at-btn" @click="printPage()">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 5V1h8v4M4 12H2V6h12v6h-2M4 9h8v6H4z"/></svg>
+          Печать
+        </button>
         <input type="file" x-ref="fileImport" accept=".json" hidden @change="importJson($event)" />
       </div>
     </header>
@@ -39,20 +55,30 @@
           <span class="at-tab-icon">📋</span> Все разделы
         </button>
         <template x-for="(section, si) in data.sections" :key="section.id">
-          <button class="at-tab" :class="{ active: activeTab === si }"
-                  @click="selectTab(si)" @dblclick="startRenameSection(si)"
-                  draggable="true" @dragstart="tabDragFrom = si" @dragover.prevent
-                  @drop="moveSectionByDrag(si)">
-            <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
-            <span x-show="renamingSection !== si" x-text="section.name"></span>
-            <input x-show="renamingSection === si" x-ref="renameInput" class="at-tab-rename"
-                   x-model="section.name" @blur="renamingSection = null"
-                   @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
-          </button>
+          <div class="at-tab-wrap" draggable="true" @dragstart="tabDragFrom = si" @dragover.prevent
+               @drop="moveSectionByDrag(si)">
+            <button class="at-tab" :class="{ active: activeTab === si }"
+                    @click="selectTab(si)" @dblclick="startRenameSection(si)">
+              <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
+              <span x-show="renamingSection !== si" x-text="section.name"></span>
+              <input x-show="renamingSection === si" class="at-tab-rename"
+                     x-model="section.name" @blur="renamingSection = null"
+                     @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
+            </button>
+            <button class="at-tab-x" title="Настройки раздела"
+                    @click.stop="openEditSectionModal(si)">⚙</button>
+          </div>
         </template>
-        <button class="at-tab at-tab-add" @click="addSection()" title="Добавить раздел">＋</button>
+        <button class="at-tab at-tab-add" @click="openAddSectionModal()" title="Добавить раздел">＋</button>
       </div>
       <div class="at-toolbar">
+        <button class="at-btn at-btn-primary at-btn-sm" @click="openAddRecordModal()">
+          <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2"/></svg>
+          Добавить запись
+        </button>
+        <button class="at-btn at-btn-ghost at-btn-sm" @click="openAddSectionModal()">
+          ＋ Раздел
+        </button>
         <div class="at-search">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
           <input x-model="filter" placeholder="Поиск записей…" />
@@ -83,19 +109,68 @@
           <colgroup>
             <col style="width:44px"><col style="width:90px"><col style="width:300px">
             <col style="width:150px"><col style="width:90px"><col style="width:100px">
-            <col style="width:120px"><col style="width:130px"><col style="width:190px"><col style="width:44px">
+            <col style="width:120px"><col style="width:130px"><col style="width:190px"><col style="width:118px">
           </colgroup>
           <thead>
             <tr>
               <th class="at-th-num">#</th>
-              <th class="at-th"><span class="at-col-type">T</span> Обоснование</th>
-              <th class="at-th"><span class="at-col-type">T</span> Наименование работ и затрат</th>
-              <th class="at-th"><span class="at-col-type">⬡</span> Тип затрат</th>
-              <th class="at-th"><span class="at-col-type">T</span> Ед. изм.</th>
-              <th class="at-th at-th-right"><span class="at-col-type">#</span> Кол-во</th>
-              <th class="at-th at-th-right"><span class="at-col-type">$</span> Текущая цена, ₽</th>
-              <th class="at-th at-th-right"><span class="at-col-type">∑</span> Стоимость, ₽</th>
-              <th class="at-th"><span class="at-col-type">T</span> Примечание</th>
+              <th class="at-th">
+                <span class="at-th-label">
+                  <span class="at-col-type">T</span> Обоснование
+                </span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'basis' ? null : 'basis'">▾</button>
+                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'basis'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('basis')">↑ Сортировать А→Я</button>
+                  <button @click="sortDescOrAsc('basis')">↓ Сортировать Я→А</button>
+                </div>
+              </th>
+              <th class="at-th">
+                <span class="at-th-label"><span class="at-col-type">T</span> Наименование работ и затрат</span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'name' ? null : 'name'">▾</button>
+                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'name'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('name')">↑ Сортировать А→Я</button>
+                  <button @click="sortDescOrAsc('name')">↓ Сортировать Я→А</button>
+                </div>
+              </th>
+              <th class="at-th">
+                <span class="at-th-label"><span class="at-col-type">⬡</span> Тип затрат</span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'type' ? null : 'type'">▾</button>
+                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'type'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('type')">↑ Сортировать по типу</button>
+                </div>
+              </th>
+              <th class="at-th">
+                <span class="at-th-label"><span class="at-col-type">T</span> Ед. изм.</span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'unit' ? null : 'unit'">▾</button>
+                <div class="at-menu at-menu-left" x-show="fieldMenuFor === 'unit'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('unit')">↑ Сортировать по ед. изм.</button>
+                </div>
+              </th>
+              <th class="at-th at-th-right">
+                <span class="at-th-label"><span class="at-col-type">#</span> Кол-во</span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'qty' ? null : 'qty'">▾</button>
+                <div class="at-menu at-menu-right" x-show="fieldMenuFor === 'qty'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('qty')">↑ По возрастанию</button>
+                  <button @click="sortDescOrAsc('qty')">↓ По убыванию</button>
+                </div>
+              </th>
+              <th class="at-th at-th-right">
+                <span class="at-th-label"><span class="at-col-type">$</span> Текущая цена, ₽</span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'price' ? null : 'price'">▾</button>
+                <div class="at-menu at-menu-right" x-show="fieldMenuFor === 'price'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('price')">↑ По возрастанию</button>
+                  <button @click="sortDescOrAsc('price')">↓ По убыванию</button>
+                </div>
+              </th>
+              <th class="at-th at-th-right">
+                <span class="at-th-label"><span class="at-col-type">∑</span> Стоимость, ₽</span>
+                <button class="at-th-caret" @click.stop="fieldMenuFor = fieldMenuFor === 'total' ? null : 'total'">▾</button>
+                <div class="at-menu at-menu-right" x-show="fieldMenuFor === 'total'" @click.outside="fieldMenuFor = null" x-transition>
+                  <button @click="sortDescOrAsc('total')">↑ По возрастанию</button>
+                  <button @click="sortDescOrAsc('total')">↓ По убыванию</button>
+                </div>
+              </th>
+              <th class="at-th"><span class="at-th-label"><span class="at-col-type">T</span> Примечание</span></th>
               <th class="at-th"></th>
             </tr>
           </thead>
@@ -189,8 +264,13 @@
                   </template>
                 </td>
 
-                <td class="at-cell-actions">
-                  <button class="at-row-x" @click.stop="removeRowById(item.si, item.row.id)" title="Удалить запись">✕</button>
+                <td class="at-cell-actions" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
+                  <div class="at-row-tools" :class="{ show: hover }">
+                    <button class="at-tool-btn" @click.stop="moveRow(item, -1)" title="Выше">↑</button>
+                    <button class="at-tool-btn" @click.stop="moveRow(item, 1)" title="Ниже">↓</button>
+                    <button class="at-tool-btn" @click.stop="duplicateRowById(item.si, item.row.id)" title="Дублировать">⧉</button>
+                    <button class="at-tool-btn danger" @click.stop="removeRowById(item.si, item.row.id)" title="Удалить запись">✕</button>
+                  </div>
                 </td>
               </tr>
             </template>
@@ -206,11 +286,16 @@
               </tr>
             </template>
 
-            <!-- Строка добавления записи -->
+            <!-- Строка добавления записей -->
             <tr class="at-add-row">
               <td class="at-cell-num add" @click="addRow(currentTargetSection())">＋</td>
-              <td colspan="9" @click="addRow(currentTargetSection())">
+              <td colspan="4" @click="addRow(currentTargetSection())">
                 <span class="at-add-hint">Нажмите, чтобы добавить запись…</span>
+              </td>
+              <td colspan="5" class="at-add-inline">
+                <button class="at-btn at-btn-sm at-btn-ghost" @click.stop="openAddRecordModal()">
+                  ⤢ Добавить через форму
+                </button>
               </td>
             </tr>
           </tbody>
@@ -289,7 +374,7 @@
       <span x-show="filter" x-text="'Скрыто фильтром: ' + hiddenCount()"></span>
       <span>ПЗ: <b x-money="sums.pz"></b> ₽</span>
       <span class="at-grand">Итого: <b x-money="sums.grand"></b> ₽</span>
-      <span class="muted">localStorage ✓</span>
+      <span class="muted" x-text="savedTimeText()"></span>
     </footer>
 
     <!-- Модальное окно записи -->
@@ -332,6 +417,86 @@
             </div>
           </div>
         </template>
+      </div>
+    </div>
+
+    <!-- Модальное окно ДОБАВЛЕНИЯ ЗАПИСИ -->
+    <div class="at-modal-backdrop" x-show="recordModalOpen" x-cloak @click.self="saveRecordModal()">
+      <div class="at-modal" x-show="recordModalOpen" x-transition>
+        <template x-if="recordRow">
+          <div>
+            <div class="at-modal-head">
+              <span class="at-modal-title">Новая запись · раздел «<b x-text="data.sections[recordDraft.si]?.name"></b>»</span>
+              <button class="at-btn" @click="cancelRecordModal()">✕</button>
+            </div>
+            <div class="at-modal-body">
+              <label class="at-field"><span>Обоснование (шифр расценки)</span>
+                <input x-model="recordRow.basis" x-focus placeholder="напр. ГЭСН 81-02-01-01-01" /></label>
+              <label class="at-field"><span>Наименование работ и затрат</span>
+                <input x-model="recordRow.name" placeholder="напр. Разработка грунта экскаватором" /></label>
+              <label class="at-field"><span>Тип затрат</span>
+                <select x-model="recordRow.type">
+                  <option value="labor">ЗТ — затраты труда</option>
+                  <option value="machine">ОМ — эксплуатация машин</option>
+                  <option value="material">М — материалы</option>
+                </select></label>
+              <label class="at-field" x-show="recordRow.type === 'machine'">
+                <span>Оплата труда машинистов (Тмр)</span>
+                <input type="checkbox" x-model="recordRow.operator" style="width:auto" /></label>
+              <label class="at-field"><span>Ед. изм.</span>
+                <input x-model="recordRow.unit" placeholder="м3, т, чел.-ч, маш.-ч…" list="unit-list" /></label>
+              <datalist id="unit-list">
+                <option value="м3"></option><option value="м2"></option><option value="м"></option>
+                <option value="т"></option><option value="шт"></option><option value="чел.-ч"></option>
+                <option value="маш.-ч"></option><option value="компл."></option><option value="ц."></option>
+              </datalist>
+              <label class="at-field"><span>Кол-во</span>
+                <input type="number" step="any" min="0" x-model.number="recordRow.qty" /></label>
+              <label class="at-field"><span>Текущая цена, ₽</span>
+                <input type="number" step="any" min="0" x-model.number="recordRow.price" /></label>
+              <label class="at-field"><span>Стоимость, ₽</span>
+                <input :value="fmtMoney(rowTotal(recordRow))" disabled /></label>
+              <label class="at-field"><span>Примечание</span>
+                <textarea rows="2" x-model="recordRow.note"></textarea></label>
+            </div>
+            <div class="at-modal-foot">
+              <button class="at-btn" @click="cancelRecordModal()">Отмена</button>
+              <button class="at-btn at-btn-primary" @click="saveRecordModal()">✓ Сохранить запись</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Модальное окно ДОБАВЛЕНИЯ / НАСТРОЙКИ РАЗДЕЛА -->
+    <div class="at-modal-backdrop" x-show="sectionModalOpen" x-cloak @click.self="saveSectionModal()">
+      <div class="at-modal at-modal-sm" x-show="sectionModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title" x-text="sectionModalMode === 'create' ? 'Новый раздел' : 'Настройки раздела'"></span>
+          <button class="at-btn" @click="sectionModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <label class="at-field"><span>Наименование раздела</span>
+            <input x-model="sectionDraft.name" x-focus
+                   placeholder="напр. Кровля" @keydown.enter="saveSectionModal()" /></label>
+          <div class="at-modal-hint" x-show="sectionModalMode === 'edit' && sectionDraft.index != null">
+            Записей в разделе: <b x-text="data.sections[sectionDraft.index]?.resources.length ?? 0"></b>
+          </div>
+        </div>
+        <div class="at-modal-foot at-modal-foot-split">
+          <template x-if="sectionModalMode === 'edit' && sectionDraft.index != null">
+            <div class="at-modal-foot-left">
+              <button class="at-btn" @click="duplicateSection(sectionDraft.index); sectionModalOpen = false">⧉ Дублировать раздел</button>
+              <button class="at-btn danger" @click="deleteSectionFromModal()">✕ Удалить раздел</button>
+            </div>
+          </template>
+          <div class="at-modal-foot-right">
+            <button class="at-btn" @click="sectionModalOpen = false">Отмена</button>
+            <button class="at-btn at-btn-primary" @click="saveSectionModal()">
+              <span x-text="sectionModalMode === 'create' ? '＋ Создать раздел' : '✓ Применить'"></span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

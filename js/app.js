@@ -9,7 +9,17 @@ const LS_RESOURCES_KEY = 'smetapro.resources.v1';
 const LS_UI_KEY = 'smetapro.ui.v1';
 const LS_HISTORY_KEY = 'smetapro.history.v1';
 const LS_COLS_KEY = 'smetapro.v4.cols';
+const LS_PRINT_KEY = 'smetapro.print.v1';   // поля печати (#21)
 const PAGE_SIZE = 50; // виртуализация: строк на страницу (пункт #38)
+
+/* Настройки печати: состав колонок печатной формы и включение титульного листа */
+function loadPrintSettings() {
+  try {
+    const p = JSON.parse(localStorage.getItem(LS_PRINT_KEY) || 'null');
+    if (p && Array.isArray(p.cols)) return { cols: p.cols, titleSheet: !!p.titleSheet };
+  } catch (e) { /* ignore */ }
+  return { cols: ['basis', 'name', 'type', 'unit', 'qty', 'price', 'total', 'note'], titleSheet: false };
+}
 
 /* Миграция v3 → v4: дополняем новую схему дефолтами, ничего не теряя */
 function migrateV3toV4(obj) {
@@ -237,6 +247,18 @@ window.smeta = function smeta() {
     ],
     printOrientation: 'landscape', // landscape | portrait
     printModalOpen: false,
+    printSettings: loadPrintSettings(), // { cols: [...], titleSheet: bool } (#21, #24)
+    printCols() { return this.columns.filter((c) => c.key !== 'num' && c.key !== 'actions'); },
+    printColOn(key) { return this.printSettings.cols.includes(key); },
+    togglePrintCol(key) {
+      const arr = this.printSettings.cols;
+      const i = arr.indexOf(key);
+      if (i >= 0) arr.splice(i, 1); else arr.push(key);
+      this.savePrintSettings();
+    },
+    savePrintSettings() {
+      try { localStorage.setItem(LS_PRINT_KEY, JSON.stringify(this.printSettings)); } catch (e) { /* ignore */ }
+    },
     helpModalOpen: false,
     nsbModalOpen: false,
     nsbSearch: '',
@@ -1506,16 +1528,6 @@ window.smeta = function smeta() {
     /* ---------- печать: выбор ориентации + настройки (#24, #47) ---------- */
 
     openPrintModal() { this.printModalOpen = true; },
-
-    togglePrintField(key) {
-      if (key === 'title') return; // заголовок обязателен
-      const i = this.printFields.indexOf(key);
-      if (i >= 0) this.printFields.splice(i, 1);
-      else this.printFields.push(key);
-      try { localStorage.setItem(LS_PRINT_KEY, JSON.stringify(this.printFields)); } catch (e) { /* ignore */ }
-    },
-
-    printHas(key) { return this.printFields.includes(key); },
 
     doPrint() {
       // применяем ориентацию через @page (переопределяем правило в <style>)

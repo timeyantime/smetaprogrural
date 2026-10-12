@@ -113,6 +113,15 @@ window.smeta = function smeta() {
     editing: null,         // { key: `${rowId}|${field}` }
     expandedRow: null,     // { si, row, index } — модальное окно записи
     sidebarCollapsed: false,
+    sectionModalOpen: false,   // модальное окно добавления/редактирования раздела
+    sectionModalMode: 'create',// create | edit
+    sectionDraft: { name: '', index: null },
+    recordModalOpen: false,    // модальное окно добавления записи
+    recordDraft: null,         // { si, rowId }
+    sortState: { field: null, dir: 1 },
+    fieldMenuFor: null,        // id колонки, для которой открыто меню поля
+    savedFlash: false,         // подсветка кнопки «Сохранено»
+    lastSavedAt: null,         // время последнего автосохранения
 
     /* ---------- инициализация / хранение ---------- */
 
@@ -120,7 +129,11 @@ window.smeta = function smeta() {
       this.$watch('data', () => this.saveLocal(), { deep: true });
       // Ctrl+A — выделить все видимые, Esc — снять выделение/редактирование
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') { this.editing = null; this.expandedRow = null; this.selectedIds = new Set(); }
+        if (e.key === 'Escape') {
+          this.editing = null; this.expandedRow = null; this.selectedIds = new Set();
+          this.sectionModalOpen = false; this.fieldMenuFor = null;
+          if (this.recordModalOpen) this.cancelRecordModal();
+        }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a' && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) {
           e.preventDefault();
           this.selectedIds = new Set(this.flatRows.map((i) => i.row.id));
@@ -135,9 +148,22 @@ window.smeta = function smeta() {
     saveLocal() {
       try {
         localStorage.setItem(LS_KEY, JSON.stringify(this.exportable()));
+        this.lastSavedAt = new Date();
       } catch (e) {
         console.warn('localStorage недоступен', e);
       }
+    },
+
+    manualSave() {
+      this.saveLocal();
+      this.savedFlash = true;
+      setTimeout(() => (this.savedFlash = false), 1500);
+    },
+
+    savedTimeText() {
+      if (!this.lastSavedAt) return 'Автосохранение включено';
+      const t = this.lastSavedAt.toLocaleTimeString('ru-RU');
+      return `Сохранено в ${t}`;
     },
 
     exportable() {
@@ -308,8 +334,33 @@ window.smeta = function smeta() {
 
     /* ---------- управление разделами (вкладками) ---------- */
 
+    openAddSectionModal() {
+      this.sectionModalMode = 'create';
+      this.sectionDraft = { name: '', index: null };
+      this.sectionModalOpen = true;
+    },
+
+    openEditSectionModal(si) {
+      this.sectionModalMode = 'edit';
+      this.sectionDraft = { name: this.data.sections[si].name, index: si };
+      this.sectionModalOpen = true;
+    },
+
+    saveSectionModal() {
+      const name = (this.sectionDraft.name || '').trim();
+      if (!name) { this.sectionModalOpen = false; return; }
+      if (this.sectionModalMode === 'create') {
+        this.data.sections.push(newSection(name));
+        this.activeTab = this.data.sections.length - 1;
+      } else if (this.sectionDraft.index != null && this.data.sections[this.sectionDraft.index]) {
+        this.data.sections[this.sectionDraft.index].name = name;
+      }
+      this.sectionModalOpen = false;
+    },
+
     addSection() {
-      this.data.sections.push(newSection());
+      // Быстрое добавление через ＋ на панели вкладок — сразу с переименованием inline
+      this.data.sections.push(newSection('Новый раздел'));
       this.activeTab = this.data.sections.length - 1;
       this.startRenameSection(this.activeTab);
     },
@@ -322,8 +373,7 @@ window.smeta = function smeta() {
     startRenameSection(si) {
       this.renamingSection = si;
       this.$nextTick(() => {
-        const inputs = this.$el.querySelectorAll('.at-tab-rename');
-        const el = inputs[si]; // x-ref внутри template unreliable — ищем по порядку
+        const el = document.querySelector('.at-tab-wrap .at-tab-rename');
         if (el) { el.focus(); el.select(); }
       });
     },
@@ -336,6 +386,29 @@ window.smeta = function smeta() {
       }
     },
 
+    deleteSectionFromModal() {
+      const si = this.sectionDraft.index;
+      if (si == null || !this.data.sections[si]) return;
+      const sec = this.data.sections[si];
+      const cnt = sec.resources.length;
+      if (confirm(`Удалить раздел «${sec.name}» и ${cnt} записей в нём?`)) {
+        this.data.sections.splice(si, 1);
+        this.activeTab = null;
+        this.sectionModalOpen = false;
+      }
+    },
+
+    duplicateSection(si) {
+      const src = this.data.sections[si];
+      const copy = newSection(src.name + ' (копия)');
+      copy.resources = src.resources.map((r) => {
+        const { id: _drop, ...rest } = r;
+        return newRow(rest);
+      });
+      this.data.sections.splice(si + 1, 0, copy);
+      this.activeTab = si + 1;
+    },
+
     moveSectionByDrag(targetSi) {
       if (this.tabDragFrom === null || this.tabDragFrom === targetSi) return;
       const arr = this.data.sections;
@@ -343,6 +416,38 @@ window.smeta = function smeta() {
       arr.splice(targetSi, 0, moved);
       this.activeTab = null;
       this.tabDragFrom = null;
+    },
+
+    /* ---------- меню поля колонки (Airtable-style header menu) ---------- */
+
+    toggleFieldMenu(col) {
+      this.fieldMenuFor = this.fieldMenuFor === col ? null : col;
+    },
+
+    sortDescOrAsc(field) {
+      const order = this.sortState.field === field ? -this.sortState.dir : 1;
+      this.sortState = { field, dir: order };
+      this.applySortToSections();
+      this.fieldMenuFor = null;
+    },
+
+    applySortToSections() {
+      const { field, dir } = this.sortState;
+      if (!field) return;
+      const val = (r) => {
+        if (field === 'type') return this.typeLabel(r);
+        if (field === 'total') return this.rowTotal(r);
+        const v = r[field];
+        return typeof v === 'number' ? v : String(v ?? '').toLowerCase();
+      };
+      for (const sec of this.data.sections) {
+        sec.resources.sort((a, b) => {
+          const va = val(a), vb = val(b);
+          if (va < vb) return -dir;
+          if (va > vb) return dir;
+          return 0;
+        });
+      }
     },
 
     /* ---------- управление строками ---------- */
@@ -359,6 +464,50 @@ window.smeta = function smeta() {
       this.openCell('name', { row: created });
     },
 
+    openAddRecordModal() {
+      let si = this.activeTab === null
+        ? (this.data.sections.length ? this.data.sections.length - 1 : null)
+        : this.activeTab;
+      if (si == null || !this.data.sections[si]) {
+        this.data.sections.push(newSection('Новый раздел'));
+        si = this.data.sections.length - 1;
+        this.activeTab = si;
+      }
+      const row = newRow({ type: 'material' });
+      this.data.sections[si].resources.push(row);
+      this.recordDraft = { si, rowId: row.id };
+      this.recordModalOpen = true;
+    },
+
+    get recordRow() {
+      if (!this.recordModalOpen || !this.recordDraft) return null;
+      const sec = this.data.sections[this.recordDraft.si];
+      if (!sec) return null;
+      return sec.resources.find((r) => r.id === this.recordDraft.rowId) || null;
+    },
+
+    saveRecordModal() {
+      const row = this.recordRow;
+      if (row && !(String(row.name).trim() || String(row.basis).trim())) {
+        // пустая запись — удалить
+        const idx = this.data.sections[this.recordDraft.si].resources.indexOf(row);
+        if (idx >= 0) this.data.sections[this.recordDraft.si].resources.splice(idx, 1);
+      }
+      this.recordModalOpen = false;
+      this.recordDraft = null;
+    },
+
+    cancelRecordModal() {
+      const row = this.recordRow;
+      if (row && !(String(row.name).trim() || String(row.basis).trim() || Number(row.qty) || Number(row.price))) {
+        const sec = this.data.sections[this.recordDraft.si];
+        const idx = sec.resources.indexOf(row);
+        if (idx >= 0) sec.resources.splice(idx, 1);
+      }
+      this.recordModalOpen = false;
+      this.recordDraft = null;
+    },
+
     removeRowById(si, id) {
       const arr = this.data.sections[si].resources;
       const idx = arr.findIndex((r) => r.id === id);
@@ -372,6 +521,15 @@ window.smeta = function smeta() {
       if (idx < 0) return;
       const { id: _drop, ...rest } = arr[idx];
       arr.splice(idx + 1, 0, newRow(rest));
+    },
+
+    moveRow(item, delta) {
+      const sec = this.data.sections[item.si];
+      const from = sec.resources.findIndex((r) => r.id === item.row.id);
+      const to = from + delta;
+      if (from < 0 || to < 0 || to >= sec.resources.length) return;
+      const [moved] = sec.resources.splice(from, 1);
+      sec.resources.splice(to, 0, moved);
     },
 
     /* ---------- экспорт / импорт ---------- */
@@ -455,10 +613,10 @@ window.smeta = function smeta() {
   };
 };
 
-/* Директива x-focus: фокус input при появлении (inline-редактирование ячейки). */
+/* Директива x-focus: фокус input при появлении (inline-редактирование ячейки, модальные окна). */
 document.addEventListener('alpine:init', () => {
   window.Alpine.directive('focus', (el) => {
-    requestAnimationFrame(() => { el.focus(); if (el.select) el.select(); });
+    requestAnimationFrame(() => { setTimeout(() => { el.focus(); if (el.select && el.tagName === 'INPUT' && el.type !== 'checkbox') el.select(); }, 30); });
   });
 });
 

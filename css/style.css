@@ -66,6 +66,8 @@ body {
 .at-btn-ghost:hover { background: var(--hover); border-color: var(--line); color: var(--text); }
 .at-btn.danger { color: #d93c3c; }
 .at-btn.danger:hover { background: #fdecec; border-color: #d93c3c; }
+.at-btn-sm { padding: 4px 10px; font-size: 12.5px; }
+.at-btn-primary.is-saved { background: #2a5838; border-color: #2a5838; }
 
 /* ============ Вкладки разделов + тулбар ============ */
 .at-tabs-bar { flex-shrink: 0; border-bottom: 1px solid var(--line); }
@@ -74,6 +76,15 @@ body {
   display: flex; align-items: center; gap: 2px; padding: 6px 12px 0;
   overflow-x: auto; white-space: nowrap;
 }
+.at-tab-wrap {
+  display: inline-flex; align-items: center; position: relative; flex-shrink: 0;
+}
+.at-tab-wrap:hover .at-tab-x { opacity: 1; }
+.at-tab-x {
+  opacity: 0; border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 11px; padding: 2px 4px; margin-left: -4px; border-radius: 4px; transition: opacity .12s;
+}
+.at-tab-x:hover { background: var(--hover); color: var(--accent); }
 .at-tab {
   cursor: pointer; border: none; background: transparent; color: var(--muted);
   padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 6px 6px 0 0;
@@ -133,6 +144,17 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-table thead th:last-child { border-right: none; }
 .at-th-num { text-align: center; color: var(--muted) !important; }
 .at-th-right { text-align: right !important; }
+.at-th { position: relative; }
+.at-th-label { display: inline-flex; align-items: center; cursor: pointer; }
+.at-th-label:hover { color: var(--accent); }
+.at-th-caret {
+  border: none; background: none; cursor: pointer; color: transparent; font-size: 10px;
+  padding: 2px 4px; margin-left: 4px; border-radius: 3px; vertical-align: middle;
+}
+.at-th:hover .at-th-caret { color: var(--muted); }
+.at-th-caret:hover { background: var(--hover); color: var(--accent) !important; }
+.at-menu-left { left: 8px; }
+.at-menu-right { right: 8px; }
 .at-col-type {
   display: inline-grid; place-items: center; width: 18px; height: 18px;
   border: 1px solid var(--line-strong); border-radius: 3px; margin-right: 6px;
@@ -204,13 +226,17 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .dot-material { background: var(--chip-material-dot); }
 
 /* Действия строки */
-.at-cell-actions { width: 44px; text-align: center; border-bottom: 1px solid var(--line); }
-.at-row-x {
-  border: none; background: none; cursor: pointer; color: transparent; font-size: 12px;
-  padding: 4px 8px; border-radius: 4px;
+.at-cell-actions { width: 118px; text-align: right; border-bottom: 1px solid var(--line); }
+.at-row-tools {
+  display: inline-flex; gap: 2px; opacity: 0; transition: opacity .12s; padding-right: 4px;
 }
-.at-row:hover .at-row-x { color: var(--muted); }
-.at-row-x:hover { color: #d93c3c !important; background: #fdecec; }
+.at-cell-actions:hover .at-row-tools, .at-row-tools.show { opacity: 1; }
+.at-tool-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted); font-size: 12px;
+  padding: 3px 6px; border-radius: 4px;
+}
+.at-tool-btn:hover { background: var(--accent-soft); color: var(--accent); }
+.at-tool-btn.danger:hover { color: #d93c3c !important; background: #fdecec; }
 
 /* Итоги групп */
 .at-group-total td {
@@ -308,12 +334,19 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px;
   border-top: 1px solid var(--line); position: sticky; bottom: 0; background: #fff;
 }
+.at-modal-sm { width: 460px; }
+.at-modal-foot-split { justify-content: space-between; }
+.at-modal-foot-left, .at-modal-foot-right { display: flex; gap: 8px; }
+.at-modal-hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+
+/* Строка добавления: инлайн + кнопка формы */
+.at-add-inline { text-align: right; padding-right: 8px !important; }
 
 /* ============ Печать ============ */
 @media print {
   html, body { height: auto; }
   .app { display: block; height: auto; overflow: visible; }
-  .at-actions, .at-toolbar, .at-sidebar-toggle, .at-row-x, .at-add-row,
+  .at-actions, .at-toolbar, .at-sidebar-toggle, .at-row-tools, .at-add-row,
   .at-statusbar .spacer, .at-modal-backdrop { display: none !important; }
   .at-main { display: block; }
   .at-sidebar { width: auto; border: none; }

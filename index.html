@@ -275,7 +275,7 @@
                   <span class="at-group-total-label" x-text="'Итого — ' + g.label + ':'"></span>
                 </td>
                 <td class="at-right at-formula"><b x-money="g.total"></b></td>
-                <td colspan="2"></td>
+                <td colspan="3"></td>
               </tr>
             </template>
 
@@ -285,7 +285,7 @@
               <td colspan="4" @click="addRow(currentTargetSection())">
                 <span class="at-add-hint">Нажмите, чтобы добавить запись…</span>
               </td>
-              <td colspan="6" class="at-add-inline">
+              <td colspan="7" class="at-add-inline">
                 <button class="at-btn at-btn-sm at-btn-ghost" @click.stop="openAddRecordModal()">
                   ⤢ Добавить через форму
                 </button>
@@ -301,9 +301,15 @@
           <label class="at-gantt-start">Начало работ:
             <input type="date" x-model="data.startDate" />
           </label>
-          <span class="at-gantt-info">Длительность задаётся в столбце «Длит., дн.» таблицы. Разделы выполняются последовательно.</span>
+          <span class="at-gantt-info">Длительность задаётся в столбце «Длит., дн.» таблицы. Записи с длительностью 0 или без длительности на диаграмме не отображаются.</span>
           <span class="spacer"></span>
+          <span class="at-gantt-skipped" x-show="ganttData.skipped.length" x-cloak
+                :title="'Записей без длительности: ' + ganttData.skipped.map(s => s.name || '(без названия)').join(', ')">
+            ⊘ <b x-text="ganttData.skipped.length"></b> записей скрыто (длительность = 0)
+          </span>
+          <span class="at-gantt-total">Общая длительность: <b x-text="ganttData.workedDays"></b> дн.</span>
           <span class="at-gantt-legend">
+            <i class="gb gb-section"></i> Раздел
             <i class="gb gb-labor"></i> ЗТ
             <i class="gb gb-machine"></i> ОМ
             <i class="gb gb-material"></i> М
@@ -321,7 +327,22 @@
                 </template>
               </div>
             </div>
-            <!-- строки -->
+            <!-- сводные полосы разделов -->
+            <template x-for="s in ganttData.sections" :key="'sec-' + s.id">
+              <div class="at-gantt-row at-gantt-secrow">
+                <div class="at-gantt-name" :title="s.name">
+                  <span class="at-gantt-sec" x-text="s.si + 1 + '.'"></span>
+                  <b x-text="s.name"></b>
+                </div>
+                <div class="at-gantt-track">
+                  <div class="at-gantt-bar gb-section" :style="ganttSecBarStyle(s)"
+                       :title="s.name + ' · ' + s.spanDays + ' дн. · ' + fmtMoney(s.total) + ' ₽'">
+                    <span class="at-gantt-bar-label" x-text="s.spanDays + ' дн.'"></span>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <!-- строки работ -->
             <template x-for="(g, gi) in ganttData.rows" :key="g.row.id">
               <div class="at-gantt-row" :class="{ 'is-section-start': gi === 0 || ganttData.rows[gi-1].si !== g.si }">
                 <div class="at-gantt-name" :title="g.name">
@@ -330,15 +351,16 @@
                 </div>
                 <div class="at-gantt-track">
                   <div class="at-gantt-bar" :class="'gb-' + g.type"
-                       :style="'left: calc(' + g.leftDays + ' * var(--day-w)); width: calc(' + g.spanDays + ' * var(--day-w) - 4px)'"
+                       :style="ganttBarStyle(g)"
                        :title="g.name + ' · ' + g.days + ' дн. · ' + fmtMoney(g.total) + ' ₽'">
                     <span class="at-gantt-bar-label" x-text="g.days + ' дн.'"></span>
                   </div>
                 </div>
               </div>
             </template>
-            <div class="at-gantt-empty" x-show="!ganttData.rows.length">
-              Нет записей — добавьте записи в таблице, затем включите этот вид.
+            <div class="at-gantt-empty" x-show="!ganttData.rows.length" x-cloak>
+              Нет записей с длительностью &gt; 0. Задайте длительность в столбце «Длит., дн.» в табличном виде —
+              такие записи появятся на диаграмме.
             </div>
           </div>
         </div>
@@ -452,6 +474,8 @@
                 <input :value="fmtMoney(rowTotal(expandedRow.row))" disabled /></label>
               <label class="at-field"><span>Примечание</span>
                 <textarea rows="3" x-model="expandedRow.row.note"></textarea></label>
+              <label class="at-field"><span>Длительность, дни (0 или пусто — запись не попадёт на диаграмму Ганта)</span>
+                <input type="number" step="1" min="0" x-model.number="expandedRow.row.days" placeholder="напр. 5" /></label>
             </div>
             <div class="at-modal-foot">
               <button class="at-btn" @click="duplicateRowById(expandedRow.si, expandedRow.row.id); expandedRow = null">⧉ Дублировать</button>
@@ -622,20 +646,26 @@
           <p class="formula grand">ИТОГО = ПЗ + НР + СП + НДС</p>
 
           <h4>9. Диаграмма Ганта</h4>
-          <p>Для каждой записи задайте длительность в днях (столбец «Длит., дн.»). Работы внутри раздела
-             идут последовательно одна за другой, разделы — также последовательно. Дата начала задаётся
-             в панели над диаграммой. Полосы окрашены по типу затрат.</p>
+          <p>Для каждой записи задайте длительность в днях (столбец «Длит., дн.»).
+             <b>Записи с длительностью 0 или без длительности на диаграмму не попадают</b> — их количество
+             показывается в панели над диаграммой. Работы внутри раздела идут последовательно одна за другой,
+             разделы — также последовательно; над строками работ отображаются сводные полосы разделов.
+             Если открыта вкладка конкретного раздела — диаграмма строится только по его работам.
+             Дата начала задаётся в панели над диаграммой. Полосы окрашены по типу затрат.</p>
 
           <h4>10. Нормативно-справочная база (НСБ)</h4>
           <p>Кнопка «НСБ» вверху открывает базу расценок: шифр, наименование, тип, ед. изм., цена.
              Записи можно добавлять, редактировать, удалять, а также импортировать/экспортировать в JSON.
-             Кнопка «Вставить в смету» переносит расценку в выделенную строку таблицы
+             Кнопка «⇥ В смету» переносит расценку в выделенную строку таблицы
              (или создаёт новую запись в текущем разделе).</p>
 
           <h4>11. Полезные клавиши</h4>
           <ul>
             <li><b>Ctrl+A</b> — выделить все видимые записи; <b>Ctrl+D</b> — дублировать выделенную;</li>
-            <li><b>Esc</b> — закрыть окно/снять выделение; двойной клик по ячейке — редактирование.</li>
+            <li><b>Esc</b> — закрыть окно/снять выделение; двойной клик по ячейке — редактирование;</li>
+            <li>двойной клик по номеру строки — расширенная карточка записи;</li>
+            <li>перетаскивание границы заголовка колонки — изменение ширины (сохраняется автоматически);
+                «↺ Сбросить ширины» — в меню любой колонки (▾).</li>
           </ul>
         </div>
         <div class="at-modal-foot">
@@ -657,6 +687,8 @@
             <button class="at-btn at-btn-sm" @click="$refs.fileNsbImport.click()">⤓ Импорт JSON</button>
             <button class="at-btn at-btn-sm" @click="exportNsb()">⤒ Экспорт JSON</button>
             <button class="at-btn at-btn-sm at-btn-ghost" @click="nsbResetDefaults()">↺ Стартовый набор</button>
+            <button class="at-btn at-btn-sm" @click="nsbApplyToSelected()"
+                    title="Обновить цены в выделенных записях сметы по совпадению шифра или наименования">⟳ Обновить цены выделения из НСБ</button>
             <div class="at-search nsb-search">
               <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
               <input x-model="nsbSearch" placeholder="Поиск по базе…" />

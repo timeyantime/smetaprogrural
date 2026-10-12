@@ -379,11 +379,24 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 }
 .at-gantt-info { color: var(--muted); }
 .at-gantt-toolbar .spacer { flex: 1; }
+.at-gantt-total { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.at-gantt-skipped {
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+  background: #fff7e6; border: 1px solid #f0c36d; color: #9c6b12;
+  font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 3px 8px;
+}
 .at-gantt-legend { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 .at-gantt-legend .gb { width: 14px; height: 10px; border-radius: 3px; display: inline-block; }
 .gb-labor { background: var(--chip-labor-dot); }
 .gb-machine { background: var(--chip-machine-dot); }
 .gb-material { background: var(--chip-material-dot); }
+.gb-section { background: #4f5b7a; opacity: 0.92; }
+
+/* сводная строка раздела в диаграмме Ганта */
+.at-gantt-secrow { background: #f2f5fa; min-height: 26px; }
+.at-gantt-secrow .at-gantt-name b { font-size: 12px; }
+.at-gantt-secrow .at-gantt-bar { height: 8px; align-self: center; border-radius: 4px; }
+.at-gantt-secrow .at-gantt-bar-label { display: none; }
 
 .at-gantt-scroll { flex: 1; overflow: auto; }
 .at-gantt { min-width: 100%; width: max-content; }
@@ -478,7 +491,7 @@ button.danger:hover { background: #fdecec; }
   .app { display: block; height: auto; overflow: visible; }
   .at-actions, .at-toolbar, .at-views, .at-sidebar-toggle, .at-row-tools, .at-add-row,
   .at-th-caret, .at-resizer, .at-statusbar .spacer, .at-modal-backdrop,
-  .at-gantt-toolbar .at-gantt-info { display: none !important; }
+  .at-gantt-toolbar .at-gantt-info, .at-gantt-skipped { display: none !important; }
   .at-main { display: block; }
   .at-sidebar { width: auto; border: none; }
   .at-table thead th { position: static; }
@@ -490,4 +503,11 @@ button.danger:hover { background: #fdecec; }
   .at-gantt-scroll { overflow: visible; }
   .at-gantt-scale, .at-gantt-scale-name { position: static; }
   .at-gantt-wrap { overflow: visible; }
+}
+
+/* Печать диаграммы Ганта: если открыт вид «Гант», печатаем только его + сводку */
+body.printing-gantt {
+  .at-table-wrap { display: none !important; }
+  .at-tabs-bar { display: none !important; }
+  .at-gantt-wrap { display: flex !important; }
 }

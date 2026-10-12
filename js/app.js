@@ -721,11 +721,15 @@ window.smeta = function smeta() {
         style.textContent = `@media print { @page { size: A4 ${this.printOrientation}; margin: 10mm; } }`;
       }
       document.body.classList.add('printing');
+      if (this.viewTab === 'gantt') document.body.classList.add('printing-gantt');
       this.printModalOpen = false;
       // небольшая задержка — чтобы стиль успел примениться
       setTimeout(() => {
         window.print();
-        setTimeout(() => document.body.classList.remove('printing'), 300);
+        setTimeout(() => {
+          document.body.classList.remove('printing');
+          document.body.classList.remove('printing-gantt');
+        }, 300);
       }, 60);
     },
 
@@ -738,32 +742,63 @@ window.smeta = function smeta() {
     get ganttData() {
       const DAY = 86400000;
       const start = new Date(this.data.startDate || defaultStartDate()).getTime();
+      // если активна вкладка раздела — диаграмма строится только по работам этого раздела
+      const scoped = this.activeTab === null
+        ? this.data.sections.map((sec, si) => ({ sec, si }))
+        : [{ sec: this.data.sections[this.activeTab], si: this.activeTab }].filter((x) => x.sec);
       const rows = [];
-      let cursorBySection = {};
-      let maxEnd = start + DAY; // минимум одна неделя
-      for (const [si, sec] of this.data.sections.entries()) {
-        let secStart = start;
+      const skipped = [];   // записи без длительности — не попадают на диаграмму
+      const sections = [];  // итоги по разделам (полоса раздела = охват его работ)
+      let prevEnd = start;
+      let maxEnd = start;
+      for (const { sec, si } of scoped) {
         // разделы идут последовательно: каждый следующий начинается после конца предыдущего
-        if (si > 0 && cursorBySection[si - 1]) secStart = Math.max(secStart, cursorBySection[si - 1]);
+        const secStart = Math.max(start, prevEnd);
         let cur = secStart;
+        let secFrom = null, secTo = null;
         for (const r of sec.resources) {
-          const d = Math.max(0, Math.round(Number(r.days) || 0));
-          const dur = d > 0 ? d : 1;
+          // Длительность 0 или не задана → запись НЕ отображается на диаграмме
+          // (в том числе дробная < 1 дня округляется до 0 и скрывается).
+          const raw = Number(r.days);
+          if (!isFinite(raw) || raw <= 0) { skipped.push(r); continue; }
+          const dur = Math.round(raw);
+          if (dur <= 0) { skipped.push(r); continue; }
           const from = cur;
-          const to = cur + dur * DAY;
+          const to = from + dur * DAY;
           rows.push({
             row: r, si, name: r.name || '(без наименования)', type: r.type,
-            total: this.rowTotal(r), days: d,
+            total: this.rowTotal(r), days: dur,
             leftDays: Math.round((from - start) / DAY),
             spanDays: dur,
           });
+          if (secFrom === null) secFrom = from;
+          secTo = to;
           cur = to;
           if (to > maxEnd) maxEnd = to;
         }
-        cursorBySection[si] = cur;
+        if (secFrom !== null) {
+          sections.push({
+            id: sec.id, si, name: sec.name,
+            leftDays: Math.round((secFrom - start) / DAY),
+            spanDays: Math.round((secTo - secFrom) / DAY),
+            total: this.sectionTotal(sec),
+          });
+          prevEnd = secTo;
+        }
       }
-      const totalDays = Math.max(7, Math.ceil((maxEnd - start) / DAY) + 1);
-      return { rows, totalDays, start };
+      const workedDays = Math.ceil((maxEnd - start) / DAY);
+      const totalDays = Math.max(7, workedDays); // минимум — неделя шкалы
+      return { rows, sections, skipped, totalDays, workedDays, start };
+    },
+
+    ganttBarStyle(g) {
+      const w = this.ganttDayWidth();
+      return `left:${g.leftDays * w}px;width:${Math.max(6, g.spanDays * w - 4)}px`;
+    },
+
+    ganttSecBarStyle(s) {
+      const w = this.ganttDayWidth();
+      return `left:${s.leftDays * w}px;width:${Math.max(6, s.spanDays * w - 4)}px`;
     },
 
     ganttDateLabel(offsetDays) {
@@ -880,13 +915,14 @@ window.smeta = function smeta() {
       }
       if (!appliedTo) {
         // создаём новую запись в текущем разделе
-        const si = this.currentTargetSection();
-        if (si == null || !this.data.sections[si]) { this.addSection(); }
-        const sIdx = this.data.sections.length - 1;
-        const row = newRow({});
-        this.data.sections[sIdx >= 0 ? sIdx : 0].resources.push(row);
-        appliedTo = row;
-        this.activeTab = sIdx >= 0 ? sIdx : 0;
+        let si = this.currentTargetSection();
+        if (si == null || !this.data.sections[si]) {
+          this.data.sections.push(newSection('Новый раздел'));
+          si = this.data.sections.length - 1;
+          this.activeTab = si;
+        }
+        appliedTo = newRow({});
+        this.data.sections[si].resources.push(appliedTo);
       }
       appliedTo.basis = item.basis;
       appliedTo.name = item.name;
@@ -894,6 +930,29 @@ window.smeta = function smeta() {
       appliedTo.unit = item.unit;
       appliedTo.price = item.price;
       this.nsbModalOpen = false;
+    },
+
+    /* массовое обновление цен в выделенных записях по совпадению шифра или наименования в НСБ */
+    nsbApplyToSelected() {
+      if (!this.selectedIds.size) { alert('Сначала выделите записи в таблице (клик по номеру строки, Ctrl+A — все видимые).'); return; }
+      let updated = 0;
+      for (const sec of this.data.sections) {
+        for (const r of sec.resources) {
+          if (!this.selectedIds.has(r.id)) continue;
+          const hit = this.nsbItems.find((n) =>
+            (r.basis && n.basis && r.basis.trim().toLowerCase() === n.basis.trim().toLowerCase()) ||
+            (r.name && n.name && r.name.trim().toLowerCase() === n.name.trim().toLowerCase()));
+          if (hit) {
+            r.price = hit.price;
+            if (!r.unit) r.unit = hit.unit;
+            if (!r.basis) r.basis = hit.basis;
+            updated++;
+          }
+        }
+      }
+      alert(updated
+        ? `Цены из НСБ обновлены в ${updated} выделенных записях.`
+        : 'Среди выделенных записей нет совпадений с НСБ (по шифру или наименованию).');
     },
 
     exportNsb() {

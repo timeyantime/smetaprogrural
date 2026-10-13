@@ -73,3 +73,11 @@ function svgToPng(svgMarkup, scale, callback) {
   img.onerror = () => callback(null);
   img.src = url;
 }
+
+/* Функции объявлены как function declarations — они автоматически становятся
+   глобальными при загрузке файла классическим <script> (так подключен office.js). */
+
+/* ES-модульный экспорт: единый источник SpreadsheetML-логики.
+   Сервис services/export.js импортирует отсюда buildSpreadsheetML/xmlEsc,
+   а не дублирует их. */
+export { xmlEsc, buildSpreadsheetML, svgToPng };

@@ -1,10 +1,27 @@
 /**
  * Сервис для расчетов сметы
  * Отвечает за расчет стоимости, накладных, прибыли, НДС
+ *
+ * ВАЖНО: округление — единый источник истины в ../rounding.js (Методика 421/пр).
+ * Здесь roundValue/roundGrandTotal только реэкспортируются, чтобы не дублировать логику.
  */
 
 import { Resource } from '../models/Resource.js';
 import { Section } from '../models/Section.js';
+import { roundMoney, roundGrandTotal } from '../rounding.js';
+
+export { roundMoney, roundGrandTotal };
+
+/**
+ * Совместимое имя: roundValue(value, mode, method) === roundMoney из rounding.js
+ * @param {number} value - Значение для округления
+ * @param {string} mode - Режим округления ('kopecks' или 'rubles')
+ * @param {string} method - Метод округления ('math', 'bank', 'truncate')
+ * @returns {number} Округленное значение
+ */
+export function roundValue(value, mode, method) {
+  return roundMoney(value, mode, method);
+}
 
 /**
  * Рассчитывает итоги по проекту
@@ -108,59 +125,6 @@ export function calculateResourceTotal(resource) {
 }
 
 /**
- * Применяет округление к значению
- * @param {number} value - Значение для округления
- * @param {string} mode - Режим округления ('kopecks' или 'rubles')
- * @param {string} method - Метод округления ('math', 'bank', 'truncate')
- * @returns {number} Округленное значение
- */
-export function roundValue(value, mode, method) {
-  const v = Number(value) || 0;
-  if (!isFinite(v)) {
-    return 0;
-  }
-
-  const digits = mode === 'rubles' ? 0 : 2;
-  const factor = Math.pow(10, digits);
-  const scaled = v * factor;
-
-  let result;
-
-  switch (method) {
-    case 'bank':
-      // Банковское округление (half to even)
-      {
-        const floor = Math.floor(scaled);
-        const diff = scaled - floor;
-        if (Math.abs(diff - 0.5) < 1e-9) {
-          result = floor % 2 === 0 ? floor : floor + 1;
-        } else {
-          result = Math.round(scaled);
-        }
-      }
-      break;
-    case 'truncate':
-      result = Math.floor(scaled);
-      break;
-    case 'math':
-    default:
-      // Математическое округление
-      result = Math.sign(scaled) * Math.round(Math.abs(scaled));
-  }
-
-  return result / factor;
-}
-
-/**
- * Округляет итоговую сумму
- * @param {number} value - Значение
- * @returns {number} Округленное значение
- */
-export function roundGrandTotal(value) {
-  return Math.round((Number(value) || 0) * 100) / 100;
-}
-
-/**
  * Рассчитывает стоимость с учетом оператора для машин
  * @param {Object} resource - Ресурс (машина)
  * @returns {number} Стоимость с оператором
@@ -178,6 +142,9 @@ export function calculateMachineTotalWithOperator(resource) {
 
 /**
  * Рассчитывает длительность работ по разделу
+ * Ресурсы внутри раздела выполняются параллельно,
+ * поэтому длительность раздела = МАКСИМУМ из длительностей ресурсов
+ * (см. тест: [5,10] + [3,7] → 10 + 7 = 17 дней, а не сумма 25)
  * @param {Object} section - Раздел
  * @returns {number} Максимальная длительность в днях
  */
@@ -189,8 +156,9 @@ export function calculateSectionDuration(section) {
   let maxDay = 0;
 
   for (const resource of section.resources) {
-    if (resource.days !== null && resource.days > maxDay) {
-      maxDay = resource.days;
+    const days = Number(resource.days);
+    if (resource.days !== null && isFinite(days) && days > maxDay) {
+      maxDay = days;
     }
   }
 
@@ -199,6 +167,7 @@ export function calculateSectionDuration(section) {
 
 /**
  * Рассчитывает общую длительность проекта
+ * Разделы выполняются последовательно → суммируем длительности разделов
  * @param {Object} project - Проект
  * @returns {number} Общая длительность в днях
  */

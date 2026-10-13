@@ -80,19 +80,9 @@ function formatMoney(value) {
   });
 }
 
-/**
- * Debounce функция
- * @param {Function} fn - Функция
- * @param {number} delay - Задержка в мс
- * @returns {Function} Debounced функция
- */
-function debounce(fn, delay) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn.apply(this, args), delay);
-  };
-}
+/* Локальная копия debounce удалена: дублировала simpleDebounce из
+   utils/debounce.js и нигде в модуле не вызывалась. При необходимости
+   используйте: import { simpleDebounce } from './utils/debounce.js'; */
 
 // ============================================
 // Загрузка данных

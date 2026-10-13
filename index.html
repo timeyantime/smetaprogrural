@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="css/style.css" />
   <style id="print-orientation-style">@media print { @page { size: A4 landscape; margin: 10mm; } }</style>
   <!-- Порядок загрузки: сначала данные/директивы (window.smeta), затем Alpine (defer). -->
+  <script src="js/rounding.js"></script>
+  <script src="js/office.js"></script>
   <script src="js/money.js"></script>
   <script src="js/app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
@@ -157,23 +159,36 @@
         <table class="at-table" :style="'width:' + totalTableWidth() + 'px'">
           <colgroup>
             <template x-for="col in columns" :key="col.key">
-              <col :style="'width:' + col.width + 'px'" />
+              <col x-show="!colHidden(col.key)" :style="'width:' + col.width + 'px'" />
             </template>
           </colgroup>
           <thead>
             <tr>
               <template x-for="(col, ci) in columns" :key="col.key">
-                <th class="at-th" :class="{ 'at-th-num': col.key === 'num', 'at-th-right': ['qty','price','total','days'].includes(col.key) }">
+                <th class="at-th" x-show="!colHidden(col.key)"
+                    :class="{ 'at-th-num': col.key === 'num', 'at-th-right': ['qty','price','total','days'].includes(col.key), 'print-off': !printColOn(col.key) && col.key !== 'num' && col.key !== 'actions' }">
                   <span class="at-th-label">
                     <span class="at-col-type" x-text="colIcon(col.key)"></span>
                     <span x-show="col.label" x-text="col.label"></span>
                   </span>
-                  <button class="at-th-caret" x-show="col.sortable"
+                  <button class="at-th-caret" title="Меню колонки"
                           @click.stop="fieldMenuFor = fieldMenuFor === col.key ? null : col.key">▾</button>
                   <div class="at-menu" :class="['qty','price','total','days'].includes(col.key) ? 'at-menu-right' : 'at-menu-left'"
                        x-show="fieldMenuFor === col.key" @click.outside="fieldMenuFor = null" x-transition>
-                    <button @click="sortDescOrAsc(col.key)">↑ Сортировать по возрастанию</button>
-                    <button @click="sortDescOrAsc2(col.key)">↓ Сортировать по убыванию</button>
+                    <template x-if="col.sortable">
+                      <div>
+                        <button @click="sortDescOrAsc(col.key)">↑ Сортировать по возрастанию</button>
+                        <button @click="sortDescOrAsc2(col.key)">↓ Сортировать по убыванию</button>
+                        <button @click="addSortLevel(col.key, 1)" @click.shift.prevent="addSortLevel(col.key, 1)"
+                                title="Shift+клик — добавить уровень сортировки (#15)">＋ Уровень сортировки (Shift)</button>
+                        <button class="danger-text" x-show="sortLevelIndex(col.key)"
+                                @click="removeSortLevel(col.key)">✕ Убрать из сортировки</button>
+                        <hr class="at-menu-sep" />
+                      </div>
+                    </template>
+                    <button @click="toggleColVisibility(col.key)" x-show="col.key !== 'num' && col.key !== 'name' && col.key !== 'actions'">
+                      🚫 Скрыть колонку</button>
+                    <button @click="showAllCols()">👁 Показать все колонки</button>
                     <hr class="at-menu-sep" />
                     <button @click="resetColWidths()">↺ Сбросить ширины колонок</button>
                   </div>
@@ -184,26 +199,26 @@
           </thead>
 
           <tbody>
-            <!-- Плоский список строк текущей области просмотра -->
-            <template x-for="item in pagedRows" :key="item.row.id">
-              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id) }">
+            <!-- Плоский список строк текущей области просмотра (виртуализация: 50 строк на страницу, #38) -->
+            <template x-for="(item, vi) in groupedFlatRows" :key="item.row.id">
+              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi }">
                 <td class="at-cell-num" @dblclick="openRowModal(item)" @click="toggleSelect(item.row.id)"
                     @contextmenu="openCtxMenu($event, item)" x-text="item.index"></td>
 
-                <td class="at-cell" @dblclick="openCell('basis', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell" :class="{ 'print-off': !printColOn('basis') }" @dblclick="openCell('basis', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|basis'">
-                    <input class="at-edit" x-model="item.row.basis" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                    <input class="at-edit" x-model="item.row.basis" x-focus list="cell-suggestions"
+                           @keydown.enter="commitEdit($event, 'basis', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'basis', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|basis')">
                     <div class="at-cellval" x-text="item.row.basis || '—'"></div>
                   </template>
                 </td>
 
-                <td class="at-cell" @dblclick="openCell('name', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell" :class="{ 'print-off': !printColOn('name') }" @dblclick="openCell('name', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|name'">
                     <input class="at-edit" x-model="item.row.name" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                           @keydown.enter="commitEdit($event, 'name', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'name', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|name')">
                     <div class="at-cellval strong" x-text="item.row.name || 'Новая запись'"></div>
@@ -211,7 +226,7 @@
                 </td>
 
                 <!-- Тип затрат: цветной чип, как single select в Airtable -->
-                <td class="at-cell" @click="selectOnly(item.row.id)"
+                <td class="at-cell" :class="{ 'print-off': !printColOn('type') }" @click="selectOnly(item.row.id)"
                     x-data="{ open: false }" @click.outside="open = false">
                   <button class="at-chip" :class="'chip-' + item.row.type" @click.stop="open = !open"
                           x-text="typeLabel(item.row)"></button>
@@ -228,30 +243,30 @@
                   </div>
                 </td>
 
-                <td class="at-cell" @dblclick="openCell('unit', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell" :class="{ 'print-off': !printColOn('unit') }" @dblclick="openCell('unit', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|unit'">
-                    <input class="at-edit" x-model="item.row.unit" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                    <input class="at-edit" x-model="item.row.unit" x-focus list="cell-suggestions"
+                           @keydown.enter="commitEdit($event, 'unit', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'unit', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|unit')">
                     <div class="at-cellval" x-text="item.row.unit || '—'"></div>
                   </template>
                 </td>
 
-                <td class="at-cell at-right" @dblclick="openCell('qty', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell at-right" :class="{ 'print-off': !printColOn('qty') }" @dblclick="openCell('qty', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|qty'">
                     <input class="at-edit at-num" type="number" step="any" min="0" x-model.number="item.row.qty" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                           @keydown.enter="commitEdit($event, 'qty', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'qty', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|qty')">
                     <div class="at-cellval num" x-text="fmtNum(item.row.qty)"></div>
                   </template>
                 </td>
 
-                <td class="at-cell at-right" @dblclick="openCell('price', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell at-right" :class="{ 'print-off': !printColOn('price') }" @dblclick="openCell('price', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|price'">
                     <input class="at-edit at-num" type="number" step="any" min="0" x-model.number="item.row.price" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                           @keydown.enter="commitEdit($event, 'price', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'price', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|price')">
                     <div class="at-cellval num" x-money="Number(item.row.price) || 0"></div>
@@ -259,14 +274,14 @@
                 </td>
 
                 <!-- Вычисляемое поле (формула) -->
-                <td class="at-cell at-right at-formula">
+                <td class="at-cell at-right at-formula" :class="{ 'print-off': !printColOn('total') }">
                   <div class="at-cellval num" x-money="rowTotal(item.row)"></div>
                 </td>
 
-                <td class="at-cell" @dblclick="openCell('note', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell" :class="{ 'print-off': !printColOn('note') }" @dblclick="openCell('note', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|note'">
-                    <input class="at-edit" x-model="item.row.note" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                    <input class="at-edit" x-model="item.row.note" x-focus list="cell-suggestions"
+                           @keydown.enter="commitEdit($event, 'note', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'note', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|note')">
                     <div class="at-cellval muted" x-text="item.row.note || ''"></div>
@@ -274,13 +289,24 @@
                 </td>
 
                 <!-- Длительность, дни (для диаграммы Ганта) -->
-                <td class="at-cell at-right" @dblclick="openCell('days', item)" @click="selectOnly(item.row.id)">
+                <td class="at-cell at-right" :class="{ 'print-off': !printColOn('days') }" @dblclick="openCell('days', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|days'">
                     <input class="at-edit at-num" type="number" step="1" min="0" x-model.number="item.row.days" x-focus
-                           @keydown.enter="editing = null" @keydown.esc="editing = null" @blur="editing = null" />
+                           @keydown.enter="commitEdit($event, 'days', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'days', item)" />
                   </template>
                   <template x-if="!(editing && editing.key === item.row.id + '|days')">
                     <div class="at-cellval num" :class="{ muted: !item.row.days }" x-text="item.row.days ? item.row.days : '—'"></div>
+                  </template>
+                </td>
+
+                <!-- Предшественник (связи Ганта, #49) -->
+                <td class="at-cell" :class="{ 'print-off': !printColOn('pred') }" @dblclick="openCell('pred', item)" @click="selectOnly(item.row.id)">
+                  <template x-if="editing && editing.key === item.row.id + '|pred'">
+                    <input class="at-edit" x-model="item.row.pred" x-focus list="cell-suggestions"
+                           @keydown.enter="commitEdit($event, 'pred', item)" @keydown.esc="editing = null" @blur="commitEdit($event, 'pred', item)" />
+                  </template>
+                  <template x-if="!(editing && editing.key === item.row.id + '|pred')">
+                    <div class="at-cellval" :class="{ muted: !item.row.pred }" x-text="item.row.pred || '—'"></div>
                   </template>
                 </td>
 
@@ -298,21 +324,23 @@
             <!-- Итоги по группам / разделам -->
             <template x-for="g in visibleGroups" :key="g.key">
               <tr class="at-group-total">
-                <td colspan="8" class="at-right">
+                <td :colspan="colSpanFor('total') - 1" class="at-right">
                   <span class="at-group-total-label" x-text="'Итого — ' + g.label + ':'"></span>
+                  <button class="at-mini-x" x-show="groupBy !== 'none' && groupCollapsed[g.key]"
+                          @click="ungroupKey(g.key)" title="Развернуть группу">▸</button>
                 </td>
                 <td class="at-right at-formula"><b x-money="g.total"></b></td>
-                <td colspan="3"></td>
+                <td :colspan="tailCols()"></td>
               </tr>
             </template>
 
             <!-- Строка добавления записей -->
             <tr class="at-add-row">
               <td class="at-cell-num add" @click="addRow(currentTargetSection())">＋</td>
-              <td colspan="4" @click="addRow(currentTargetSection())">
+              <td :colspan="Math.max(1, colSpanFor('total') - 2)" @click="addRow(currentTargetSection())">
                 <span class="at-add-hint">Нажмите, чтобы добавить запись…</span>
               </td>
-              <td colspan="7" class="at-add-inline">
+              <td :colspan="tailCols() + 1" class="at-add-inline">
                 <button class="at-btn at-btn-sm at-btn-ghost" @click.stop="openAddRecordModal()">
                   ⤢ Добавить через форму
                 </button>
@@ -320,6 +348,13 @@
             </tr>
           </tbody>
         </table>
+
+        <!-- Пагинация виртуализации (50 строк на страницу, #38) -->
+        <div class="at-pager" x-show="pageCount > 1 || flatRows.length > PAGE_SIZE">
+          <button class="at-btn at-btn-sm" :disabled="page === 0" @click="goPage(-1)">← Назад</button>
+          <span class="at-pager-label" x-text="'Страница ' + pageLabel() + ' · показано ' + Math.min(PAGE_SIZE, flatRows.length - page * PAGE_SIZE) + ' из ' + flatRows.length"></span>
+          <button class="at-btn at-btn-sm" :disabled="page >= pageCount - 1" @click="goPage(1)">Вперёд →</button>
+        </div>
       </div>
 
       <!-- ===== Вид: Диаграмма Ганта ===== -->

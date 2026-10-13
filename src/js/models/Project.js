@@ -6,6 +6,18 @@
 import { Resource } from './Resource.js';
 import { Section } from './Section.js';
 
+// Реэкспорт смежных моделей: тесты и внешний код могут импортировать
+// Section/Resource из Project.js (модели связаны и живут в одной папке).
+// Это единая точка входа для моделей данных.
+export { Section } from './Section.js';
+export { Resource } from './Resource.js';
+
+/**
+ * Счётчик для генерации уникальных ID (модульная переменная,
+ * а не локальная внутри функции — иначе счётчик сбрасывается при каждом вызове)
+ */
+let uidCounter = 0;
+
 /**
  * Ставки для расчетов (накладные, прибыль, НДС)
  * @typedef {Object} Rates
@@ -124,7 +136,6 @@ export class Project {
    * @returns {string} Уникальный ID
    */
   static generateId() {
-    let uidCounter = 0;
     return `id-${Date.now().toString(36)}-${(uidCounter++).toString(36)}`;
   }
 

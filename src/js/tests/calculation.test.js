@@ -132,8 +132,11 @@ describe('Calculation Service', () => {
       expect(totals.grandTotal).toBe(2000);
       expect(totals.overhead).toBe(150); // 15% от labor
       expect(totals.profit).toBe(100); // 10% от labor
-      expect(totals.vat).toBeCloseTo(470); // 20% от (2000 + 150 + 100)
-      expect(totals.totalWithVat).toBeCloseTo(2720);
+      // НДС начисляется на (итог по смете + накладные + прибыль):
+      // 20% от (2000 + 150 + 100) = 450 — корректно по методике ценообразования.
+      // Итог с НДС: 2000 + 150 + 100 + 450 = 2700.
+      expect(totals.vat).toBeCloseTo(450);
+      expect(totals.totalWithVat).toBeCloseTo(2700);
     });
 
     test('should return zeros for empty project', () => {
@@ -256,7 +259,9 @@ describe('Calculation Service', () => {
       ];
       
       const duration = calculateProjectDuration(project);
-      expect(duration).toBe(25); // 10 + 7
+      // Внутри раздела ресурсы идут параллельно → max(5,10)=10 и max(3,7)=7;
+      // разделы последовательно → 10 + 7 = 17 дней.
+      expect(duration).toBe(17);
     });
 
     test('should return 0 for empty project', () => {

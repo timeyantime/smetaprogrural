@@ -44,6 +44,10 @@
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
           Экспорт CSV
         </button>
+        <button class="at-btn" @click="exportXls()" title="Экспорт в Excel (.xls, без интернета)">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M2 2h12v12H2V2zm4.6 6L9.4 12h-1L7 9.8 5.6 12h-1l2.8-4L4.6 4h1L7 6.2 8.4 4h1L6.6 8z"/></svg>
+          Excel
+        </button>
         <button class="at-btn" @click="helpModalOpen = true" title="Как считаются затраты — справочник по методике">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.9 10.6H7.1v-1.4h1.8v1.4zm0-2.6H7.1V4.6h1.8v4.4z"/></svg>
           Справочник
@@ -153,9 +157,10 @@
       </div>
     </nav>
 
-    <!-- ===== Основная таблица + вид «Диаграмма Ганта» ===== -->
+    <!-- ===== Основная область: контент видов + боковая панель сводки ===== -->
     <main class="at-main">
-      <div class="at-table-wrap" x-show="viewTab === 'table'">
+      <div class="at-content">
+      <div class="at-table-wrap" x-show="viewTab === 'table'" x-cloak>
         <table class="at-table" :style="'width:' + totalTableWidth() + 'px'">
           <colgroup>
             <template x-for="col in columns" :key="col.key">
@@ -321,13 +326,14 @@
               </tr>
             </template>
 
-            <!-- Итоги по группам / разделам -->
+            <!-- Итоги по группам / разделам (сворачивание #17) -->
             <template x-for="g in visibleGroups" :key="g.key">
               <tr class="at-group-total">
-                <td :colspan="colSpanFor('total') - 1" class="at-right">
-                  <span class="at-group-total-label" x-text="'Итого — ' + g.label + ':'"></span>
-                  <button class="at-mini-x" x-show="groupBy !== 'none' && groupCollapsed[g.key]"
-                          @click="ungroupKey(g.key)" title="Развернуть группу">▸</button>
+                <td :colspan="Math.max(2, colSpanFor('total') - 1)" class="at-right">
+                  <button class="at-mini-x" x-show="groupBy !== 'none'" @click="toggleGroupCollapse(g.key)"
+                          :title="groupCollapsedFn(g.key) ? 'Развернуть группу' : 'Свернуть группу'"
+                          x-text="groupCollapsedFn(g.key) ? '▸' : '▾'"></button>
+                  <span class="at-group-total-label" x-text="'Итого — ' + g.label + ' (' + g.count + ') :'"></span>
                 </td>
                 <td class="at-right at-formula"><b x-money="g.total"></b></td>
                 <td :colspan="tailCols()"></td>
@@ -357,24 +363,30 @@
         </div>
       </div>
 
-      <!-- ===== Вид: Диаграмма Ганта ===== -->
+      <!-- ===== Вид: Диаграмма Ганта (v2 — drag полос, связи щелчком, критический путь) ===== -->
       <div class="at-gantt-wrap" x-show="viewTab === 'gantt'" x-cloak>
         <div class="at-gantt-toolbar">
           <label class="at-gantt-start">Начало работ:
             <input type="date" x-model="data.startDate" />
           </label>
-          <span class="at-gantt-info">Длительность задаётся в столбце «Длит., дн.» таблицы. Записи с длительностью 0 или без длительности на диаграмме не отображаются.</span>
+          <span class="at-gantt-info">Полосы можно перетаскивать мышью · клик по краю полосы — рисование связи · правый клик — убрать связь/сдвиг. Записи с длительностью 0 на диаграмме не отображаются.</span>
           <span class="spacer"></span>
+          <button class="at-btn at-btn-sm" :class="{ active: ganttCritical }" @click="ganttCritical = !ganttCritical"
+                  title="Подсветка критического пути (#49)">⚑ Крит. путь</button>
+          <button class="at-btn at-btn-sm" @click="resetAllGanttShifts()" x-show="ganttHasShifts()" title="Вернуть все работы в автоплан">↺ Автоплан</button>
+          <button class="at-btn at-btn-sm" @click="exportGanttPng()" title="Сохранить PNG (#26)">🖼 PNG</button>
+          <button class="at-btn at-btn-sm" @click="exportGanttSvg()" title="Сохранить SVG">⤒ SVG</button>
           <span class="at-gantt-skipped" x-show="ganttData.skipped.length" x-cloak
                 :title="'Записей без длительности: ' + ganttData.skipped.map(s => s.name || '(без названия)').join(', ')">
-            ⊘ <b x-text="ganttData.skipped.length"></b> записей скрыто (длительность = 0)
+            ⊘ <b x-text="ganttData.skipped.length"></b> скрыто
           </span>
-          <span class="at-gantt-total">Общая длительность: <b x-text="ganttData.workedDays"></b> дн.</span>
+          <span class="at-gantt-total">Длительность: <b x-text="ganttData.workedDays"></b> дн.</span>
           <span class="at-gantt-legend">
             <i class="gb gb-section"></i> Раздел
             <i class="gb gb-labor"></i> ЗТ
             <i class="gb gb-machine"></i> ОМ
             <i class="gb gb-material"></i> М
+            <i class="gb gb-critical"></i> Крит. путь
           </span>
         </div>
         <div class="at-gantt-scroll">
@@ -410,16 +422,36 @@
                 <div class="at-gantt-name" :title="g.name">
                   <span class="at-gantt-sec" x-text="data.sections[g.si] ? (g.si + 1 + '.') : ''"></span>
                   <span x-text="g.name"></span>
+                  <span class="at-gantt-dep" x-show="g.row.pred" :title="'Предшественник: №' + g.row.pred"
+                        @click.stop="removePred(g.row)">→№<b x-text="g.row.pred"></b>✕</span>
                 </div>
-                <div class="at-gantt-track">
-                  <div class="at-gantt-bar" :class="'gb-' + g.type"
+                <div class="at-gantt-track" @mousemove="trackGanttLink($event)" @click.self="cancelGanttLink()">
+                  <div class="at-gantt-bar" :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFrom === g }]"
                        :style="ganttBarStyle(g)"
-                       :title="g.name + ' · ' + g.days + ' дн. · ' + fmtMoney(g.total) + ' ₽'">
+                       @mousedown="startGanttDrag($event, g)"
+                       @contextmenu.prevent="onBarContext(g)">
                     <span class="at-gantt-bar-label" x-text="g.days + ' дн.'"></span>
+                    <span class="at-gantt-link-handle" @mousedown.stop @click.stop="ganttLinkClick($event, g)"
+                          title="Клик — начать/закончить связь">#</span>
                   </div>
                 </div>
               </div>
             </template>
+            <!-- SVG-слой связей -->
+            <svg class="at-gantt-links" :width="ganttLinksSize.w" :height="ganttLinksSize.h" aria-hidden="true">
+              <template x-for="(d, li) in ganttLinkLines" :key="'lnk-' + li">
+                <path :d="d" class="at-gantt-linkpath" marker-end="url(#arrowhead)" />
+              </template>
+              <template x-if="ganttLinkPath">
+                <line :x1="ganttLinkPath[0]" :y1="ganttLinkPath[1]" :x2="ganttLinkPath[2]" :y2="ganttLinkPath[3]"
+                      class="at-gantt-linkpath preview" />
+              </template>
+              <defs>
+                <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                  <polygon points="0 0, 7 3.5, 0 7" fill="#666" />
+                </marker>
+              </defs>
+            </svg>
             <div class="at-gantt-empty" x-show="!ganttData.rows.length" x-cloak>
               Нет записей с длительностью &gt; 0. Задайте длительность в столбце «Длит., дн.» в табличном виде —
               такие записи появятся на диаграмме.
@@ -427,6 +459,61 @@
           </div>
         </div>
       </div>
+
+      <!-- ===== Вид: Сводная ведомость ресурсов (#12, группировка #17) ===== -->
+      <div class="at-summary-wrap" x-show="viewTab === 'summary'" x-cloak>
+        <div class="at-summary-toolbar">
+          <h3 class="at-summary-title">Сводная ведомость ресурсов</h3>
+          <div class="at-group-btns">
+            <button class="at-btn at-btn-sm" :class="{ active: summaryGroup === 'none' }" @click="summaryGroup = 'none'">Без группировки</button>
+            <button class="at-btn at-btn-sm" :class="{ active: summaryGroup === 'type' }" @click="summaryGroup = 'type'">По типу</button>
+            <button class="at-btn at-btn-sm" :class="{ active: summaryGroup === 'unit' }" @click="summaryGroup = 'unit'">По единице</button>
+          </div>
+          <div class="at-search"><input x-model="summarySearch" placeholder="Поиск ресурса…" /></div>
+          <span class="spacer"></span>
+          <button class="at-btn at-btn-sm" @click="exportSummaryCsv()">⤒ CSV</button>
+        </div>
+        <table class="at-table summary-table">
+          <thead>
+            <tr>
+              <th class="at-th" style="width:44px">#</th>
+              <th class="at-th"><span class="at-col-type">T</span> Наименование ресурса</th>
+              <th class="at-th" style="width:120px"><span class="at-col-type">⬡</span> Тип</th>
+              <th class="at-th" style="width:80px"><span class="at-col-type">T</span> Ед. изм.</th>
+              <th class="at-th at-th-right" style="width:110px"><span class="at-col-type">#</span> Кол-во всего</th>
+              <th class="at-th at-th-right" style="width:130px"><span class="at-col-type">$</span> Средняя цена</th>
+              <th class="at-th at-th-right" style="width:140px"><span class="at-col-type">∑</span> Стоимость, ₽</th>
+              <th class="at-th" style="width:180px"><span class="at-col-type">T</span> Расценки (обоснования)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(item, ii) in summaryRows" :key="item.key">
+              <template x-if="!item.collapsed">
+                <tr class="at-row">
+                  <td class="at-cell-num" x-text="item.header ? '' : item.num"></td>
+                  <td class="at-cell" :class="{ 'at-summary-header': item.header }"
+                      x-text="item.header ? item.label : item.e.name"></td>
+                  <td class="at-cell" x-show="!item.header">
+                    <span class="at-chip" :class="'chip-' + item.e.type" x-text="groupTypeLabel(item.e.type)"></span>
+                  </td>
+                  <td class="at-cell" x-show="!item.header" x-text="item.e.unit"></td>
+                  <td class="at-cell at-right num" x-text="fmtNum(item.header ? item.groupCount : item.e.qty)"></td>
+                  <td class="at-cell at-right num" x-show="!item.header" x-money="item.avgPrice"></td>
+                  <td class="at-cell at-right at-formula"><b x-money="item.header ? item.groupTotal : item.e.cost"></b></td>
+                  <td class="at-cell muted" x-show="!item.header" x-text="[...item.e.bases].join(', ') || '—'"></td>
+                </tr>
+              </template>
+            </template>
+            <tr class="at-group-total">
+              <td colspan="6" class="at-right"><b>Итого по всем ресурсам:</b></td>
+              <td class="at-right at-formula"><b x-money="summaryTotalCost()"></b></td>
+              <td></td>
+            </tr>
+            <tr x-show="!summaryRows.length"><td colspan="8" class="nsb-empty muted">Ничего не найдено.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      </div><!-- /.at-content -->
 
       <!-- ===== Боковая панель сводки ===== -->
       <aside class="at-sidebar" :class="{ collapsed: sidebarCollapsed }">
@@ -486,10 +573,97 @@
           <div class="at-side-section" x-show="selectedIds.size > 0">
             <div class="at-side-row"><span>Выделено записей: <b x-text="selectedIds.size"></b></span></div>
             <div class="at-side-row"><span>Стоимость выделения</span><b x-money="selectionTotal()"></b></div>
+            <button class="at-btn at-btn-sm at-btn-primary" style="width:100%;margin-top:6px" @click="openBatchBar()">✎ Пакетное редактирование…</button>
+          </div>
+
+          <!-- Режим пересчёта (#48) и округление (#11) -->
+          <div class="at-side-section">
+            <div class="at-side-title">Сервис</div>
+            <div class="at-side-row">
+              <span>Пересчёт ресурсов</span>
+              <select class="at-base" :value="data.recalcMode" @change="setRecalcMode($event.target.value)">
+                <option value="auto">Авто (единая цена)</option>
+                <option value="manual">Ручной</option>
+              </select>
+            </div>
+            <div class="at-side-row" x-show="data.recalcMode === 'manual'">
+              <button class="at-btn at-btn-sm" :disabled="!dirty" @click="forceRecalc()">⟳ Применить и сохранить</button>
+            </div>
+            <div class="at-side-row">
+              <span title="Методика № 421/пр, п. 58">Округление итогов</span>
+              <span class="at-rate">
+                <select class="at-base" x-model="data.rounding.mode">
+                  <option value="kopecks">копейки</option><option value="rubles">рубли</option>
+                </select>
+                <select class="at-base" x-model="data.rounding.method" title="Способ округления">
+                  <option value="math">матем.</option><option value="bank">банковское</option><option value="truncate">отбрас.</option>
+                </select>
+              </span>
+            </div>
           </div>
         </div>
       </aside>
     </main>
+
+    <!-- ===== Контекстное меню строки (#35) ===== -->
+    <div class="at-ctx-menu" x-show="ctxMenu" x-cloak x-transition.opacity
+         :style="'left:' + (ctxMenu?.x || 0) + 'px; top:' + (ctxMenu?.y || 0) + 'px'"
+         @click.outside="closeCtxMenu()">
+      <div class="at-ctx-head" x-text="(ctxMenu?.item?.row?.name || 'Запись').slice(0, 28)"></div>
+      <button @click="ctxEditRow()">🔍 Открыть карточку</button>
+      <button @click="ctxDuplicate()">⧉ Дублировать</button>
+      <button @click="ctxMoveUp()">↑ Переместить выше</button>
+      <button @click="ctxMoveDown()">↓ Переместить ниже</button>
+      <hr class="at-menu-sep" />
+      <button @click="ctxApplyNsb()">📚 Применить расценку НСБ</button>
+      <button @click="ctxCalc()">🧮 Калькулятор для этой строки</button>
+      <button @click="ctxCopyName()">📋 Копировать наименование</button>
+      <hr class="at-menu-sep" />
+      <button class="danger-text" @click="ctxDeleteRow()">✕ Удалить запись</button>
+    </div>
+
+    <!-- ===== Панель пакетного редактирования (#36) ===== -->
+    <div class="at-batch-bar" x-show="batchBar && selectedIds.size > 0" x-cloak x-transition>
+      <span class="at-batch-count">Выделено: <b x-text="selectedIds.size"></b></span>
+      <label>Цена ₽ <input type="number" step="any" min="0" x-model="batchPrice" placeholder="—" /></label>
+      <label>Кол-во <input type="number" step="any" min="0" x-model="batchQty" placeholder="—" /></label>
+      <label>Ед. <input x-model="batchUnit" placeholder="—" style="width:70px" /></label>
+      <button class="at-btn at-btn-sm at-btn-primary" @click="batchApply()">✓ Применить ко всем</button>
+      <button class="at-btn at-btn-sm" @click="setAllSelectedPriceFromNsb()">📚 Цена из НСБ</button>
+      <button class="at-btn at-btn-sm danger" @click="removeSelected()">✕ Удалить выделенные</button>
+      <button class="at-btn at-btn-sm at-btn-ghost" @click="clearSelection()">Отмена</button>
+    </div>
+
+    <!-- ===== Журнал изменений + проверка сметы (#46, #10) ===== -->
+    <div class="at-history-panel" x-show="historyOpen" x-cloak x-transition.opacity>
+      <div class="at-history-head">
+        <b>Журнал и проверка сметы</b>
+        <button class="at-btn at-btn-sm" @click="undoAction()" :disabled="!undoStack.length" title="Ctrl+Z">↶</button>
+        <button class="at-btn at-btn-sm" @click="redoAction()" :disabled="!redoStack.length" title="Ctrl+Shift+Z">↷</button>
+        <button class="at-btn at-btn-sm at-btn-ghost" @click="historyOpen = false">✕</button>
+      </div>
+      <div class="at-history-tabs">
+        <button :class="{ active: historyTab === 'problems' }" @click="historyTab = 'problems'">
+          Проблемы <span class="at-badge" x-show="problemCount() > 0" x-text="problemCount()"></span>
+        </button>
+        <button :class="{ active: historyTab === 'log' }" @click="historyTab = 'log'">История</button>
+      </div>
+      <div class="at-history-body" x-show="historyTab === 'problems'">
+        <template x-for="(p, pi) in problems" :key="pi">
+          <div class="at-problem" :class="p.sev" @click="goToProblem(p)" title="Перейти к записи">
+            <span x-text="p.sev === 'err' ? '⛔' : '⚠️'"></span> <span x-text="p.text"></span>
+          </div>
+        </template>
+        <div class="muted at-history-empty" x-show="!problems.length">✅ Проблем не найдено — смета чистая.</div>
+      </div>
+      <div class="at-history-body" x-show="historyTab === 'log'">
+        <template x-for="(a, ai) in activityLog.slice(0, 60)" :key="ai">
+          <div class="at-log-line"><span class="muted" x-text="a.time"></span> <span x-text="a.text"></span></div>
+        </template>
+        <div class="muted at-history-empty" x-show="!activityLog.length">Пока пусто.</div>
+        <button class="at-btn at-btn-sm at-btn-ghost" x-show="activityLog.length" @click="clearActivity()">Очистить журнал</button>
+      </div>
+    </div>
 
     <!-- ===== Нижний статус-бар ===== -->
     <footer class="at-statusbar">
@@ -649,8 +823,25 @@
               </label>
             </div>
           </div>
+          <div class="at-field"><span>Колонки печатной формы (#21)</span>
+            <div class="at-print-cols">
+              <template x-for="c in printCols()" :key="c.key">
+                <label class="at-print-col">
+                  <input type="checkbox" :checked="printColOn(c.key)" @change="togglePrintCol(c.key)" />
+                  <span x-text="c.label"></span>
+                </label>
+              </template>
+            </div>
+          </div>
+          <label class="at-field" style="flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" x-model="printSettings.titleSheet" style="width:auto" @change="savePrintSettings()" />
+            <span>Титульный лист с реквизитами объекта (#24)</span>
+          </label>
+          <div class="at-modal-hint" x-show="printSettings.titleSheet && !projectFilled()">
+            ⚠ Реквизиты объекта не заполнены — откройте «Реквизиты» в шапке.
+          </div>
           <div class="at-modal-hint">
-            Печатается текущий вид: таблица (или диаграмма Ганта, если она открыта) + сводная стоимость.
+            Печатается текущий вид: таблица (или диаграмма Ганта / сводная ведомость, если они открыты) + сводная стоимость.
             Совет: для широкой сметы выбирайте альбомную ориентацию.
           </div>
         </div>
@@ -732,6 +923,138 @@
         </div>
         <div class="at-modal-foot">
           <button class="at-btn at-btn-primary" @click="helpModalOpen = false">Понятно</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Модалка: ЕДИНЫЙ СПРАВОЧНИК РЕСУРСОВ (#9) ===== -->
+    <div class="at-modal-backdrop" x-show="resModalOpen" x-cloak @click.self="resModalOpen = false">
+      <div class="at-modal at-modal-lg" x-show="resModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">🔗 Единый справочник ресурсов — все уникальные ресурсы сметы</span>
+          <button class="at-btn" @click="resModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <div class="nsb-toolbar">
+            <div class="at-search nsb-search">
+              <input x-model="resSearch" placeholder="Поиск ресурса…" />
+            </div>
+            <span class="at-count" x-text="uniqueResources.length + ' уникальных ресурсов'"></span>
+            <span class="spacer"></span>
+            <span class="muted">Изменение цены применяет её ко всем записям этого ресурса.</span>
+          </div>
+          <table class="nsb-table">
+            <thead>
+              <tr>
+                <th>Наименование ресурса</th>
+                <th style="width:100px">Тип</th>
+                <th style="width:70px">Ед.</th>
+                <th style="width:80px" class="at-right">Исп.</th>
+                <th style="width:130px" class="at-right">Цена, ₽</th>
+                <th style="width:150px">Где используется</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="e in uniqueResources" :key="e.key">
+                <tr class="nsb-row">
+                  <td><span class="nsb-name" x-text="e.name"></span></td>
+                  <td><span class="at-chip" :class="'chip-' + e.type" x-text="groupTypeLabel(e.type)"></span></td>
+                  <td x-text="e.unit || '—'"></td>
+                  <td class="at-right num" x-text="e.uses"></td>
+                  <td class="at-right">
+                    <input type="number" step="any" min="0" style="width:110px;text-align:right"
+                           :value="e.prices.size === 1 ? [...e.prices][0] : ''"
+                           :placeholder="e.prices.size > 1 ? 'разные (' + e.prices.size + ')' : 'цена'"
+                           @change="applyResourcePrice(e, $event.target.value)" />
+                  </td>
+                  <td class="muted" style="font-size:12px" x-text="[...e.sections].join(', ')"></td>
+                </tr>
+              </template>
+              <tr x-show="!uniqueResources.length"><td colspan="6" class="nsb-empty muted">Ресурсов нет.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="at-modal-foot">
+          <button class="at-btn at-btn-primary" @click="resModalOpen = false">Готово</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Модалка: КАЛЬКУЛЯТОР ТРУДОЗАТРАТ / МАШ.-ЧАСОВ (#48) ===== -->
+    <div class="at-modal-backdrop" x-show="calcModalOpen" x-cloak @click.self="calcModalOpen = false">
+      <div class="at-modal" x-show="calcModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">🧮 Калькулятор трудозатрат и машинного времени</span>
+          <button class="at-btn" @click="calcModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <div class="at-history-tabs" style="margin-bottom:10px">
+            <button :class="{ active: calcTab === 'labor' }" @click="calcTab = 'labor'">Труд (чел.-ч)</button>
+            <button :class="{ active: calcTab === 'machine' }" @click="calcTab = 'machine'">Машины (маш.-ч)</button>
+          </div>
+          <label class="at-field"><span>Объём работ (в единице сметы)</span>
+            <input type="number" step="any" min="0" x-model.number="calc.volume" /></label>
+          <label class="at-field"><span x-text="calcTab === 'labor' ? 'Норма времени, чел.-ч на единицу' : 'Норма времени, маш.-ч на единицу'"></span>
+            <input type="number" step="any" min="0" x-model.number="calc.normTime" /></label>
+          <label class="at-field"><span x-text="calcTab === 'labor' ? 'Состав бригады, чел.' : 'Звено механизаторов, чел.'"></span>
+            <input type="number" step="1" min="1" x-model.number="calc.crewSize" /></label>
+          <div class="at-field-row" style="display:flex;gap:10px">
+            <label class="at-field" style="flex:1"><span>Смен в день</span>
+              <input type="number" step="1" min="1" x-model.number="calc.shiftsPerDay" /></label>
+            <label class="at-field" style="flex:1"><span>Часов в смене</span>
+              <input type="number" step="1" min="1" x-model.number="calc.hoursPerShift" /></label>
+          </div>
+          <label class="at-field"><span>Стоимость часа, ₽</span>
+            <input type="number" step="any" min="0" x-model.number="calc.ratePerHour" /></label>
+          <label class="at-field"><span>Задать срок, дней (необязательно — подберёт состав)</span>
+            <input type="number" step="1" min="1" x-model.number="calc.days" placeholder="—" /></label>
+
+          <div class="at-side-section" style="margin-top:8px">
+            <div class="at-side-row"><span>Всего часов</span><b x-text="fmtNum(calcResult.totalHours)"></b></div>
+            <div class="at-side-row"><span>Длительность</span><b x-text="calcResult.days + ' дн.'"></b></div>
+            <div class="at-side-row"><span>Стоимость</span><b x-money="calcResult.cost"></b></div>
+            <div class="at-side-row" x-show="calcResult.needCrew"><span>Минимальный состав для срока</span>
+              <b x-text="calcResult.needCrew + ' чел.'"></b></div>
+          </div>
+        </div>
+        <div class="at-modal-foot">
+          <button class="at-btn" @click="calcModalOpen = false">Закрыть</button>
+          <button class="at-btn at-btn-primary" @click="applyCalcToRow(ctxMenu?.item || null)"
+                  title="Перенести часы, цену и длительность в выделенную/контекстную запись">⇥ Применить к записи</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Модалка: РЕКВИЗИТЫ ОБЪЕКТА / ТИТУЛЬНЫЙ ЛИСТ (#24) ===== -->
+    <div class="at-modal-backdrop" x-show="projModalOpen" x-cloak @click.self="projModalOpen = false">
+      <div class="at-modal" x-show="projModalOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">🏗 Реквизиты объекта (титульный лист при печати)</span>
+          <button class="at-btn" @click="projModalOpen = false">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <label class="at-field"><span>Наименование объекта</span>
+            <input x-model="data.company.objectName" x-focus placeholder="напр. Жилой дом, 5 эт." /></label>
+          <label class="at-field"><span>Адрес объекта / стройплощадки</span>
+            <input x-model="data.company.address" /></label>
+          <label class="at-field"><span>Заказчик</span>
+            <input x-model="data.company.customer" /></label>
+          <label class="at-field"><span>Подрядчик (составитель сметы)</span>
+            <input x-model="data.company.contractor" /></label>
+          <label class="at-field"><span>Основание (проектная документация, договор)</span>
+            <input x-model="data.company.basis" /></label>
+          <div class="at-field-row" style="display:flex;gap:10px">
+            <label class="at-field" style="flex:1"><span>Смету составил (должн., ФИО)</span>
+              <input x-model="data.company.chief" /></label>
+            <label class="at-field" style="flex:1"><span>Телефон</span>
+              <input x-model="data.company.phone" /></label>
+          </div>
+          <label class="at-field"><span>Дата составления</span>
+            <input type="date" x-model="data.company.date" /></label>
+        </div>
+        <div class="at-modal-foot">
+          <button class="at-btn" @click="projModalOpen = false">Отмена</button>
+          <button class="at-btn at-btn-primary" @click="saveProjectModal()">✓ Сохранить реквизиты</button>
         </div>
       </div>
     </div>

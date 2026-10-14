@@ -6,8 +6,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import smetaModule from '../app.js';
 
+// Вне Alpine-окружения $nextTick недоступен (node/jsdom); подменяем no-op'ом.
+const proto = smetaModule();
+if (!Object.prototype.hasOwnProperty.call(proto, '$nextTick')) {
+  Object.defineProperty(proto, '$nextTick', {
+    value: function (fn) { fn && fn(); }, configurable: true, enumerable: false, writable: true,
+  });
+}
+
+/** Свежий экземпляр smeta с тестовым $nextTick (Alpine внедряет его в рантайме). */
+function mk() {
+  const o = smetaModule();
+  o.$nextTick = proto.$nextTick;
+  return o;
+}
+
 describe('фаза 1: форматирование и отображение', () => {
-  const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
+  const obj = mk();
 
   // ru-RU использует неразрывный пробел как разделитель тысяч — нормализуем для сравнения
   const norm = (s) => String(s).replace(/[\u00A0\u202F]/g, ' ');
@@ -110,7 +125,7 @@ describe('фаза 1: форматирование и отображение', (
 });
 
 describe('фаза 1: проблемы сметы (#10)', () => {
-  const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
+  const obj = mk();
   const mkSection = (name, resources = []) => ({ id: 's1', name, parentId: null, collapsed: false, resources });
   const origSections = () => JSON.parse(JSON.stringify(obj.data.sections));
 
@@ -157,7 +172,7 @@ describe('фаза 1: проблемы сметы (#10)', () => {
 });
 
 describe('фаза 1: пагинация (#38)', () => {
-  const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
+  const obj = mk();
   const origSections = () => JSON.parse(JSON.stringify(obj.data.sections));
 
   beforeEach(() => {
@@ -186,7 +201,7 @@ describe('фаза 1: пагинация (#38)', () => {
 });
 
 describe('фаза 1: редактирование ячеек и строк', () => {
-  const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
+  const obj = mk();
   const mkRow = (over = {}) => ({ id: 'r1', name: '', basis: '', type: 'material', operator: false, unit: '', qty: 0, price: 0, note: '', days: null, pred: '', startAt: null, ...over });
   const mkSection = (name, resources = []) => ({ id: 's1', name, parentId: null, collapsed: false, resources });
 

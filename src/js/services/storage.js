@@ -4,6 +4,7 @@
  */
 
 import { Project, migrateV3toV4 } from '../models/Project.js';
+import { encodeValue as toonEncode, decodeValue as toonDecode, encodeProject as toonEncodeProject, decodeProject as toonDecodeProject } from '../toon.js';
 
 /**
  * Ключи для localStorage
@@ -31,7 +32,15 @@ export function saveProject(project) {
       return false;
     }
 
-    const data = JSON.stringify(project);
+    // Компактный блочный формат (TOON): экономия ~50% объёма localStorage.
+    // При любой ошибке кодируем как раньше — данные не должны теряться.
+    let data;
+    try {
+      data = toonEncodeProject(project);
+      toonDecodeProject(data.slice('TOONP1:'.length)); // self-check roundtrip
+    } catch (e) {
+      data = JSON.stringify(project);
+    }
     localStorage.setItem(STORAGE_KEYS.DATA, data);
     return true;
   } catch (error) {
@@ -60,8 +69,9 @@ export function loadProject() {
       return null;
     }
 
-    const project = JSON.parse(data);
-    
+    // Автоопределение формата: компактный TOON-блок или классический JSON
+    const project = data.startsWith('TOONP1:') ? toonDecodeProject(data.slice('TOONP1:'.length)) : JSON.parse(data);
+
     if (!Project.validate(project)) {
       console.error('Invalid project data in storage');
       return null;
@@ -125,7 +135,7 @@ export function loadUISettings() {
  */
 export function saveHistory(history) {
   try {
-    const data = JSON.stringify(history);
+    const data = toonEncode(STORAGE_KEYS.HISTORY, history);
     localStorage.setItem(STORAGE_KEYS.HISTORY, data);
     return true;
   } catch (error) {
@@ -141,7 +151,7 @@ export function saveHistory(history) {
 export function loadHistory() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.HISTORY);
-    return data ? JSON.parse(data) : [];
+    return data ? toonDecode(STORAGE_KEYS.HISTORY, data) : [];
   } catch (error) {
     console.error('Failed to load history:', error);
     return [];

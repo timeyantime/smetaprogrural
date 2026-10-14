@@ -6,7 +6,7 @@
   <title>СметаПро — ресурсный метод</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="src/css/style.css" />
   <style id="print-orientation-style">@media print { @page { size: A4 landscape; margin: 10mm; } }</style>
   <!-- Модульное приложение (миграция из legacy js/ завершена):
        money.js регистрирует Alpine-директиву x-money (слушает 'alpine:init',
@@ -96,8 +96,10 @@
           <span class="at-tab-icon">📋</span> Все разделы
         </button>
         <template x-for="(section, si) in data.sections" :key="section.id">
-          <div class="at-tab-wrap" draggable="true" @dragstart="tabDragFrom = si" @dragover.prevent
-               @drop="moveSectionByDrag(si)">
+          <div class="at-tab-wrap" draggable="true" @dragstart="tabDragFrom = si" @dragend="tabDragFrom = null"
+               @dragover.prevent="tabDragOver = (tabDragFrom !== null && tabDragFrom !== si) ? si : tabDragOver"
+               @dragleave="tabDragOver === si && (tabDragOver = null)"
+               @drop="moveSectionByDrag(si); tabDragOver = null; tabDragFrom = null">
             <button class="at-tab" :class="{ active: activeTab === si }"
                     @click="selectTab(si)" @dblclick="startRenameSection(si)">
               <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
@@ -208,7 +210,9 @@
           <tbody>
             <!-- Плоский список строк текущей области просмотра (виртуализация: 50 строк на страницу, #38) -->
             <template x-for="(item, vi) in groupedFlatRows" :key="item.row.id">
-              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi }">
+              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi, dragging: dragRow && dragRow.id === item.row.id, 'is-section-start': showSectionStarts && item.isSectionStart }"
+                  draggable="true" @dragstart="startRowDrag($event, item)" @dragend="rowDragEnd(item, $event)"
+                  @dragover.prevent="rowDragOver(item)" @drop.prevent="rowDrop(item)">
                 <td class="at-cell-num" @dblclick="openRowModal(item)" @click="toggleSelect(item.row.id)"
                     @contextmenu="openCtxMenu($event, item)" x-text="item.index"></td>
 

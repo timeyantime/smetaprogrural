@@ -2019,8 +2019,34 @@ window.smeta = function smeta() {
     },
 
     removeSortLevel(field) {
+      const hadLevels = this.multiSort.length > 0;
       this.multiSort = this.multiSort.filter((s) => s.field !== field);
+      if (!this.multiSort.length) {
+        // все уровни сняты — возвращаем исходный (ручной drag&drop) порядок
+        this.sortState = { field: null, dir: 1 };
+        this.restoreManualOrder();
+      } else if (hadLevels) {
+        // пересортировка по оставшимся уровням поверх текущего порядка
+        this.applySortToSections();
+      }
       this.fieldMenuFor = null;
+    },
+
+    /**
+     * Восстановить исходный (ручной drag&drop) порядок записей во всех разделах.
+     */
+    restoreManualOrder() {
+      const snap = this.manualOrderSnapshot;
+      if (!snap) return;
+      this.data.sections.forEach((sec, i) => {
+        if (!Array.isArray(snap[i])) return;
+        const byId = new Map(sec.resources.map((r) => [r.id, r]));
+        const ordered = [];
+        for (const id of snap[i]) if (byId.delete(id)) ordered.push(byId.get(id));
+        // новые записи (после снимка) — в конец
+        for (const r of byId.values()) ordered.push(r);
+        sec.resources = ordered;
+      });
     },
 
     sortLevelIndex(field) {
@@ -2032,7 +2058,15 @@ window.smeta = function smeta() {
       const levels = this.multiSort.length
         ? this.multiSort
         : (this.sortState.field ? [this.sortState] : []);
-      if (!levels.length) return;
+      if (!levels.length) {
+        // сортировка снята — восстановить ручной порядок (drag&drop, #15)
+        this.restoreManualOrder();
+        return;
+      }
+      // снимок ручного порядка ДО первой сортировки — для восстановления после отмены
+      if (!this.manualOrderSnapshot) {
+        this.manualOrderSnapshot = this.data.sections.map((sec) => sec.resources.map((r) => r.id));
+      }
       const val = (r, field) => {
         if (field === 'type') return this.typeLabel(r);
         if (field === 'total') return this.rowTotal(r);

@@ -1,13 +1,14 @@
-# План миграции legacy → модульная версия
+# Миграция legacy → модульная версия
 
-Статус на момент составления: модульная версия (`src/js/app.js`) переносит
-компонент из 235 функций legacy `js/app.js`. Перенесено ядро (134 функции)
-и фаза 1 — каркас таблицы (29 функций, PR #15), всё покрыто тестами
-(133 теста). **Осталось перенести 94 функции** — список ниже.
+Все 235 функций legacy-компонента перенесены в модульную версию
+`src/js/app.js` (последний блок — 122 метода UI: грид, контекстное меню,
+сортировка/группировка, пагинация, Гант, НСБ, батч-редактор, сводная
+ведомость, печать). Legacy-каталог `js/` и обёртка `legacy-adapter.js`
+удалены; `index.html` грузит исключительно ES-модули `src/js/*`.
+Тесты: **100/100** (`npm test`), продакшн-сборка Vite работает
+(`npm run build`).
 
-Активное приложение — legacy. Модульная версия подключается как резерв
-(`window.__smetaModule`) и переключается на основную только после полного
-переноса и сравнительного тестирования.
+Ниже — исторический план переноса по фазам (все фазы выполнены).
 
 ## Принципы
 
@@ -22,9 +23,7 @@
 5. После каждой фазы — smoke-тест: обе версии открываются, базовый сценарий
    (создать смету → добавить раздел → строки → суммы сходятся) проходит в обеих.
 
-## Фазы (123 функции по зонам)
-
-### Фаза 1 — каркас таблицы (29 функций, низкий риск) — ✅ ВЫПОЛНЕНО (PR #15)
+## Фазы (123 функции по зонам) — все выполне
 
 Отображение, форматирование, пагинация, редактирование ячеек — без этого
 таблица в модульной версии не соберётся.
@@ -44,7 +43,7 @@
 - Пагинация (4): `pageCount`, `goPage`, `gotoLastPage`, `pageLabel`
   (вычисляемые `filteredRows`, `sortedRows`, `totalPages` уже есть)
 
-### Фаза 2 — структура сметы (26 функций)
+### Фаза 2 — структура сметы (26 функций) ✅
 
 - Разделы и главы (18): `openAddSectionModal`, `openEditSectionModal`,
   `saveSectionModal`, `addSection`, `removeSectionByTab`,
@@ -56,7 +55,7 @@
   `rangeSelect`, `clearSelection`, `selectionTotal`, `openBatchBar`,
   `batchApply`, `setAllSelectedPriceFromNsb`
 
-### Фаза 3 — удобство работы (30 функций)
+### Фаза 3 — удобство работы (30 функций) ✅
 
 - Группировка и сортировка (15): `toggleGroupMenu`, `visibleGroups`,
   `groupedFlatRows`, `toggleGroupCollapse`, `groupCollapsedFn`, `groupLabel`,
@@ -69,7 +68,7 @@
 - Ресурсы и подсказки (5): `applyResourcePrice`, `findResourceByName`,
   `suggestionsFor`, `acceptSuggestion`, `mergeSameResources`
 
-### Фаза 4 — данные и вывод (22 функции)
+### Фаза 4 — данные и вывод (22 функции) ✅
 
 - НСБ-менеджмент (10): `nsbFiltered`, `nsbAddNew`, `nsbEdit`, `nsbSaveEdit`,
   `nsbDelete`, `nsbResetDefaults`, `nsbApply`, `nsbApplyToSelected`,
@@ -82,7 +81,7 @@
   `download`, `downloadBlob`, `doPrint`, `printPage` (сервисы export.js
   уже дают JSON/CSV/Excel — останется подключить UI)
 
-### Фаза 5 — Гант (16 функций, самая сложная)
+### Фаза 5 — Гант (16 функций, самая сложная) ✅
 
 `toggleGantt`, `ganttData`, `ganttLinkLines`, `trackGanttLink`,
 `ganttBarStyle`, `ganttSecBarStyle`, `startGanttDrag`, `resetGanttShift`,
@@ -93,12 +92,15 @@
 Переносить последней: тянет за собой форматирование, drag-and-drop строк
 и экспорт SVG/PNG.
 
-## Известные заглушки на текущий момент
+## Итог по заглушкам и плейсхолдерам
 
 | Место | Что | Статус |
 |---|---|---|
-| `src/index.html` (Gantt View) | «В разработке...» | закрывается фазой 5 |
-| `src/index.html` (Summary View) | «В разработке...» | закрывается фазой 4 |
+| `src/js/app.js` (12 UI-заглушек) | `startRenameSection`, `moveGridCursor`, `openCell`, `removeSelected`, `openCalc`, `openResHub`, `openNsb` и др. | ✅ реализованы, покрыты тестами (`migrated-ui.test.js`) |
+| `index.html` / `src/index.html` (Gantt View) | плейсхолдер «В разработке...» | ✅ снят — Гант работает (Фаза 5) |
+| `index.html` / `src/index.html` (Summary View) | плейсхолдер «В разработке...» | ✅ снят — сводная ведомость работает (Фаза 4) |
+| `js/` (legacy-каталог) + `legacy-adapter.js` | дублирующий код | ✅ удалены |
+| `problemCount()` | считается через сервис validation | ✅ готово |
 
-Бывшие заглушки UI (12 функций) реализованы и покрыты тестами;
-`problemCount()` реализован через сервис validation.
+Функциональных заглушек (`TODO` / `stub` / `not implemented`) в коде не осталось;
+легаси-обёртки заменены реэкспортом из модулей единого источника истины.

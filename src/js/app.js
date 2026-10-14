@@ -341,6 +341,7 @@ window.smeta = function smeta() {
     groupCollapsed: {},
     page: 0,
     historyOpen: false,
+    dragRow: null, // drag&drop строк между разделами (#26)
     activityLog: loadActivity(),
     undoStack: [],
     redoStack: [],
@@ -527,14 +528,51 @@ window.smeta = function smeta() {
       return this.selectedIds.has(rowId);
     },
 
+    /* ---------- проблемы сметы (#10, перенос legacy — фаза 1) ---------- */
+
+    get problems() {
+      const list = [];
+      let n = 0;
+      for (let si = 0; si < this.data.sections.length; si++) {
+        const sec = this.data.sections[si];
+        if (!sec.name.trim()) list.push({ sev: 'warn', text: `Раздел ${si + 1}: пустое название`, si });
+        for (const r of sec.resources) {
+          n++;
+          const label = `№${n} «${(r.name || '').trim() || 'без наименования'}»`;
+          if (!(String(r.name).trim() || String(r.basis).trim()))
+            list.push({ sev: 'err', text: `${label}: пустая запись (нет ни наименования, ни обоснования)`, si, id: r.id });
+          else {
+            if (!String(r.basis).trim())
+              list.push({ sev: 'warn', text: `${label}: нет обоснования (шифра расценки)`, si, id: r.id });
+            if ((Number(r.price) || 0) <= 0)
+              list.push({ sev: 'err', text: `${label}: цена ≤ 0 — стоимость не формируется`, si, id: r.id });
+            if ((Number(r.qty) || 0) <= 0)
+              list.push({ sev: 'warn', text: `${label}: количество ≤ 0`, si, id: r.id });
+            if (!String(r.unit).trim())
+              list.push({ sev: 'warn', text: `${label}: не указана единица измерения`, si, id: r.id });
+          }
+        }
+      }
+      return list;
+    },
+
     /**
-     * Количество проблем (для значка)
-     * Считает ошибки валидации сметы через единый сервис validation,
-     * как геттер problems() в legacy js/app.js.
+     * Количество проблем (для значка), опционально с фильтром по severity
      */
-    problemCount() {
-      const result = validation.validateProject(this.data);
-      return result.valid ? 0 : result.errors.length;
+    problemCount(sev) {
+      return this.problems.filter((p) => !sev || p.sev === sev).length;
+    },
+
+    goToProblem(p) {
+      this.activeTab = null;
+      this.page = 0;
+      if (p.si != null) {
+        // модульный selectTab переключает вкладку — в legacy здесь прямое присваивание
+        this.activeTab = p.si;
+        this.selectedIds = new Set();
+      }
+      if (p.id) this.selectedIds = new Set([p.id]);
+      this.historyOpen = false;
     },
 
     /**
@@ -1269,6 +1307,202 @@ window.smeta = function smeta() {
       const items = this.flatRows;
       const target = items[n - 1];
       row.pred = target ? String(this.rowNumber(target.row.id)) : '';
+    },
+
+    // ==========================================
+    // Перенесено из legacy — фаза 1 (см. docs/MIGRATION.md)
+    // ==========================================
+
+    /* ---------- форматирование ---------- */
+
+    fmtNum(v) {
+      const n = Number(v) || 0;
+      return n.toLocaleString('ru-RU', { maximumFractionDigits: 6 });
+    },
+
+    fmtMoney(v) {
+      return (Number(v) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
+    typeLabel(row) {
+      if (row.type === 'labor') return 'ЗТ · труд';
+      if (row.type === 'machine') return row.operator ? 'ОМ · Тмр' : 'ОМ · машины';
+      return 'М · материал';
+    },
+
+    setType(row, t) {
+      row.type = t;
+      if (t !== 'machine') row.operator = false;
+    },
+
+    /* ---------- снапшот данных для сохранения ---------- */
+
+    exportable() {
+      return JSON.parse(JSON.stringify(this.data));
+    },
+
+    /* ---------- вычисления (#11) ---------- */
+
+    rowTotal(row) {
+      return (Number(row.qty) || 0) * (Number(row.price) || 0);
+    },
+
+    sectionTotal(section) {
+      return section.resources.reduce((s, r) => s + this.rowTotal(r), 0);
+    },
+
+    roundingLabel() {
+      const r = this.data.rounding || {};
+      return (ROUND_MODES[r.mode] || ROUND_MODES.kopecks).label + ' · ' + (ROUND_METHODS[r.method] || '');
+    },
+
+    setRecalcMode(mode) {
+      this.data.recalcMode = mode;
+      if (mode === 'auto' && this.dirty) this.saveLocal();
+      this.logActivity('Режим пересчёта: ' + (mode === 'auto' ? 'автоматический' : 'ручной'));
+    },
+
+    forceRecalc() {
+      this.saveLocal();
+      this.savedFlash = true;
+      setTimeout(() => (this.savedFlash = false), 1500);
+    },
+
+    /* ---------- пагинация (#38) ---------- */
+
+    get pageCount() {
+      return Math.max(1, this.totalPages);
+    },
+
+    goPage(delta) {
+      this.page = Math.max(0, Math.min(this.pageCount - 1, this.page + delta));
+      this.cursor = -1;
+    },
+
+    gotoLastPage() { this.page = this.pageCount - 1; },
+
+    pageLabel() {
+      return `${Math.min(this.page + 1, this.pageCount)} / ${this.pageCount}`;
+    },
+
+    /* ---------- таблица: ширины и служебные ---------- */
+
+    totalTableWidth() {
+      return this.visibleColumns().reduce((s, c) => s + c.width, 0);
+    },
+
+    colSpanFor(key) {
+      // ячейка-разделитель на всю ширину таблицы: суммарный colspan видимых колонок
+      const vis = this.visibleColumns();
+      const idx = vis.findIndex((c) => c.key === key);
+      if (idx < 0) return 0;
+      let span = 0;
+      for (let i = idx; i < vis.length; i++) span += (vis[i].key === 'name' ? 2 : 1);
+      return span;
+    },
+
+    colIcon(key) {
+      return { num: '#', basis: 'T', name: 'T', type: '⬡', unit: 'T', qty: '#', price: '$', total: '∑', note: 'T', days: '🗓', pred: '→', actions: '' }[key] || '';
+    },
+
+    resetColWidths() {
+      localStorage.removeItem(LS_COLS_KEY);
+      location.reload();
+    },
+
+    /* ---------- редактирование ячеек (#37) ---------- */
+
+    commitEdit(ev, field, item) {
+      const row = item.row;
+      if (ev && ev.key === 'Escape') { this.editing = null; return; }
+      const input = ev && ev.target;
+      let val = input ? input.value : row[field];
+      if (['qty', 'price', 'days'].includes(field)) {
+        val = String(val).replace(',', '.');
+        const n = parseFloat(val);
+        row[field] = isFinite(n) ? n : 0;
+      } else if (field === 'pred') {
+        this.setPredByNumber(row, val);
+      } else {
+        row[field] = String(val).trim();
+      }
+      if (field === 'price') this.onPriceEdited(row);
+      this.pushHistory(`Правка поля «${field}»`);
+      this.editing = null;
+      // Tab — переход к следующей редактируемой ячейке строки (#37)
+      if (ev && ev.key === 'Tab') {
+        ev.preventDefault();
+        const order = ['basis', 'name', 'unit', 'qty', 'price', 'note', 'days', 'pred'];
+        const i = order.indexOf(field);
+        const next = order[(i + 1) % order.length];
+        this.$nextTick(() => this.openCell(next, item));
+      }
+    },
+
+    /* ---------- модальное окно записи ---------- */
+
+    openRowModal(item) {
+      this.expandedRow = { ...item };
+    },
+
+    addRow(si) {
+      if (si == null || si < 0 || !this.data.sections[si]) { this.createSection(); this.activeTab = this.data.sections.length - 1; return; }
+      this.pushHistory('Добавлена запись');
+      this.data.sections[si].resources.push(Resource.create());
+      const list = this.data.sections[si].resources;
+      const created = list[list.length - 1];
+      this.openCell('name', { row: created });
+    },
+
+    saveRecordModal() {
+      const row = this.recordRow;
+      if (row && !(String(row.name).trim() || String(row.basis).trim())) {
+        // пустая запись — удалить
+        const idx = this.data.sections[this.recordDraft.si].resources.indexOf(row);
+        if (idx >= 0) this.data.sections[this.recordDraft.si].resources.splice(idx, 1);
+      } else if (row) {
+        this.syncResourcePrice(row);
+      }
+      this.recordModalOpen = false;
+      this.recordDraft = null;
+    },
+
+    removeRowById(si, id) {
+      this.pushHistory('Удалена запись');
+      const arr = this.data.sections[si].resources;
+      const idx = arr.findIndex((r) => r.id === id);
+      if (idx >= 0) arr.splice(idx, 1);
+      this.selectedIds.delete(id);
+    },
+
+    moveRow(item, delta) {
+      const sec = this.data.sections[item.si];
+      const from = sec.resources.findIndex((r) => r.id === item.row.id);
+      const to = from + delta;
+      if (from < 0 || to < 0 || to >= sec.resources.length) return;
+      this.pushHistory('Перемещение записи');
+      const [moved] = sec.resources.splice(from, 1);
+      sec.resources.splice(to, 0, moved);
+    },
+
+    /* drag&drop строк между разделами (#26) */
+    startRowDrag(e, item) {
+      this.dragRow = { si: item.si, id: item.row.id };
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', item.row.id); } catch (err) { /* ignore */ }
+    },
+
+    endRowDrag() { this.dragRow = null; },
+
+    dropOnSection(si) {
+      if (!this.dragRow || this.dragRow.si === si) return;
+      this.pushHistory('Запись перенесена в другой раздел');
+      const fromArr = this.data.sections[this.dragRow.si].resources;
+      const idx = fromArr.findIndex((r) => r.id === this.dragRow.id);
+      if (idx < 0) return;
+      const [moved] = fromArr.splice(idx, 1);
+      this.data.sections[si].resources.push(moved);
+      this.dragRow = null;
     },
 
     /** Открытие модалки реквизитов проекта */

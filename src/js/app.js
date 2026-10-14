@@ -24,6 +24,7 @@ import * as exportService from './services/export.js';
 import * as validation from './services/validation.js';
 import { roundMoney, roundGrandTotal, ROUND_MODES, ROUND_METHODS } from './rounding.js';
 import { xmlEsc, svgToPng } from './office.js';
+import { encodeValue as toonEncode, decodeValue as toonDecode } from './toon.js';
 
 // ============================================
 // Константы
@@ -98,7 +99,7 @@ function loadLocal() {
   try {
     const data = localStorage.getItem(LS_KEY);
     if (data) {
-      const project = JSON.parse(data);
+      const project = toonDecode(LS_KEY, data);
       if (validation.validateProject(project).valid) {
         return project;
       }
@@ -127,7 +128,7 @@ function loadLocal() {
 function loadNsb() {
   try {
     const data = localStorage.getItem(LS_NSB_KEY);
-    return data ? JSON.parse(data) : defaultNsb();
+    return data ? toonDecode(LS_NSB_KEY, data) : defaultNsb();
   } catch (e) {
     return defaultNsb();
   }
@@ -140,7 +141,7 @@ function loadNsb() {
 function loadResources() {
   try {
     const data = localStorage.getItem(LS_RESOURCES_KEY);
-    return data ? JSON.parse(data) : [];
+    return data ? toonDecode(LS_RESOURCES_KEY, data) : [];
   } catch (e) {
     return [];
   }
@@ -153,7 +154,7 @@ function loadResources() {
 function loadActivity() {
   try {
     const data = localStorage.getItem(LS_HISTORY_KEY);
-    return data ? JSON.parse(data) : [];
+    return data ? toonDecode(LS_HISTORY_KEY, data) : [];
   } catch (e) {
     return [];
   }
@@ -1239,7 +1240,7 @@ window.smeta = function smeta() {
 
     /** Сохранение базы НСБ в localStorage */
     saveNsb() {
-      try { localStorage.setItem(LS_NSB_KEY, JSON.stringify(this.nsbItems)); } catch (e) { /* ignore */ }
+      try { localStorage.setItem(LS_NSB_KEY, toonEncode(LS_NSB_KEY, this.nsbItems)); } catch (e) { /* ignore */ }
     },
 
     /** Текущая строка формы записи (для модалки редактирования) */

@@ -142,4 +142,16 @@ describe('src/js/app.js — перенесённые из legacy UI-функци
     expect(row.unit).toBe('чел-ч');
     expect(obj.calcModalOpen).toBe(false);
   });
+
+  it('problemCount считает ошибки валидации сметы', () => {
+    const origSections = obj.data.sections;
+    const mkSection = (name) => ({ id: 's1', name, parentId: null, collapsed: false, resources: [] });
+    // пустое название раздела — ошибка валидации
+    obj.data.sections = [mkSection('')];
+    expect(obj.problemCount()).toBeGreaterThan(0);
+    // корректный раздел — ноль проблем
+    obj.data.sections = [mkSection('Раздел')];
+    expect(obj.problemCount()).toBe(0);
+    obj.data.sections = origSections;
+  });
 });

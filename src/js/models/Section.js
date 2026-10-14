@@ -23,6 +23,7 @@ export class Section {
       parentId: null,
       collapsed: false,
       resources: [],
+      children: [], // подразделы (главы), см. UI-логику app.js: isChapter/promoteSection
     };
   }
 

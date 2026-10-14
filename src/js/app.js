@@ -25,6 +25,7 @@ import * as validation from './services/validation.js';
 import { roundMoney, roundGrandTotal, ROUND_MODES, ROUND_METHODS } from './rounding.js';
 import { xmlEsc, svgToPng } from './office.js';
 import { encodeValue as toonEncode, decodeValue as toonDecode } from './toon.js';
+import { formatMoney } from './utils/formatters.js';
 
 // ============================================
 // Константы
@@ -70,22 +71,7 @@ function safeJsonParse(str, defaultValue = null) {
   }
 }
 
-/**
- * Форматирование денег
- * @param {number} value - Значение
- * @returns {string} Форматированная строка
- */
-function formatMoney(value) {
-  const n = Number(value) || 0;
-  return n.toLocaleString('ru-RU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-/* Локальная копия debounce удалена: дублировала simpleDebounce из
-   utils/debounce.js и нигде в модуле не вызывалась. При необходимости
-   используйте: import { simpleDebounce } from './utils/debounce.js'; */
+// Форматирование денег — единая реализация в utils/formatters.js (см. импорт выше).
 
 // ============================================
 // Загрузка данных

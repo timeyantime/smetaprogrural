@@ -441,13 +441,11 @@
             </template>
             <!-- SVG-слой связей -->
             <svg class="at-gantt-links" :width="ganttLinksSize.w" :height="ganttLinksSize.h" aria-hidden="true">
-              <template x-for="(d, li) in ganttLinkLines" :key="'lnk-' + li">
-                <path :d="d" class="at-gantt-linkpath" marker-end="url(#arrowhead)" />
-              </template>
-              <template x-if="ganttLinkPath">
-                <line :x1="ganttLinkPath[0]" :y1="ganttLinkPath[1]" :x2="ganttLinkPath[2]" :y2="ganttLinkPath[3]"
-                      class="at-gantt-linkpath preview" />
-              </template>
+              <!-- Vite/parse5 не может сериализовать <template> внутри SVG-контекста
+                   (сломанная сборка: "Cannot read properties of undefined (reading 'nodeName')").
+                   Эквивалент исходному x-for/x-if: Alpine-компонент ganttLinks() в src/js/app.js
+                   перерисовывает этот <g> при изменениях ganttLinkLines / ganttLinkPath. -->
+              <g :data-link-count="ganttLinkLines.length" x-data="ganttLinks()" x-effect="render($el, ganttLinkLines, ganttLinkPath)"></g>
               <defs>
                 <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
                   <polygon points="0 0, 7 3.5, 0 7" fill="#666" />

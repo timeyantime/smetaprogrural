@@ -2572,6 +2572,34 @@ window.smeta = function smeta() {
   };
 };
 
+// Вспомогательный Alpine-компонент для SVG-слоя связей Ганта.
+// Нужен потому, что parse5 (используется Vite при сборке) не умеет
+// сериализовать <template x-for>/<template x-if> внутри SVG-контекста —
+// вместо этого связи перерисовываются императивно через x-effect (см. index.html).
+window.ganttLinks = function ganttLinks() {
+  const NS = 'http://www.w3.org/2000/svg';
+  return {
+    render(el, lines, preview) {
+      el.replaceChildren(
+        ...lines.map((d) => {
+          const p = document.createElementNS(NS, 'path');
+          p.setAttribute('d', d);
+          p.setAttribute('class', 'at-gantt-linkpath');
+          p.setAttribute('marker-end', 'url(#arrowhead)');
+          return p;
+        }),
+        ...(preview ? (() => {
+          const l = document.createElementNS(NS, 'line');
+          l.setAttribute('x1', preview[0]); l.setAttribute('y1', preview[1]);
+          l.setAttribute('x2', preview[2]); l.setAttribute('y2', preview[3]);
+          l.setAttribute('class', 'at-gantt-linkpath preview');
+          return [l];
+        })() : []),
+      );
+    },
+  };
+};
+
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
   // Проверяем доступность localStorage

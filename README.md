@@ -1,7 +1,7 @@
 # СметаПро — сметная программа ресурсного метода
 
 Локальное веб-приложение для составления локальных смет ресурсным методом на **Alpine.js** (ES-модули, без бэкенда).
-Полное описание модели данных и столбцов — в [docs/SPEC.md](docs/SPEC.md), история перехода с legacy-архитектуры — в [docs/MIGRATION.md](docs/MIGRATION.md).
+Полное описание модели данных и столбцов — в [docs/SPEC.md](docs/SPEC.md).
 
 ## Запуск
 
@@ -37,13 +37,13 @@ python3 -m http.server 8080
 ## Структура
 
 Приложение полностью модульное (legacy-версия `js/` удалена по завершении
-миграции — см. [docs/MIGRATION.md](docs/MIGRATION.md)):
+миграции):
 
 ```
 index.html          — точка входа: грузит ES-модули src/js/* + Alpine (CDN)
-src/index.html      — копия интерфейса для dev-сервера Vite
 src/js/app.js       — Alpine-компонент smeta(): данные, расчёты, грид,
-                      сортировка/группировка, Гант, НСБ, батч, печать, экспорт
+                      сортировка/группировка, drag&drop строк и разделов,
+                      Гант, НСБ, батч, печать, экспорт
 src/js/money.js     — директива x-money (денежное форматирование ячеек)
 src/js/models/      — модели Project / Section / Resource
 src/js/services/    — storage, calculation, validation, export (JSON/CSV/Excel)
@@ -51,8 +51,7 @@ src/js/rounding.js  — единый источник истины для окр
 src/js/office.js    — SpreadsheetML-экспорт, xmlEsc, svgToPng
 src/js/utils/       — debounce/throttle и прочие утилиты
 src/js/tests/       — тесты (vitest, jsdom): `npm test` — 100/100
-css/style.css       — стили Airtable-style + печатные правила
+src/css/style.css   — стили Airtable-style + печатные правила
 docs/SPEC.md        — спецификация: столбцы, формулы, модель данных
-docs/MIGRATION.md   — история и итог миграции legacy → модульная архитектура
 dist/               — продакшн-сборка (`npm run build`)
 ```

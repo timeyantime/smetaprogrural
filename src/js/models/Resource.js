@@ -37,6 +37,26 @@ export class Resource {
       days: null, // Длительность, дни (для диаграммы Ганта)
       pred: '', // Преемственность: номер записи (для связей в Гант)
       startAt: null, // Принудительно начало в днях от старта сметы
+      // --- Каркасный метод (framework v2.0): метаданные строки ---
+      wasteGroup: '', // группа норм отходов (id из WASTE_NORMS), '' = без запаса
+      perUnit: 0, // p_отп отпускная цена ₽/ед. (0 = использовать price)
+      unitMassT: 0, // Масса_ед, т (для рейсов доставки и металлолома)
+      vehicleCapT: 0, // Грузоподъемность_т
+      distanceKm: 0, // L_км плечо перевозки
+      tariffPerKm: 0, // C_тариф_км, ₽/км
+      supplyFee: 0, // C_подачи, ₽
+      kGabarit: 1, // k_габарит
+      manipulatorFlag: false, // Флаг_манипулятор (0|1)
+      unloadMachineHr: 0, // C_маш_ч разгрузки, ₽/ч
+      unloadHours: 0, // t_час, ч
+      moveDistM: 0, // S_м перемещение после разгрузки
+      moveSpeedMh: 0, // V_перем, м/ч
+      perPct: 0, // П — надбавка, % (1per·П)
+      storePct: 0, // Х — хранение, % (1hran·Х)
+      perOn: true, // 1per ∈ {0,1}
+      storeOn: false, // 1hran ∈ {0,1}
+      night: false, // работа в ночную смену (k_ночн)
+      holiday: false, // работа в праздник (k_ночн)
       ...partial,
     };
   }

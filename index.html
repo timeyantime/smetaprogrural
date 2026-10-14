@@ -563,15 +563,38 @@
             </div>
             <div class="at-side-row indent"><span></span><b x-money="sums.sp"></b></div>
 
-            <div class="at-side-row">
+            <div class="at-side-row" x-show="!sums.framework">
               <span>НДС</span>
               <span class="at-rate">
                 <input class="at-pct" type="number" step="0.1" x-model.number="data.rates.vatPct" />%
               </span>
             </div>
-            <div class="at-side-row indent"><span></span><b x-money="sums.vat"></b></div>
+            <div class="at-side-row indent" x-show="!sums.framework"><span></span><b x-money="sums.vat"></b></div>
 
-            <div class="at-side-row grand"><span>ИТОГО ПО СМЕТЕ</span><b x-money="sums.grand"></b></div>
+            <!-- Каркасный метод v2.0: ЛЗ, Налог, Возвратные -->
+            <template x-if="sums.framework">
+              <div>
+                <div class="at-side-row"><span>Лимитированные затраты (ЛЗ)</span><b x-money="sums.lz"></b></div>
+                <div class="at-side-row indent"><span title="Временные здания и сооружения">ВЗ</span><b x-money="sums.lzParts.vz"></b></div>
+                <div class="at-side-row indent"><span title="Зимнее удорожание">ЗУ</span><b x-money="sums.lzParts.zu"></b></div>
+                <div class="at-side-row indent"><span title="Потери от осадков (вероятностные)">Дож</span><b x-money="sums.lzParts.rain"></b></div>
+                <div class="at-side-row indent"><span title="Подготовка территории">ПП</span><b x-money="sums.lzParts.pp"></b></div>
+                <div class="at-side-row indent"><span title="Доставка персонала (топливо ×2 ×1.05 × дни)">Т_раб</span><b x-money="sums.lzParts.workerTransport"></b></div>
+                <div class="at-side-row indent"><span title="Гарантийное удержание (cash flow)">Гарант</span><b x-money="sums.lzParts.garant"></b></div>
+                <div class="at-side-row indent"><span title="Непредвиденные расходы, 3% для каркаса">НП</span><b x-money="sums.lzParts.np"></b></div>
+                <div class="at-side-row"><span>Транспортный налог и страховка</span><b x-money="sums.vehicleTax"></b></div>
+                <div class="at-side-row">
+                  <span>Налог (УСН)</span>
+                  <span class="at-rate">
+                    <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.usnPct" />%
+                  </span>
+                </div>
+                <div class="at-side-row indent"><span></span><b x-money="sums.tax"></b></div>
+                <div class="at-side-row"><span title="Металлолом + ликвидация ВЗ">− Возвратные суммы</span><b x-money="-sums.returnable.total"></b></div>
+              </div>
+            </template>
+
+            <div class="at-side-row grand"><span x-text="sums.framework ? 'ИТОГО S = ПЗ+НР+СП+ЛЗ+Нал−Возвр' : 'ИТОГО ПО СМЕТЕ'"></span><b x-money="sums.grand"></b></div>
           </div>
 
           <div class="at-side-section" x-show="selectedIds.size > 0">
@@ -604,6 +627,53 @@
                 </select>
               </span>
             </div>
+          </div>
+
+          <!-- Каркасный метод ценообразования v2.0 (framework.js) -->
+          <div class="at-side-section">
+            <div class="at-side-title" title="S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС)">Каркасный метод v2.0</div>
+            <div class="at-side-row">
+              <span>Включить каркасный расчёт</span>
+              <input type="checkbox" x-model="data.framework.enabled" />
+            </div>
+            <template x-if="data.framework.enabled">
+              <div>
+                <div class="at-side-row"><span title="Непредвиденные расходы, % от С_СМР (3% для каркаса)">НП, %</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.npPct" /></div>
+                <div class="at-side-row"><span title="Временные здания и сооружения, % от С_СМР">ВЗ, %</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.vzPct" /></div>
+                <div class="at-side-row"><span title="Зимнее удорожание, % от С_СМР">ЗУ, %</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.zuPct" /></div>
+                <div class="at-side-row"><span title="Подготовка территории, % от С_СМР">ПП, %</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.ppPct" /></div>
+                <div class="at-side-row"><span title="Гарантийное удержание, 3–5% (cash flow)">Гарант, %</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.garantPct" /></div>
+                <div class="at-side-row"><span title="Т_раб: расход л/100км">Расход, л/100км</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.fuelPer100" /></div>
+                <div class="at-side-row"><span title="Цена топлива, ₽/л">Топливо, ₽/л</span>
+                  <input class="at-pct" type="number" step="0.1" x-model.number="data.framework.fuelPrice" /></div>
+                <div class="at-side-row"><span title="L_км до объекта в одну сторону (×2 туда-обратно)">Плечо, км</span>
+                  <input class="at-pct" type="number" step="1" x-model.number="data.framework.workerDistanceKm" /></div>
+                <div class="at-side-row"><span title="Дни_раб — фактические дни бригады на объекте">Дни бригады</span>
+                  <input class="at-pct" type="number" step="1" x-model.number="data.framework.workDays" /></div>
+                <div class="at-side-row"><span title="Дож: простои от осадков только на ФОТ">Дожди, дней</span>
+                  <input class="at-pct" type="number" step="1" x-model.number="data.framework.rainDays" style="width:44px"
+                         title="d_дождь" />
+                  <input class="at-pct" type="number" step="0.01" min="0" max="1" x-model.number="data.framework.rainKLoss" style="width:44px"
+                         title="k_потерь (0.05–0.30)" />
+                  <input class="at-pct" type="number" step="0.05" min="0" max="1" x-model.number="data.framework.rainProb" style="width:48px"
+                         title="p_вероятн" /></div>
+                <div class="at-side-row"><span title="T_стр_мес: срок строительства, мес (1–3)">Срок, мес</span>
+                  <input class="at-pct" type="number" step="1" min="1" max="12" x-model.number="data.framework.buildMonths" /></div>
+                <div class="at-side-row"><span title="Транспортный налог + страховка за год, ₽">Трансн.+страх., ₽/год</span>
+                  <input class="at-pct" type="number" step="100" x-model.number="data.framework.vehicleTaxYear" />
+                  <input class="at-pct" type="number" step="100" x-model.number="data.framework.insuranceYear" /></div>
+                <div class="at-side-row"><span title="Реализация металлолома, ₽/т">Лом, ₽/т</span>
+                  <input class="at-pct" type="number" step="100" x-model.number="data.framework.scrapPricePerTon" /></div>
+                <div class="at-side-row"><span title="Ликвидационная стоимость ВЗ после демонтажа">Ликвид. ВЗ, ₽</span>
+                  <input class="at-pct" type="number" step="100" x-model.number="data.framework.vzLiquidation" /></div>
+              </div>
+            </template>
           </div>
         </div>
       </aside>

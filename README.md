@@ -34,3 +34,18 @@ js/money.js     — директива x-money (денежное формати�
 css/style.css   — стили Airtable-style + печатные правила
 docs/SPEC.md    — спецификация: столбцы, формулы, модель данных
 ```
+
+### Модульная версия (в разработке)
+
+Параллельно идёт миграция на модульную архитектуру в `src/`:
+
+- `src/js/app.js` — модульная версия компонента smeta (ядро перенесено);
+- `src/js/models/` — модели Project / Section / Resource;
+- `src/js/services/` — storage, calculation, validation, export;
+- `src/js/rounding.js`, `src/js/office.js` — единый источник истины для
+  округления и Excel-экспорта (файлы в `js/` — тонкие обёртки над ними);
+- `src/js/tests/` — тесты (vitest, `npm test`).
+
+Модульная версия пока подключается как резерв (`window.__smetaModule`),
+основное приложение — legacy `js/app.js`. Статус переноса и план —
+в [docs/MIGRATION.md](docs/MIGRATION.md).

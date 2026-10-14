@@ -485,9 +485,12 @@ window.smeta = function smeta() {
 
     /**
      * Количество проблем (для значка)
+     * Считает ошибки валидации сметы через единый сервис validation,
+     * как геттер problems() в legacy js/app.js.
      */
     problemCount() {
-      return 0; // Будет реализовано позже
+      const result = validation.validateProject(this.data);
+      return result.valid ? 0 : result.errors.length;
     },
 
     /**

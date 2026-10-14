@@ -379,13 +379,6 @@
     </div>
   </div>
 
-  <!-- Модульное приложение (окончательный вариант после миграции из legacy js/):
-       - /src/js/money.js регистрирует Alpine-директиву x-money до старта Alpine
-         (этот модуль отложенный, а CDN-скрипт Alpine тоже defer → порядок сохраняется);
-       - /src/js/app.js объявляет window.smeta для x-data="smeta()" и экспортирует
-         компонент по умолчанию; все бывшие заглушки реализованы, единый источник
-         логики округления/Excel — src/js/rounding.js и src/js/office.js. -->
-  <script type="module" src="/src/js/money.js"></script>
-  <script type="module" src="/src/js/app.js"></script>
+
 </body>
 </html>

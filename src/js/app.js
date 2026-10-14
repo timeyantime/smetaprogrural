@@ -80,19 +80,9 @@ function formatMoney(value) {
   });
 }
 
-/**
- * Debounce функция
- * @param {Function} fn - Функция
- * @param {number} delay - Задержка в мс
- * @returns {Function} Debounced функция
- */
-function debounce(fn, delay) {
-  let timeout;
-  return function(...args) {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => fn.apply(this, args), delay);
-  };
-}
+/* Локальная копия debounce удалена: дублировала simpleDebounce из
+   utils/debounce.js и нигде в модуле не вызывалась. При необходимости
+   используйте: import { simpleDebounce } from './utils/debounce.js'; */
 
 // ============================================
 // Загрузка данных
@@ -319,6 +309,17 @@ window.smeta = function smeta() {
     batchQty: '',
     batchUnit: '',
     darkTheme: false,
+    cursor: -1,
+    calcTab: 'labor',
+    calc: {
+      volume: 100,       // объём работ в единице из сметы
+      normTime: 1.2,     // чел-ч (или machine-часы) на единицу объёма
+      crewSize: 3,       // бригада, чел. (для машин — звено механизаторов)
+      shiftsPerDay: 1,   // смен в день
+      hoursPerShift: 8,  // часов в смене
+      ratePerHour: 250,  // стоимость одного чел-ч / маш-ч, руб.
+      days: null,        // обратный расчёт: задан срок → подобрать состав
+    },
     calcModalOpen: false,
     projModalOpen: false,
     resModalOpen: false,
@@ -993,11 +994,11 @@ window.smeta = function smeta() {
       this.helpModalOpen = true;
     },
 
-    /**
-     * Открытие модального окна НСБ
-     */
+    /** Открытие справочника НСБ (сброс состояния редактирования) */
     openNsb() {
       this.nsbModalOpen = true;
+      this.nsbEditId = null;
+      this.nsbDraft = null;
     },
 
     // ==========================================
@@ -1042,22 +1043,199 @@ window.smeta = function smeta() {
     },
 
     // ==========================================
-    // Прочие функции (заглушки для совместимости)
+    // Прочие UI-функции (перенесены из legacy js/app.js)
     // ==========================================
 
-    // Эти функции будут реализованы позже
-    startRenameSection(si) {},
-    moveSectionByDrag(si) {},
-    startResize(e, col) {},
-    moveGridCursor(dir) {},
-    openCell(field, item) {},
-    removeSelected() {},
-    cancelNsbEdit() {},
-    cancelRecordModal() {},
-    openProjectModal() {},
-    openCalc() {},
-    openResHub() {},
-    openNsb() {},
+    /** Переименование раздела inline (F2/клик по имени вкладки) */
+    startRenameSection(si) {
+      this.renamingSection = si;
+      this.$nextTick(() => {
+        const el = document.querySelector('.at-tab-wrap .at-tab-rename');
+        if (el) { el.focus(); el.select(); }
+      });
+    },
+
+    /** Перемещение вкладки раздела drag&drop */
+    moveSectionByDrag(targetSi) {
+      if (this.tabDragFrom === null || this.tabDragFrom === targetSi) return;
+      const arr = this.data.sections;
+      const [moved] = arr.splice(this.tabDragFrom, 1);
+      arr.splice(targetSi, 0, moved);
+      this.activeTab = null;
+      this.tabDragFrom = null;
+    },
+
+    /** Ресайз колонки таблицы за край заголовка */
+    startResize(e, col) {
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startW = col.width;
+      document.body.style.userSelect = 'none';
+      const onMove = (ev) => {
+        col.width = Math.max(col.min, startW + ev.clientX - startX);
+      };
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        document.body.style.userSelect = '';
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+
+    /** Перемещение курсора таблицы стрелками ↑/↓ */
+    moveGridCursor(delta) {
+      const items = this.pagedRows;
+      if (!items.length) return;
+      this.cursor = Math.max(0, Math.min(items.length - 1, this.cursor + delta));
+      const item = items[this.cursor];
+      if (item) this.selectedIds = new Set([item.row.id]);
+    },
+
+    /** Открытие ячейки на редактирование */
+    openCell(field, item) {
+      this.editing = { key: item.row.id + '|' + field };
+    },
+
+    /** Удаление выделенных записей */
+    removeSelected() {
+      if (!this.selectedIds.size) return;
+      if (!confirm(`Удалить выделенные записи (${this.selectedIds.size})?`)) return;
+      this.pushHistory(`Удалено записей: ${this.selectedIds.size}`);
+      for (const sec of this.data.sections)
+        sec.resources = sec.resources.filter((r) => !this.selectedIds.has(r.id));
+      this.selectedIds = new Set();
+    },
+
+    /** Отмена редактирования элемента НСБ (пустая новая запись удаляется) */
+    cancelNsbEdit() {
+      if (this.nsbEditId && this.nsbDraft && !String(this.nsbDraft.name || '').trim()) {
+        const idx = this.nsbItems.findIndex((n) => n.id === this.nsbEditId);
+        if (idx >= 0) { this.nsbItems.splice(idx, 1); this.saveNsb(); }
+      }
+      this.nsbEditId = null;
+      this.nsbDraft = null;
+    },
+
+    /** Сохранение базы НСБ в localStorage */
+    saveNsb() {
+      try { localStorage.setItem(LS_NSB_KEY, JSON.stringify(this.nsbItems)); } catch (e) { /* ignore */ }
+    },
+
+    /** Текущая строка формы записи (для модалки редактирования) */
+    get recordRow() {
+      if (!this.recordModalOpen || !this.recordDraft) return null;
+      const sec = this.data.sections[this.recordDraft.si];
+      if (!sec) return null;
+      return sec.resources.find((r) => r.id === this.recordDraft.rowId) || null;
+    },
+
+    /** Открытие модалки формы новой записи */
+    openAddRecordModal() {
+      let si = this.activeTab === null
+        ? (this.data.sections.length ? this.data.sections.length - 1 : null)
+        : this.activeTab;
+      if (si == null || !this.data.sections[si]) {
+        this.addSection();
+        si = this.data.sections.length - 1;
+      }
+      this.pushHistory('Новая запись (форма)');
+      const row = Resource.create({ type: 'material' });
+      this.data.sections[si].resources.push(row);
+      this.recordDraft = { si, rowId: row.id };
+      this.recordModalOpen = true;
+    },
+
+    /** Отмена модалки записи (пустая новая запись удаляется) */
+    cancelRecordModal() {
+      const row = this.recordRow;
+      if (row && !(String(row.name).trim() || String(row.basis).trim() || Number(row.qty) || Number(row.price))) {
+        const sec = this.data.sections[this.recordDraft.si];
+        const idx = sec.resources.indexOf(row);
+        if (idx >= 0) sec.resources.splice(idx, 1);
+      }
+      this.recordModalOpen = false;
+      this.recordDraft = null;
+    },
+
+    /** Синхронизация цены ресурса во всех записях с тем же ключом */
+    syncResourcePrice(row) {
+      if (this.data.recalcMode === 'manual') return; // ручной режим — не трогаем остальные (#48)
+      const k = this.resKey(row);
+      if (!k) return;
+      for (const sec of this.data.sections)
+        for (const r of sec.resources)
+          if (r !== row && this.resKey(r) === k) r.price = row.price;
+    },
+
+    /** Обработка правки цены в ячейке */
+    onPriceEdited(row) {
+      this.syncResourcePrice(row);
+      this.logActivity(`Цена «${(row.name || '').slice(0, 40)}» → ${row.price}`);
+    },
+
+    /** Сквозной номер записи по flatRows (для предшественника по номеру) */
+    rowNumber(rowId) {
+      const i = this.flatRows.findIndex((it) => it.row.id === rowId);
+      return i >= 0 ? i + 1 : null;
+    },
+
+    /** Установка предшественника по его номеру (#49) */
+    setPredByNumber(row, numText) {
+      const n = parseInt(numText, 10);
+      if (!isFinite(n) || n <= 0) { row.pred = ''; return; }
+      const items = this.flatRows;
+      const target = items[n - 1];
+      row.pred = target ? String(this.rowNumber(target.row.id)) : '';
+    },
+
+    /** Открытие модалки реквизитов проекта */
+    openProjectModal() { this.projModalOpen = true; },
+
+    /** Открытие калькулятора трудозатрат / маш-часов (#48) */
+    openCalc(prefillRow) {
+      this.calcTab = prefillRow && prefillRow.type === 'machine' ? 'machine' : 'labor';
+      if (prefillRow) {
+        this.calc.volume = Number(prefillRow.qty) || 100;
+        this.calc.ratePerHour = Number(prefillRow.price) || 250;
+      }
+      this.calc.days = null;
+      this.calcModalOpen = true;
+    },
+
+    /** Результат расчёта калькулятора */
+    get calcResult() {
+      const c = this.calc;
+      const V = Number(c.volume) || 0;
+      const N = Number(c.normTime) || 0;
+      const totalHours = V * N;                                   // всего чел-ч / маш-ч
+      const dayHours = Math.max(1, (Number(c.crewSize) || 1)) * Math.max(1, Number(c.shiftsPerDay) || 1) * Math.max(1, Number(c.hoursPerShift) || 8);
+      const days = totalHours > 0 ? totalHours / dayHours : 0;
+      const cost = totalHours * (Number(c.ratePerHour) || 0);
+      // обратная задача: срок задан → минимальный состав бригады
+      const needCrew = (Number(c.days) > 0)
+        ? Math.ceil(totalHours / (Math.max(1, Number(c.days)) * Math.max(1, Number(c.shiftsPerDay) || 1) * Math.max(1, Number(c.hoursPerShift) || 8)))
+        : null;
+      return { totalHours, days: Math.ceil(days), exactDays: days, cost, needCrew, dayHours };
+    },
+
+    /** Применение результата калькулятора к записи */
+    applyCalcToRow(item) {
+      const res = this.calcResult;
+      const row = item ? item.row : this.recordRow;
+      if (!row) { alert('Сначала выделите запись в таблице.'); this.calcModalOpen = false; return; }
+      this.pushHistory('Калькулятор применён к записи');
+      row.type = this.calcTab === 'labor' ? 'labor' : 'machine';
+      row.price = Number(this.calc.ratePerHour) || 0;
+      row.unit = row.unit || (this.calcTab === 'labor' ? 'чел-ч' : 'маш-ч');
+      row.qty = Number(res.totalHours.toFixed(2));
+      if (res.days > 0) row.days = res.days;
+      this.calcModalOpen = false;
+    },
+
+    /** Открытие хаба ресурсов */
+    openResHub() { this.resModalOpen = true; },
   };
 };
 

@@ -9,8 +9,11 @@
   <link rel="stylesheet" href="css/style.css" />
   <style id="print-orientation-style">@media print { @page { size: A4 landscape; margin: 10mm; } }</style>
   <!-- Порядок загрузки: сначала данные/директивы (window.smeta), затем Alpine (defer). -->
-  <script src="js/rounding.js"></script>
-  <script src="js/office.js"></script>
+  <!-- Скрипты приложения. rounding/office — ES-модули-обёртки над src/js/*
+       (единый источник истины без дублирования логики); выполняются ДО
+       классического js/app.js, т.к. модули отложенные по умолчанию. -->
+  <script type="module" src="js/rounding.js"></script>
+  <script type="module" src="js/office.js"></script>
   <script src="js/money.js"></script>
   <script src="js/app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>

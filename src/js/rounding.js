@@ -45,3 +45,7 @@ function roundMoney(value, mode, method) {
 function roundGrandTotal(v) {
   return Math.round((Number(v) || 0) * 100) / 100;
 }
+
+/* ES-модульный экспорт: этот файл — единый источник истины для округления.
+   Импортируется из модулей (services/calculation.js). */
+export { ROUND_MODES, ROUND_METHODS, roundMoney, roundGrandTotal };

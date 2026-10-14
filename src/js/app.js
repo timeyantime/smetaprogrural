@@ -304,6 +304,16 @@ window.smeta = function smeta() {
     // Данные проекта
     data: loadLocal() || defaultData(),
 
+    // Сводная ведомость ресурсов (вид «Сводка»)
+    summaryGroup: 'none', // none | type | unit
+    summarySearch: '',
+
+    // Гант: подсветка критического пути (#49)
+    ganttCritical: false,
+
+    // Боковая панель истории: problems | log
+    historyTab: 'problems',
+
     // UI состояние
     filter: '',
     groupBy: 'none',
@@ -1569,6 +1579,19 @@ window.smeta = function smeta() {
       location.reload();
     },
 
+    /** Показать все скрытые колонки (пункт меню «👁 Показать все колонки») */
+    showAllCols() {
+      this.hiddenCols = [];
+      this.saveUI();
+    },
+
+    /** Число колонок после последней видимой — для colspan-заглушек таблицы */
+    tailCols() {
+      const vis = this.visibleColumns();
+      const lastIdx = vis.length ? this.columns.indexOf(vis[vis.length - 1]) : -1;
+      return Math.max(0, this.columns.length - 1 - lastIdx);
+    },
+
     exportable() {
       return JSON.parse(JSON.stringify(this.data));
     },
@@ -2149,6 +2172,11 @@ window.smeta = function smeta() {
       });
     },
 
+    /** Пункт контекстного меню: открыть калькулятор для этой строки */
+    ctxCalc() {
+      this.ctxAction((item) => this.openCalc(item.row));
+    },
+
     rangeSelect(toIndex) {
       const items = this.flatRows;
       const last = items[items.length - 1];
@@ -2358,6 +2386,22 @@ window.smeta = function smeta() {
       });
       const workedDays = rows.reduce((m, g) => Math.max(m, g.leftDays + g.spanDays), 0);
       const totalDays = Math.max(7, workedDays); // минимум — неделя шкалы
+      /* критический путь (#49): longest path по цепочкам предшественников */
+      const memo = new Map();
+      const chainLen = (g) => {
+        if (memo.has(g)) return memo.get(g);
+        let best = 0;
+        const n = parseInt(String(g.row.pred || '').trim(), 10);
+        if (isFinite(n) && n > 0) {
+          const pred = byNum.get(n);
+          if (pred && pred !== g) best = chainLen(pred);
+        }
+        const len = best + g.spanDays;
+        memo.set(g, len);
+        return len;
+      };
+      const maxChain = rows.reduce((m, g) => Math.max(m, chainLen(g)), 0);
+      rows.forEach((g) => { g.isCritical = this.ganttCritical && chainLen(g) === maxChain; });
       const sections = [];
       for (const { sec, si } of scoped) {
         const gr = rows.filter((g) => g.row && sec.resources.includes(g.row));
@@ -2396,6 +2440,12 @@ window.smeta = function smeta() {
         e.clientX - rect.left,
         e.clientY - rect.top,
       ];
+    },
+
+    /** Клик по пустому месту дорожки — отменить рисование связи */
+    cancelGanttLink() {
+      this.ganttLinkFrom = null;
+      this.ganttLinkPath = null;
     },
 
     ganttBarStyle(g) {
@@ -2470,6 +2520,83 @@ window.smeta = function smeta() {
 
     ganttDayWidth() {
       return Math.max(26, Math.min(64, Math.floor(980 / this.ganttData.totalDays)));
+    },
+
+    /** Размер SVG-слоя связей (ширина/высота сетки диаграммы) */
+    get ganttLinksSize() {
+      const g = this.ganttData;
+      return {
+        w: g.totalDays * this.ganttDayWidth(),
+        h: 34 + g.sections.length * 38 + g.rows.length * 34,
+      };
+    },
+
+    /** Правый клик по полосе: убрать связь или ручной сдвиг */
+    onBarContext(g) {
+      if (g.row.pred) {
+        this.pushHistory('Удалена связь Ганта');
+        g.row.pred = '';
+        this.logActivity(`Снята связь у «${(g.name || '').slice(0, 30)}»`);
+      } else if (Number(g.row.startAt) >= 0) {
+        this.resetGanttShift(g.row);
+      }
+    },
+
+    ganttHasShifts() {
+      return this.ganttData.rows.some((g) => Number(g.row.startAt) >= 0);
+    },
+
+    resetAllGanttShifts() {
+      this.pushHistory('Сброшены все ручные сдвиги Ганта');
+      for (const sec of this.data.sections) {
+        const secs = this.isChapter(sec) ? sec.children : [sec];
+        for (const s of secs) for (const r of s.resources) r.startAt = null;
+      }
+      this.logActivity('Все работы возвращены в автоплан');
+    },
+
+    groupTypeLabel(type) {
+      return this.typeLabel({ type });
+    },
+
+    /** Строки сводной ведомости с группировкой (#none/type/unit), поиском и нумерацией */
+    get summaryRows() {
+      const f = this.summarySearch.trim().toLowerCase();
+      const all = this.summaryResources.filter(
+        (e) => !f || String(e.name).toLowerCase().includes(f) || String(e.unit).toLowerCase().includes(f)
+      );
+      const withAvg = all.map((e) => ({ ...e, avgPrice: e.qty > 0 ? e.cost / e.qty : e.price || 0 }));
+      if (this.summaryGroup === 'none') {
+        return withAvg.map((e, i) => ({ key: 'r' + i, num: i + 1, e, avgPrice: e.avgPrice }));
+      }
+      const groups = new Map();
+      for (const e of withAvg) {
+        const k = this.summaryGroup === 'type' ? e.type : e.unit || '—';
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(e);
+      }
+      const out = [];
+      let num = 0;
+      for (const [k, list] of groups) {
+        out.push({
+          key: 'g-' + k, header: true, label: this.summaryGroup === 'type' ? this.groupTypeLabel(k) : k,
+          groupTotal: list.reduce((s, e) => s + e.cost, 0),
+          groupCount: list.reduce((s, e) => s + e.qty, 0),
+        });
+        for (const e of list) out.push({ key: 'g-' + k + '-' + ++num, num, e, avgPrice: e.avgPrice });
+      }
+      return out;
+    },
+
+    exportSummaryCsv() {
+      const esc = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+      const lines = ['№;Наименование;Тип;Ед.;Кол-во;Средняя цена;Стоимость;Расценки'];
+      let n = 0;
+      for (const e of this.summaryResources) {
+        lines.push([++n, e.name, this.groupTypeLabel(e.type), e.unit, e.qty,
+          (e.qty > 0 ? e.cost / e.qty : 0).toFixed(2), e.cost.toFixed(2), [...e.bases].join(' / ')].map(esc).join(';'));
+      }
+      this.download('svod-resursy.csv', '\ufeff' + lines.join('\r\n'), 'text/csv;charset=utf-8');
     },
 
     totalTableWidth() {

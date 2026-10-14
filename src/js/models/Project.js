@@ -49,6 +49,36 @@ let uidCounter = 0;
  */
 
 /**
+ * Дефолтные настройки каркасного метода v2.0 — копия формулировки из
+ * src/js/framework.js без import (чтобы модели не зависели от расчётного слоя).
+ */
+function frameworkDefaults() {
+  return {
+    enabled: false,
+    npPct: 3,
+    usnPct: 6,
+    vzPct: 3,
+    zuPct: 0,
+    ppPct: 0,
+    garantPct: 0,
+    fuelPer100: 12,
+    fuelPrice: 60,
+    workerDistanceKm: 0,
+    workDays: 0,
+    rainDays: 0,
+    monthDays: 30,
+    rainKLoss: 0.1,
+    rainProb: 0.5,
+    rainMonths: [],
+    buildMonths: 2,
+    vehicleTaxYear: 0,
+    insuranceYear: 0,
+    scrapPricePerTon: 15000,
+    vzLiquidation: 0,
+  };
+}
+
+/**
  * Основная модель проекта
  * @class
  */
@@ -87,6 +117,9 @@ export class Project {
         mode: 'kopecks',
         method: 'math',
       },
+      // Каркасный метод ценообразования v2.0 (см. src/js/framework.js).
+      // enabled=false → классическая цепочка ПЗ→НР→СП→НДС (обратная совместимость).
+      framework: frameworkDefaults(),
     };
   }
 
@@ -184,6 +217,11 @@ export function migrateV3toV4(oldData) {
     newData.rounding = { ...newData.rounding, ...oldData.rounding };
   }
 
+  // Каркасный метод v2.0: объединяем с дефолтами (старые файлы его не содержат)
+  if (oldData.framework) {
+    newData.framework = { ...frameworkDefaults(), ...oldData.framework };
+  }
+
   // Копируем дату начала
   if (oldData.startDate) {
     newData.startDate = oldData.startDate;
@@ -212,6 +250,13 @@ export function migrateV3toV4(oldData) {
           newResource.days = resource.days !== null ? Number(resource.days) : null;
           newResource.pred = resource.pred || resource.predecessor || '';
           newResource.startAt = resource.startAt || null;
+          // Метаданные каркасного метода (framework v2.0) — переносим, если есть
+          for (const fk of ['wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm',
+            'tariffPerKm', 'supplyFee', 'kGabarit', 'manipulatorFlag', 'unloadMachineHr',
+            'unloadHours', 'moveDistM', 'moveSpeedMh', 'perPct', 'storePct', 'perOn',
+            'storeOn', 'night', 'holiday']) {
+            if (resource[fk] !== undefined && resource[fk] !== null) newResource[fk] = resource[fk];
+          }
           return newResource;
         });
       }

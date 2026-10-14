@@ -1051,8 +1051,22 @@ window.smeta = function smeta() {
     /**
      * Итоги сметы с применением округления по Методике № 421/пр (п. 58).
      * Расчёты идут с полной точностью; округляются только итоговые статьи.
+     * Если включён каркасный метод (data.framework.enabled) — используется
+     * формула v2.0: S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС).
      */
     get sums() {
+      if (this.data.framework && this.data.framework.enabled) {
+        const fw = calculation.calculateFrameworkTotals(this.data);
+        if (fw) {
+          return {
+            labor: fw.labor, machine: fw.machine, operator: 0, material: fw.material,
+            pz: fw.pz, nr: fw.nr, sp: fw.sp, vat: 0,
+            lz: fw.lz, lzParts: fw.lzParts, tax: fw.tax, vehicleTax: fw.vehicleTax,
+            returnable: fw.returnable, sNoTax: fw.sNoTax,
+            grand: fw.grand, framework: true,
+          };
+        }
+      }
       const sums = { labor: 0, machine: 0, operator: 0, material: 0 };
       for (const sec of this.data.sections) {
         for (const r of sec.resources) {

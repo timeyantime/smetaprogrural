@@ -9,6 +9,7 @@
 import { Resource } from '../models/Resource.js';
 import { Section } from '../models/Section.js';
 import { roundMoney, roundGrandTotal } from '../rounding.js';
+import { frameworkRowCost, calcFrameworkTotals } from '../framework.js';
 
 export { roundMoney, roundGrandTotal };
 
@@ -116,12 +117,57 @@ export function calculateSectionTotals(section, rates) {
 }
 
 /**
- * Рассчитывает стоимость ресурса
+ * Рассчитывает стоимость ресурса.
+ * Включает ли каркасный метод (project.framework.enabled) — передавайте вторым
+ * аргументом объект проекта; иначе считается классическая формула qty × price.
  * @param {Object} resource - Ресурс
+ * @param {Object|null} project - Проект (для режима framework)
  * @returns {number} Стоимость ресурса
  */
-export function calculateResourceTotal(resource) {
+export function calculateResourceTotal(resource, project = null) {
+  if (project && project.framework && project.framework.enabled) {
+    return frameworkRowCost(resource, project.framework).total;
+  }
   return Resource.calculateTotal(resource);
+}
+
+/**
+ * Каркасный метод v2.0: полный расчёт итогов сметы
+ *   S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС)
+ * @param {Object} project - Проект (project.framework.enabled должен быть true)
+ * @returns {Object|null} Итоги каркасного метода или null, если метод выключен
+ */
+export function calculateFrameworkTotals(project) {
+  if (!project || !project.framework || !project.framework.enabled) return null;
+
+  // ПЗ по фактическим объёмам и полным ценам (q_факт, p_полн, наценка труда)
+  let laborRaw = 0; // «голый» ФОТ без наценки — не используется, но полезен для отчётов
+  let labor = 0, machine = 0, material = 0;
+  const fwSettings = project.framework;
+  for (const sec of project.sections || []) {
+    const walk = (s) => {
+      for (const r of s.resources || []) {
+        const c = frameworkRowCost(r, fwSettings);
+        if (r.type === 'labor') { labor += c.total; laborRaw += (Number(r.qty) || 0) * (Number(r.price) || 0); }
+        else if (r.type === 'machine') machine += c.total;
+        else material += c.total;
+      }
+      for (const sub of s.children || []) walk(sub);
+    };
+    walk(sec);
+  }
+
+  const mode = project.rounding?.mode || 'kopecks';
+  const method = project.rounding?.method || 'math';
+  const pz = labor + machine + material;
+
+  // НР и СП — как и в классике (% от базы ФОТ или ПЗ), но округляем по 421/пр
+  const baseFor = (base) => (base === 'pz' ? pz : labor);
+  const nr = roundMoney((baseFor(project.rates?.overheadBase) * (Number(project.rates?.overheadPct) || 0)) / 100, mode, method);
+  const sp = roundMoney((baseFor(project.rates?.profitBase) * (Number(project.rates?.profitPct) || 0)) / 100, mode, method);
+
+  const totals = calcFrameworkTotals(project, { pz, nr, sp, laborTotal: labor, mode, method });
+  return { ...totals, labor, machine, material, laborRaw };
 }
 
 /**
@@ -190,6 +236,7 @@ export default {
   calculateProjectTotals,
   calculateSectionTotals,
   calculateResourceTotal,
+  calculateFrameworkTotals,
   roundValue,
   roundGrandTotal,
   calculateMachineTotalWithOperator,

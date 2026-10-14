@@ -44,8 +44,20 @@ export const PROJECT_SCHEMA = {
   rounding: ['mode', 'method'],
   // полные списки полей моделей: значения по умолчанию живут в models/*, не в хранилище
   section: ['id', 'name', 'parentId', 'collapsed', 'children'],
-  row: ['id', 'basis', 'name', 'type', 'operator', 'unit', 'qty', 'price', 'note', 'days', 'pred', 'startAt'],
+  row: ['id', 'basis', 'name', 'type', 'operator', 'unit', 'qty', 'price', 'note', 'days', 'pred', 'startAt',
+    // Каркасный метод v2.0 (framework.js): метаданные строки
+    'wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee',
+    'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh',
+    'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'],
 };
+
+/** Схема настроек каркасного метода (проект.framework). */
+export const FRAMEWORK_FIELDS = [
+  'enabled', 'npPct', 'usnPct', 'vzPct', 'zuPct', 'ppPct', 'garantPct',
+  'fuelPer100', 'fuelPrice', 'workerDistanceKm', 'workDays',
+  'rainDays', 'monthDays', 'rainKLoss', 'rainProb',
+  'buildMonths', 'vehicleTaxYear', 'insuranceYear', 'scrapPricePerTon', 'vzLiquidation',
+];
 
 const NUM_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
 
@@ -236,7 +248,7 @@ export function encodeProject(project) {
   const restMeta = {};
   let hasRestMeta = false;
   for (const k of Object.keys(project)) {
-    if (k === 'sections' || S.top.includes(k) || ['company', 'rates', 'rounding'].includes(k)) continue;
+    if (k === 'sections' || S.top.includes(k) || ['company', 'rates', 'rounding', 'framework'].includes(k)) continue;
     restMeta[k] = project[k]; hasRestMeta = true;
   }
   if (hasRestMeta) metaFields.push('_');
@@ -245,6 +257,19 @@ export function encodeProject(project) {
   parts.push(encodeBlock('company', S.company, [project.company || {}]));
   parts.push(encodeBlock('rates', S.rates, [project.rates || {}]));
   parts.push(encodeBlock('rounding', S.rounding, [project.rounding || {}]));
+  // framework: скалярные поля по схеме + rainRows/rainMonths и extra — JSON-ячейками
+  if (project.framework) {
+    const fw = project.framework;
+    const cells = FRAMEWORK_FIELDS.map((f) => escCell(fw[f]));
+    const jsons = [JSON.stringify(fw.rainRows || []), JSON.stringify(fw.rainMonths || [])].map((j) => quoted(j));
+    const restFw = {};
+    let hasRestFw = false;
+    for (const k of Object.keys(fw)) {
+      if (!FRAMEWORK_FIELDS.includes(k) && k !== 'rainRows' && k !== 'rainMonths') { restFw[k] = fw[k]; hasRestFw = true; }
+    }
+    parts.push(`@framework[${[...FRAMEWORK_FIELDS, 'rainRows', 'rainMonths', ...(hasRestFw ? ['_'] : [])].join(',')}]`);
+    parts.push([...cells, ...jsons, ...(hasRestFw ? [escCell(restFw)] : [])].join(','));
+  }
   parts.push(encodeBlock('sections', S.section, project.sections || [], { jsonFields: ['children'] }));
   const allSecs = [];
   for (const sec of project.sections || []) {
@@ -302,6 +327,28 @@ export function decodeProject(payload) {
   project.company = one('company', S.company);
   project.rates = one('rates', S.rates);
   project.rounding = one('rounding', S.rounding);
+  // framework-блок (если сохранён)
+  {
+    const fb = find('framework');
+    if (fb) {
+      const mFw = /^\[(.+)\]$/.exec(fb.header.slice('framework'.length));
+      const cols = parseCells(mFw[1]).map((c) => c.v);
+      const cells = parseCells(fb.lines[0] || '');
+      const fw = {};
+      cells.forEach((cell, i) => {
+        const col = cols[i];
+        if (!col) return;
+        if (col === '_') {
+          if (cell.v && cell.v.startsWith('{')) { try { Object.assign(fw, JSON.parse(cell.v)); } catch (e) { /* ignore */ } }
+        } else if (col === 'rainRows' || col === 'rainMonths') {
+          try { fw[col] = JSON.parse(cell.v); } catch (e) { fw[col] = []; }
+        } else {
+          fw[col] = cellValue(cell);
+        }
+      });
+      project.framework = fw;
+    }
+  }
   const secB = find('sections');
   project.sections = (secB ? decodeBlockRows(secB.lines, S.section, ['children']) : []).filter(Boolean);
   const attach = (sec) => {

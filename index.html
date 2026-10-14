@@ -8,14 +8,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <style id="print-orientation-style">@media print { @page { size: A4 landscape; margin: 10mm; } }</style>
-  <!-- Порядок загрузки: сначала данные/директивы (window.smeta), затем Alpine (defer). -->
-  <!-- Скрипты приложения. rounding/office — ES-модули-обёртки над src/js/*
-       (единый источник истины без дублирования логики); выполняются ДО
-       классического js/app.js, т.к. модули отложенные по умолчанию. -->
-  <script type="module" src="js/rounding.js"></script>
-  <script type="module" src="js/office.js"></script>
-  <script src="js/money.js"></script>
-  <script src="js/app.js"></script>
+  <!-- Модульное приложение (миграция из legacy js/ завершена):
+       money.js регистрирует Alpine-директиву x-money (слушает 'alpine:init',
+       который происходит при старте CDN-скрипта ниже); app.js объявляет
+       window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
+       (единый источник округления — src/js/rounding.js, Excel — src/js/office.js). -->
+  <script type="module" src="src/js/money.js"></script>
+  <script type="module" src="src/js/app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
 <body>

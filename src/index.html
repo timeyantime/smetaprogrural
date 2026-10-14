@@ -379,20 +379,13 @@
     </div>
   </div>
 
-  <!-- Модульная версия приложения (src/js/app.js) импортируется как резерв:
-       window.__smetaModule. Основное приложение сейчас — legacy js/app.js,
-       т.к. в модульной версии UI-функции ещё в заглушках. -->
-  <script type="module">
-    import smeta from '/src/js/app.js';
-    window.__smetaModule = smeta; // включим после реализации заглушек
-  </script>
-
-  <!-- Скрипты приложения (полная реализация UI-функций).
-       rounding/office — ES-модули-обёртки над src/js/* (единый источник истины),
-       поэтому они выполняются ДО классического js/app.js (модули отложенные). -->
-  <script type="module" src="/js/rounding.js"></script>
-  <script type="module" src="/js/office.js"></script>
-  <script src="/js/money.js"></script>
-  <script src="/js/app.js"></script>
+  <!-- Модульное приложение (окончательный вариант после миграции из legacy js/):
+       - /src/js/money.js регистрирует Alpine-директиву x-money до старта Alpine
+         (этот модуль отложенный, а CDN-скрипт Alpine тоже defer → порядок сохраняется);
+       - /src/js/app.js объявляет window.smeta для x-data="smeta()" и экспортирует
+         компонент по умолчанию; все бывшие заглушки реализованы, единый источник
+         логики округления/Excel — src/js/rounding.js и src/js/office.js. -->
+  <script type="module" src="/src/js/money.js"></script>
+  <script type="module" src="/src/js/app.js"></script>
 </body>
 </html>

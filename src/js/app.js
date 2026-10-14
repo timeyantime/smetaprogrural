@@ -22,6 +22,7 @@ import * as storage from './services/storage.js';
 import * as calculation from './services/calculation.js';
 import * as exportService from './services/export.js';
 import * as validation from './services/validation.js';
+import { roundMoney, roundGrandTotal, ROUND_MODES, ROUND_METHODS } from './rounding.js';
 
 // ============================================
 // Константы
@@ -967,6 +968,39 @@ window.smeta = function smeta() {
      */
     calculateTotals() {
       return calculation.calculateProjectTotals(this.data);
+    },
+
+    /** Округление итоговой статьи согласно правилам модели округления (#11) */
+    rnd(v) {
+      const r = this.data.rounding || { mode: 'kopecks', method: 'math' };
+      return roundMoney(v, r.mode, r.method);
+    },
+
+    /**
+     * Итоги сметы с применением округления по Методике № 421/пр (п. 58).
+     * Расчёты идут с полной точностью; округляются только итоговые статьи.
+     */
+    get sums() {
+      const sums = { labor: 0, machine: 0, operator: 0, material: 0 };
+      for (const sec of this.data.sections) {
+        for (const r of sec.resources) {
+          const t = (Number(r.qty) || 0) * (Number(r.price) || 0);
+          if (r.type === 'labor') sums.labor += t;
+          else if (r.type === 'machine') {
+            sums.machine += t;
+            if (r.operator) sums.operator += t;
+          } else sums.material += t;
+        }
+      }
+      sums.pz = sums.labor + sums.machine + sums.material;
+
+      const rate = this.data.rates || {};
+      const baseFor = (base) => (base === 'pz' ? sums.pz : sums.labor + (sums.operator || 0));
+      sums.nr = this.rnd((baseFor(rate.overheadBase) * (Number(rate.overheadPct) || 0)) / 100);
+      sums.sp = this.rnd((baseFor(rate.profitBase) * (Number(rate.profitPct) || 0)) / 100);
+      sums.vat = this.rnd(((sums.pz + sums.nr + sums.sp) * (Number(rate.vatPct) || 0)) / 100);
+      sums.grand = roundGrandTotal(sums.pz + sums.nr + sums.sp + sums.vat);
+      return sums;
     },
 
     /**

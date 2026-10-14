@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect } from 'vitest';
-import smetaModule from '../src/js/app.js';
+import smetaModule from '../app.js';
 
 describe('src/js/app.js — перенесённые из legacy UI-функции', () => {
   const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
@@ -56,9 +56,13 @@ describe('src/js/app.js — перенесённые из legacy UI-функци
   });
 
   it('removeSelected удаляет выделенные записи', () => {
+    // confirm() в jsdom не реализован и возвращает false — мокаем подтверждение
+    const origConfirm = window.confirm;
+    window.confirm = () => true;
     obj.data.sections = [{ id: 's1', name: 'S', resources: [{ id: 'r1' }, { id: 'r2' }] }];
     obj.selectedIds = new Set(['r1']);
     obj.removeSelected();
+    window.confirm = origConfirm;
     expect(obj.data.sections[0].resources.map(r => r.id)).toEqual(['r2']);
     expect(obj.selectedIds.size).toBe(0);
   });
@@ -92,9 +96,10 @@ describe('src/js/app.js — перенесённые из legacy UI-функци
 
   it('syncResourcePrice синхронизирует цену по ключу (auto режим)', () => {
     obj.data.recalcMode = 'auto';
+    // Resource.getKey требует валидного ресурса: qty/price — числа, unit — строка
     obj.data.sections = [{ id: 's1', name: 'S', resources: [
-      { id: 'a', name: 'Кирпич', unit: 'шт', type: 'material', price: 15 },
-      { id: 'b', name: 'Кирпич', unit: 'шт', type: 'material', price: 15 },
+      { id: 'a', name: 'Кирпич', unit: 'шт', type: 'material', qty: 10, price: 20 },
+      { id: 'b', name: 'Кирпич', unit: 'шт', type: 'material', qty: 5, price: 15 },
     ]}];
     const [ra, rb] = obj.data.sections[0].resources;
     ra.price = 20;
@@ -105,8 +110,8 @@ describe('src/js/app.js — перенесённые из legacy UI-функци
   it('syncResourcePrice не трогает others в manual режиме', () => {
     obj.data.recalcMode = 'manual';
     obj.data.sections = [{ id: 's1', name: 'S', resources: [
-      { id: 'a', name: 'Кирпич', unit: 'шт', type: 'material', price: 20 },
-      { id: 'b', name: 'Кирпич', unit: 'шт', type: 'material', price: 15 },
+      { id: 'a', name: 'Кирпич', unit: 'шт', type: 'material', qty: 10, price: 20 },
+      { id: 'b', name: 'Кирпич', unit: 'шт', type: 'material', qty: 5, price: 15 },
     ]}];
     obj.syncResourcePrice(obj.data.sections[0].resources[0]);
     expect(obj.data.sections[0].resources[1].price).toBe(15);

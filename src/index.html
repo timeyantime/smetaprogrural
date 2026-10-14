@@ -157,9 +157,9 @@
       </div>
       <div class="at-tabs-actions">
         <button class="at-btn at-btn-small" @click="groupBy = groupBy === 'none' ? 'type' : groupBy === 'type' ? 'unit' : 'none'" title="Группировать по типу/ед.изм.">
-          <template x-if="groupBy === 'none'">Группировать</template>
-          <template x-if="groupBy === 'type'">По типу</template>
-          <template x-if="groupBy === 'unit'">По ед.изм.</template>
+          <template x-if="groupBy === 'none'"><span>Группировать</span></template>
+          <template x-if="groupBy === 'type'"><span>По типу</span></template>
+          <template x-if="groupBy === 'unit'"><span>По ед.изм.</span></template>
         </button>
       </div>
     </nav>

@@ -320,6 +320,7 @@ window.smeta = function smeta() {
     activeTab: null,
     renamingSection: null,
     tabDragFrom: null,
+    tabDragOver: null, // si вкладки-цели при drag&drop разделов (подсветка drop-зоны)
     selectedIds: new Set(),
     editing: null,
     expandedRow: null,
@@ -371,6 +372,7 @@ window.smeta = function smeta() {
     ganttLinkFrom: null,
     ganttLinkPath: null,
     dragRow: null,
+    rowDropTarget: null, // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
     toggleGroupMenu: false,
 
     // Настройки печати
@@ -1902,7 +1904,57 @@ window.smeta = function smeta() {
       try { e.dataTransfer.setData('text/plain', item.row.id); } catch (err) { /* ignore */ }
     },
 
-    endRowDrag() { this.dragRow = null; },
+    /** Завершение перетаскивания строки — сброс состояния drag/drop-подсветки. */
+    rowDragEnd(item, e) {
+      this.dragRow = null;
+      this.rowDropTarget = null;
+    },
+
+    /**
+     * Наведение на строку во время drag&drop: определяем половину цели
+     * (вставить перед строкой или после неё) и подсвечиваем drop-зону.
+     * Перенос возможен только между разными разделами (как в исходном приложении).
+     */
+    rowDragOver(e, item) {
+      if (!this.dragRow || this.dragRow.si === item.si) {
+        if (this.rowDropTarget) this.rowDropTarget = null;
+        return;
+      }
+      const pos = this._rowDropPos(e);
+      const key = item.si + '|' + item.row.id;
+      if (this.rowDropTarget && this.rowDropTarget.key === key && this.rowDropTarget.pos === pos) return;
+      this.rowDropTarget = { key, pos };
+    },
+
+    /** Вычислить верхнюю/нижнюю половину строки по координате курсора. */
+    _rowDropPos(e) {
+      const tr = e && e.target ? e.target.closest('tr') : null;
+      if (!tr) return 'above';
+      const r = tr.getBoundingClientRect();
+      return e.clientY < r.top + r.height / 2 ? 'above' : 'below';
+    },
+
+    /** Drop строки на другую строку: перенос в раздел цели перед/после целевой записи. */
+    rowDrop(item) {
+      const target = this.rowDropTarget;
+      this.rowDropTarget = null;
+      if (!this.dragRow || this.dragRow.si === item.si) return;
+      const fromSi = this.dragRow.si;
+      const movedId = this.dragRow.id;
+      const fromArr = this.data.sections[fromSi].resources;
+      const idx = fromArr.findIndex((r) => r.id === movedId);
+      if (idx < 0) return;
+      this.pushHistory('Запись перенесена в другой раздел');
+      const [moved] = fromArr.splice(idx, 1);
+      const toArr = this.data.sections[item.si].resources;
+      let to = toArr.findIndex((r) => r.id === item.row.id);
+      if (to < 0) to = toArr.length;
+      else if ((target && target.pos === 'below')) to += 1;
+      toArr.splice(to, 0, moved);
+      this.dragRow = null;
+    },
+
+    endRowDrag() { this.dragRow = null; this.rowDropTarget = null; },
 
     dropOnSection(si) {
       if (!this.dragRow || this.dragRow.si === si) return;

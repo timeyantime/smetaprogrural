@@ -487,25 +487,27 @@ window.smeta = function smeta() {
     },
 
     /**
-     * Ресурсы текущей области просмотра (без сортировки — порядок ручной/разделами)
+     * Плоский список ресурсов текущей области просмотра.
+     * ⛔ Сортировки и группировки запрещены (см. README «⛔ Запрещено»):
+     *    порядок только ручной (перетаскивание/↑↓) и разделами сметы.
      */
-    get sortedRows() {
+    get flatViewRows() {
       return this.filteredRows;
     },
 
     /**
-     * Пагинированные ресурсы
+     * Пагинированные ресурсы (50 строк на страницу)
      */
     get pagedRows() {
       const start = this.page * PAGE_SIZE;
-      return this.sortedRows.slice(start, start + PAGE_SIZE);
+      return this.flatViewRows.slice(start, start + PAGE_SIZE);
     },
 
     /**
      * Общее количество страниц
      */
     get totalPages() {
-      return Math.ceil(this.sortedRows.length / PAGE_SIZE);
+      return Math.ceil(this.flatViewRows.length / PAGE_SIZE);
     },
 
     /**
@@ -603,7 +605,7 @@ window.smeta = function smeta() {
     goToProblem(p) {
       this.activeTab = null;
       this.page = 0;
-      if (p.si != null) {
+      if (p.si !== null && p.si !== undefined) {
         // модульный selectTab переключает вкладку — в legacy здесь прямое присваивание
         this.activeTab = p.si;
         this.selectedIds = new Set();
@@ -1283,7 +1285,7 @@ window.smeta = function smeta() {
             ? this.data.sections.length - 1
             : null
           : this.activeTab;
-      if (si == null || !this.data.sections[si]) {
+      if (si === null || !this.data.sections[si]) {
         this.addSection();
         si = this.data.sections.length - 1;
       }
@@ -1337,7 +1339,7 @@ window.smeta = function smeta() {
 
     /** Установка предшественника по его номеру (#49) */
     setPredByNumber(row, numText) {
-      const n = parseInt(numText, 10);
+      const n = parseInt(numText);
       if (!isFinite(n) || n <= 0) {
         row.pred = '';
         return;
@@ -1537,7 +1539,7 @@ window.smeta = function smeta() {
     },
 
     addRow(si) {
-      if (si == null || si < 0 || !this.data.sections[si]) {
+      if (si === null || si < 0 || !this.data.sections[si]) {
         this.createSection();
         this.activeTab = this.data.sections.length - 1;
         return;
@@ -1744,7 +1746,7 @@ window.smeta = function smeta() {
     makeChapter(index) {
       this.pushHistory('Создание главы');
       const name = prompt('Название главы:', 'Глава 1');
-      if (name == null) return;
+      if (name === null || name === undefined) return;
       this.data.sections.splice(index, 0, {
         id: uid(),
         name: name.trim() || 'Глава',
@@ -1932,7 +1934,11 @@ window.smeta = function smeta() {
       if (this.sectionModalMode === 'create') {
         this.data.sections.push(newSection(name));
         this.activeTab = this.data.sections.length - 1;
-      } else if (this.sectionDraft.index != null && this.data.sections[this.sectionDraft.index]) {
+      } else if (
+        this.sectionDraft.index !== null &&
+        this.sectionDraft.index !== undefined &&
+        this.data.sections[this.sectionDraft.index]
+      ) {
         this.data.sections[this.sectionDraft.index].name = name;
       }
       this.sectionModalOpen = false;
@@ -1955,7 +1961,7 @@ window.smeta = function smeta() {
 
     deleteSectionFromModal() {
       const si = this.sectionDraft.index;
-      if (si == null || !this.data.sections[si]) return;
+      if (si === null || !this.data.sections[si]) return;
       const sec = this.data.sections[si];
       const cnt = sec.resources.length;
       if (confirm(`Удалить раздел «${sec.name}» и ${cnt} записей в нём?`)) {
@@ -2357,7 +2363,7 @@ window.smeta = function smeta() {
       }
       const links = [];
       rows.forEach((g, i) => {
-        const n = parseInt(String(g.row.pred || '').trim(), 10);
+        const n = parseInt(String(g.row.pred || '').trim());
         if (!isFinite(n) || n <= 0 || n === i + 1) return;
         const pred = byNum.get(n);
         if (!pred) return;
@@ -2381,7 +2387,7 @@ window.smeta = function smeta() {
       const chainLen = (g) => {
         if (memo.has(g)) return memo.get(g);
         let best = 0;
-        const n = parseInt(String(g.row.pred || '').trim(), 10);
+        const n = parseInt(String(g.row.pred || '').trim());
         if (isFinite(n) && n > 0) {
           const pred = byNum.get(n);
           if (pred && pred !== g) best = chainLen(pred);
@@ -2687,7 +2693,7 @@ window.smeta = function smeta() {
       if (!appliedTo) {
         // создаём новую запись в текущем разделе
         let si = this.currentTargetSection();
-        if (si == null || !this.data.sections[si]) {
+        if (si === null || !this.data.sections[si]) {
           this.data.sections.push(newSection('Новый раздел'));
           si = this.data.sections.length - 1;
           this.activeTab = si;
@@ -2800,7 +2806,7 @@ window.smeta = function smeta() {
       for (const sec of this.data.sections) {
         for (const r of sec.resources) {
           const v = field === 'total' ? null : r[field];
-          if (v !== '' && v != null && !(Number(v) === 0)) vals.add(String(v));
+          if (v !== '' && v !== null && !(Number(v) === 0)) vals.add(String(v));
         }
       }
       let arr = [...vals].sort((a, b) => a.localeCompare(b, 'ru'));

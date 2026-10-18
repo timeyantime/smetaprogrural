@@ -12,7 +12,7 @@
        money.js регистрирует Alpine-директиву x-money (слушает 'alpine:init',
        который происходит при старте CDN-скрипта ниже); app.js объявляет
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
-       (единый источник округления — src/js/rounding.js, Excel — src/js/office.js). -->
+       (единый источник округления — src/js/rounding.js). -->
   <script type="module" src="src/js/money.js"></script>
   <script type="module" src="src/js/app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
@@ -46,10 +46,6 @@
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
           Экспорт CSV
         </button>
-        <button class="at-btn" @click="exportXls()" title="Экспорт в Excel (.xls, без интернета)">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M2 2h12v12H2V2zm4.6 6L9.4 12h-1L7 9.8 5.6 12h-1l2.8-4L4.6 4h1L7 6.2 8.4 4h1L6.6 8z"/></svg>
-          Excel
-        </button>
         <button class="at-btn" @click="helpModalOpen = true" title="Как считаются затраты — справочник по методике">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.9 10.6H7.1v-1.4h1.8v1.4zm0-2.6H7.1V4.6h1.8v4.4z"/></svg>
           Справочник
@@ -74,8 +70,6 @@
         </button>
         <button class="at-btn at-icon-btn" @click="undoAction()" :disabled="!undoStack.length" title="Отменить (Ctrl+Z)">↩</button>
         <button class="at-btn at-icon-btn" @click="redoAction()" :disabled="!redoStack.length" title="Повторить (Ctrl+Shift+Z)">↪</button>
-        <button class="at-btn at-icon-btn" @click="darkTheme = !darkTheme"
-                :title="darkTheme ? 'Светлая тема' : 'Тёмная тема'" x-text="darkTheme ? '☀️' : '🌙'"></button>
         <button class="at-btn" @click="openProjectModal()" title="Реквизиты объекта — для титульного листа печати">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 14V3h6v3h4v8H3zM5 5v1h2V5H5zM5 8v1h4V8H5zM5 11v1h4v-1H5z"/></svg>
           Объект
@@ -126,21 +120,6 @@
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
           <input x-model="filter" placeholder="Поиск записей…" />
         </div>
-        <div class="at-group" x-show="groupBy !== 'none'">
-          <span class="at-chip-label">Группировка: <b x-text="groupByLabel()"></b></span>
-          <button class="at-mini-x" @click="groupBy = 'none'">✕</button>
-        </div>
-        <div style="position:relative" x-show="groupBy === 'none'">
-          <button class="at-btn at-btn-ghost" @click="toggleGroupMenu = !toggleGroupMenu">
-            <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1 3h14v2H1zM3 7h10v2H3zM5 11h6v2H5z"/></svg>
-            Группировать ▾
-          </button>
-          <div class="at-menu" x-show="toggleGroupMenu" @click.outside="toggleGroupMenu = false" x-transition>
-            <button @click="setGroupBy('none')">Без группировки</button>
-            <button @click="setGroupBy('type')">По типу ресурса</button>
-            <button @click="setGroupBy('unit')">По единице измерения</button>
-          </div>
-        </div>
         <span class="at-count" x-text="visibleCount() + ' записей'"></span>
       </div>
 
@@ -184,17 +163,6 @@
                           @click.stop="fieldMenuFor = fieldMenuFor === col.key ? null : col.key">▾</button>
                   <div class="at-menu" :class="['qty','price','total','days'].includes(col.key) ? 'at-menu-right' : 'at-menu-left'"
                        x-show="fieldMenuFor === col.key" @click.outside="fieldMenuFor = null" x-transition>
-                    <template x-if="col.sortable">
-                      <div>
-                        <button @click="sortDescOrAsc(col.key)">↑ Сортировать по возрастанию</button>
-                        <button @click="sortDescOrAsc2(col.key)">↓ Сортировать по убыванию</button>
-                        <button @click="addSortLevel(col.key, 1)" @click.shift.prevent="addSortLevel(col.key, 1)"
-                                title="Shift+клик — добавить уровень сортировки (#15)">＋ Уровень сортировки (Shift)</button>
-                        <button class="danger-text" x-show="sortLevelIndex(col.key)"
-                                @click="removeSortLevel(col.key)">✕ Убрать из сортировки</button>
-                        <hr class="at-menu-sep" />
-                      </div>
-                    </template>
                     <button @click="toggleColVisibility(col.key)" x-show="col.key !== 'num' && col.key !== 'name' && col.key !== 'actions'">
                       🚫 Скрыть колонку</button>
                     <button @click="showAllCols()">👁 Показать все колонки</button>
@@ -209,7 +177,7 @@
 
           <tbody>
             <!-- Плоский список строк текущей области просмотра (виртуализация: 50 строк на страницу, #38) -->
-            <template x-for="(item, vi) in groupedFlatRows" :key="item.row.id">
+            <template x-for="(item, vi) in pagedRows" :key="item.row.id">
               <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi, dragging: dragRow && dragRow.id === item.row.id, 'drop-above': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'above', 'drop-below': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'below', 'is-section-start': showSectionStarts && item.isSectionStart }"
                   draggable="true" @dragstart="startRowDrag($event, item)" @dragend="rowDragEnd(item, $event)"
                   @dragover.prevent="rowDragOver($event, item)" @drop.prevent="rowDrop(item)">
@@ -329,20 +297,6 @@
                     <button class="at-tool-btn danger" @click.stop="removeRowById(item.si, item.row.id)" title="Удалить запись">✕</button>
                   </div>
                 </td>
-              </tr>
-            </template>
-
-            <!-- Итоги по группам / разделам (сворачивание #17) -->
-            <template x-for="g in visibleGroups" :key="g.key">
-              <tr class="at-group-total">
-                <td :colspan="Math.max(2, colSpanFor('total') - 1)" class="at-right">
-                  <button class="at-mini-x" x-show="groupBy !== 'none'" @click="toggleGroupCollapse(g.key)"
-                          :title="groupCollapsedFn(g.key) ? 'Развернуть группу' : 'Свернуть группу'"
-                          x-text="groupCollapsedFn(g.key) ? '▸' : '▾'"></button>
-                  <span class="at-group-total-label" x-text="'Итого — ' + g.label + ' (' + g.count + ') :'"></span>
-                </td>
-                <td class="at-right at-formula"><b x-money="g.total"></b></td>
-                <td :colspan="tailCols()"></td>
               </tr>
             </template>
 
@@ -468,11 +422,6 @@
       <div class="at-summary-wrap" x-show="viewTab === 'summary'" x-cloak>
         <div class="at-summary-toolbar">
           <h3 class="at-summary-title">Сводная ведомость ресурсов</h3>
-          <div class="at-group-btns">
-            <button class="at-btn at-btn-sm" :class="{ active: summaryGroup === 'none' }" @click="summaryGroup = 'none'">Без группировки</button>
-            <button class="at-btn at-btn-sm" :class="{ active: summaryGroup === 'type' }" @click="summaryGroup = 'type'">По типу</button>
-            <button class="at-btn at-btn-sm" :class="{ active: summaryGroup === 'unit' }" @click="summaryGroup = 'unit'">По единице</button>
-          </div>
           <div class="at-search"><input x-model="summarySearch" placeholder="Поиск ресурса…" /></div>
           <span class="spacer"></span>
           <button class="at-btn at-btn-sm" @click="exportSummaryCsv()">⤒ CSV</button>
@@ -492,21 +441,18 @@
           </thead>
           <tbody>
             <template x-for="(item, ii) in summaryRows" :key="item.key">
-              <template x-if="!item.collapsed">
                 <tr class="at-row">
-                  <td class="at-cell-num" x-text="item.header ? '' : item.num"></td>
-                  <td class="at-cell" :class="{ 'at-summary-header': item.header }"
-                      x-text="item.header ? item.label : item.e.name"></td>
-                  <td class="at-cell" x-show="!item.header">
+                  <td class="at-cell-num" x-text="item.num"></td>
+                  <td class="at-cell" x-text="item.e.name"></td>
+                  <td class="at-cell">
                     <span class="at-chip" :class="'chip-' + item.e.type" x-text="groupTypeLabel(item.e.type)"></span>
                   </td>
-                  <td class="at-cell" x-show="!item.header" x-text="item.e.unit"></td>
-                  <td class="at-cell at-right num" x-text="fmtNum(item.header ? item.groupCount : item.e.qty)"></td>
-                  <td class="at-cell at-right num" x-show="!item.header" x-money="item.avgPrice"></td>
-                  <td class="at-cell at-right at-formula"><b x-money="item.header ? item.groupTotal : item.e.cost"></b></td>
-                  <td class="at-cell muted" x-show="!item.header" x-text="[...item.e.bases].join(', ') || '—'"></td>
+                  <td class="at-cell" x-text="item.e.unit"></td>
+                  <td class="at-cell at-right num" x-text="fmtNum(item.e.qty)"></td>
+                  <td class="at-cell at-right num" x-money="item.avgPrice"></td>
+                  <td class="at-cell at-right at-formula"><b x-money="item.e.cost"></b></td>
+                  <td class="at-cell muted" x-text="[...item.e.bases].join(', ') || '—'"></td>
                 </tr>
-              </template>
             </template>
             <tr class="at-group-total">
               <td colspan="6" class="at-right"><b>Итого по всем ресурсам:</b></td>

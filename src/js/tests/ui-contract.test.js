@@ -122,13 +122,10 @@ describe('UI-контракт: index.html ↔ smeta()', () => {
 
   it('удалённый функционал отсутствует в UI: тема, Excel, сортировка/группировка строк', () => {
     expect(html).not.toMatch(/toggleTheme|darkMode|lightMode/i);
-    // «Excel» допускается только в баннере-запрете (gh-notice), но не как код/кнопка экспорта
-    const htmlWithoutNotice = html.replace(
-      /<!-- Быстрые действия[\s\S]*?Без тем · Excel · сортировок\s*<\/span>/g,
-      ''
-    );
-    expect(htmlWithoutNotice).not.toMatch(/exportExcel|Экспорт Excel|\.xlsx/i);
-    expect(htmlWithoutNotice).not.toMatch(/sortBy|toggleGroupMenu|summaryGroup/);
+    // Баннер-запрет «Без тем · Excel» убран из шапки по просьбе пользователя —
+    // теперь просто запрещаем любые упоминания Excel/xlsx и экспорта Excel в разметке.
+    expect(html).not.toMatch(/exportExcel|Экспорт Excel|\.xlsx|Без тем/i);
+    expect(html).not.toMatch(/sortBy|toggleGroupMenu|summaryGroup/);
     expect(appSrc).not.toMatch(/toggleTheme|exportExcel|sortBy\s*[:(]|toggleGroupMenu/);
   });
 

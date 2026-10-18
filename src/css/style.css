@@ -227,13 +227,16 @@ body {
 
 /* Колонка контента: виды сверху, панель разделов прижата снизу */
 .at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-/* Плавающая кнопка возврата сводной панели (когда aside схлопнут в 0 и ручка не видна) */
-.at-sidebar-restore {
-  position: absolute; right: 8px; top: 8px; z-index: 30;
-  border: 1px solid var(--line-strong); background: #f6f8fa; color: #59636e;
-  border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+/* Ручка возврата сводной панели у правого края (GitHub-style): не в шапке, а на линии боковой границы.
+   aside в схлопнутом состоянии имеет width:0 + overflow:hidden, поэтому кнопка живёт ВНУТРИ aside
+   и выходит наружу через translateX(-100%) — контейнер .at-main для этого даёт overflow по оси X. */
+.at-sidebar-edge {
+  position: absolute; right: 0; top: 50%; transform: translateX(-100%) translateY(-50%);
+  z-index: 31; border: 1px solid var(--line-strong); border-right: none;
+  background: #f6f8fa; color: #59636e; cursor: pointer;
+  border-radius: 6px 0 0 6px; padding: 14px 3px; font-size: 11px; line-height: 1;
 }
-.at-sidebar-restore:hover { background: #eef1f4; color: #0969da; }
+.at-sidebar-edge:hover { background: #ddf4ff; color: #0969da; }
 
 .at-table-wrap { flex: 1; overflow: auto; min-height: 0; }
 
@@ -288,8 +291,8 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   100% { background: transparent; box-shadow: none; }
 }
 .at-row.row-dropped td { animation: row-drop-flash .6s ease-out; }
-.at-row.drop-above td { box-shadow: inset 0 3px 0 -1px #fd8c73; background: #fff8f5; transition: box-shadow .12s ease, background .12s ease; }
-.at-row.drop-below td { box-shadow: inset 0 -3px 0 -1px #fd8c73; background: #fff8f5; transition: box-shadow .12s ease, background .12s ease; }
+/* Живой preview перетаскивания (Airtable-style): подсветка линии вставки больше не нужна —
+   строки расходятся в реальном времени через FLIP-анимацию. */
 .at-add-row td { transition: background .12s ease; }
 
 .at-cell-num {
@@ -483,6 +486,8 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   border-top: 1px solid var(--line); position: sticky; bottom: 0; background: #fff;
 }
 .at-modal-sm { width: 460px; }
+/* Модалка печати — широкая (указатель пользователя: окно печати не на всю ширину) */
+.at-modal-print { width: min(1200px, 96vw); }
 .at-modal-foot-split { justify-content: space-between; }
 .at-modal-foot-left, .at-modal-foot-right { display: flex; gap: 8px; }
 .at-modal-hint { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
@@ -619,6 +624,23 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-gantt-bar.link-source .at-gantt-link-handle { opacity: 1; background: #0969da; }
 /* Живая связь при рисовании — пунктир */
 .gantt-link-draft { stroke-dasharray: 4 3; }
+/* Стили SVG-слоя связей (drawio-style): стрелки с анимацией появления и живым превью */
+.at-gantt-links { pointer-events: none; }
+.at-gantt-linkpath {
+  fill: none; stroke: #59636e; stroke-width: 1.5;
+}
+.at-gantt-linkpath:not(.preview) { animation: link-appear .4s ease-out; }
+@keyframes link-appear {
+  from { stroke-dashoffset: var(--len, 300); stroke-dasharray: var(--len, 300); opacity: .2; }
+  to   { stroke-dashoffset: 0; stroke-dasharray: var(--len, 300); opacity: 1; }
+}
+.at-gantt-linkpath.preview {
+  stroke: #0969da; stroke-width: 1.8; stroke-dasharray: 5 4;
+  animation: link-marching .5s linear infinite;
+}
+@keyframes link-marching { to { stroke-dashoffset: -9; } }
+#arrowhead polygon { fill: #59636e; }
+#gantt-link-preview-layer .at-gantt-linkpath.preview { stroke: #0969da; }
 .at-gantt-empty { padding: 24px; color: var(--muted); text-align: center; }
 
 /* ============ Модалки: Справочник и НСБ ============ */

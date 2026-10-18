@@ -2041,6 +2041,44 @@ window.smeta = function smeta() {
       }
       this.dragRow = null;
       this.rowDropTarget = null;
+      this._flipRows();
+    },
+
+    /**
+     * FLIP-анимация перестановки строк (как в Airtable): до перерисовки DOM запоминаем
+     * позиции видимых строк, после — проигрываем «прилёт» сдвигаемых соседей и самой
+     * перемещённой строки. Без этого строки мгновенно телепортируются, и непонятно,
+     * куда именно встал перенесённый элемент.
+     */
+    _flipRows() {
+      const sel = 'tr.at-row[data-row-id]';
+      const prev = this._rowRects || new Map();
+      requestAnimationFrame(() => {
+        const anims = [];
+        document.querySelectorAll(sel).forEach((tr) => {
+          const id = tr.dataset.rowId;
+          const now = tr.getBoundingClientRect();
+          const before = prev.get(id);
+          if (!before) return;
+          const dy = before.top - now.top;
+          if (Math.abs(dy) < 2) return;
+          tr.style.transition = 'none';
+          tr.style.transform = `translateY(${dy}px)`;
+          anims.push(tr);
+        });
+        requestAnimationFrame(() => {
+          for (const tr of anims) {
+            tr.style.transition = 'transform .28s cubic-bezier(.2,.8,.3,1)';
+            tr.style.transform = '';
+            const done = () => {
+              tr.style.transition = '';
+              tr.removeEventListener('transitionend', done);
+            };
+            tr.addEventListener('transitionend', done);
+          }
+        });
+        this._rowRects = null;
+      });
     },
 
     /** Перемещение строки внутри одного раздела относительно целевой (up/down). */
@@ -2054,9 +2092,19 @@ window.smeta = function smeta() {
       if (from < to) to -= 1; // учёт удаления элемента из начала
       if (to === from) return;
       this.pushHistory('Перемещение записи');
+      this._rowRects = this._captureRowRects(); // FLIP: позиции ДО изменения модели
       const [moved] = arr.splice(from, 1);
       arr.splice(to, 0, moved);
       this._flashDroppedRow(movedId);
+    },
+
+    /** Снимок вертикальных позиций строк таблицы (для FLIP-анимации). */
+    _captureRowRects() {
+      const map = new Map();
+      document.querySelectorAll('tr.at-row[data-row-id]').forEach((tr) => {
+        map.set(tr.dataset.rowId, tr.getBoundingClientRect());
+      });
+      return map;
     },
 
     /** Подсветка строки после переноса — визуальное подтверждение нового места (указатель №7). */
@@ -2082,6 +2130,24 @@ window.smeta = function smeta() {
       if (this.rowDropTarget && this.rowDropTarget.key === key && this.rowDropTarget.pos === pos)
         return;
       this.rowDropTarget = { key, pos };
+      // Живой preview как в Airtable: при наведении меняем место перетаскиваемой строки
+      // в модели ещё до отпускания кнопки мыши — соседи плавно расходятся (FLIP),
+      // а сама строка-«призрак» остаётся полупрозрачной на новой позиции.
+      if (this.dragRow.si === item.si) {
+        const arr = this.data.sections[item.si].resources;
+        const from = arr.findIndex((r) => r.id === this.dragRow.id);
+        let to = arr.findIndex((r) => r.id === item.row.id);
+        if (from >= 0 && to >= 0 && from !== to) {
+          if (pos === 'below') to += 1;
+          if (from < to) to -= 1;
+          if (to !== from) {
+            this._rowRects = this._captureRowRects();
+            const [moved] = arr.splice(from, 1);
+            arr.splice(to, 0, moved);
+            this._flipRows();
+          }
+        }
+      }
     },
 
     /** Вычислить верхнюю/нижнюю половину строки по координате курсора. */
@@ -2502,12 +2568,33 @@ window.smeta = function smeta() {
           const fi = rows.indexOf(l.from);
           const ti = rows.indexOf(l.to);
           if (fi < 0 || ti < 0) return null;
-          const x1 = TOP * 0 + l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
+          const x1 = l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
           const y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
           const x2 = l.to.leftDays * w;
           const y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
-          const midX = Math.max(x1 + 8, x2 - 14);
-          return `M${x1},${y1} H${midX} V${y2} H${Math.max(0, x2 - 6)}`;
+          // drawio-style: ортогональный маршрутер со скруглёнными углами
+          // (правая точка предшественника → вправо → вертикаль → влево → стрелка в цель).
+          const r = 6;
+          const midX = Math.max(x1 + 12, x2 - 16);
+          const dy = y2 - y1;
+          const ady = Math.abs(dy);
+          let d;
+          if (x2 > x1 + 14 && ady > 2) {
+            // цель правее и ниже/выше — S-образная кривая с горизонтальными касательными (drawio)
+            const mx = (x1 + x2) / 2;
+            d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 7},${y2}`;
+          } else {
+            // классический Гант: «ступенька» со скруглениями
+            const rr = Math.min(r, ady / 2, Math.max(0, (midX - x1) / 2), Math.max(0, (x2 - 7 - midX) / 2));
+            const sgn = dy >= 0 ? 1 : -1;
+            d =
+              `M${x1},${y1} H${midX - rr}` +
+              (rr > 0.5 ? ` Q${midX},${y1} ${midX},${y1 + sgn * rr}` : '') +
+              ` V${y2 - sgn * rr}` +
+              (rr > 0.5 ? ` Q${midX},${y2} ${midX + rr},${y2}` : ` H${midX}`) +
+              ` H${Math.max(midX, x2 - 7)}`;
+          }
+          return d;
         })
         .filter(Boolean);
     },
@@ -2515,12 +2602,14 @@ window.smeta = function smeta() {
     trackGanttLink(e) {
       if (!this.ganttLinkFrom) return;
       const rect = e.currentTarget.getBoundingClientRect();
-      this.ganttLinkPath = [
-        this.ganttLinkFrom.leftDays * this.ganttDayWidth() + 40,
-        20,
-        e.clientX - rect.left,
-        e.clientY - rect.top,
-      ];
+      const w = this.ganttDayWidth();
+      const x1 = this.ganttLinkFrom.leftDays * w + Math.max(6, this.ganttLinkFrom.spanDays * w - 4);
+      const y1 = 20;
+      const x2 = e.clientX - rect.left;
+      const y2 = e.clientY - rect.top;
+      // превью связи тоже рисоваем кривой drawio-style
+      const mx = (x1 + x2) / 2;
+      this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
     },
 
     /** Клик по пустому месту дорожки — отменить рисование связи */
@@ -2918,27 +3007,54 @@ window.smeta = function smeta() {
 // вместо этого связи перерисовываются императивно через x-effect (см. index.html).
 window.ganttLinks = function ganttLinks() {
   const NS = 'http://www.w3.org/2000/svg';
+  let lastCount = -1;
   return {
     render(el, lines, preview) {
-      el.replaceChildren(
-        ...lines.map((d) => {
+      // Связи: перерисовываем только при изменении набора (без ре-анимации на каждое движение мыши).
+      if (lines.length !== lastCount) {
+        lastCount = lines.length;
+        el.replaceChildren(
+          ...lines.map((d) => {
+            const p = document.createElementNS(NS, 'path');
+            p.setAttribute('d', d);
+            p.setAttribute('class', 'at-gantt-linkpath');
+            p.setAttribute('marker-end', 'url(#arrowhead)');
+            return p;
+          })
+        );
+        // Анимация «прорисовки» стрелки как в draw.io: длина пути -> stroke-dashoffset.
+        requestAnimationFrame(() => {
+          for (const p of el.querySelectorAll('.at-gantt-linkpath')) {
+            try {
+              const len = Math.ceil(p.getTotalLength()) + 8;
+              p.style.setProperty('--len', len);
+            } catch {
+              /* getTotalLength недоступен вне браузера */
+            }
+          }
+        });
+      }
+      // Превью рисования связи — отдельный слой поверх (обновляется каждый mousemove).
+      let pv = document.getElementById('gantt-link-preview-layer');
+      if (!preview && !pv) return;
+      if (!pv) {
+        pv = document.createElementNS(NS, 'g');
+        pv.id = 'gantt-link-preview-layer';
+        pv.style.pointerEvents = 'none';
+        el.parentNode.appendChild(pv);
+      }
+      if (!preview) {
+        pv.remove();
+        return;
+      }
+      pv.replaceChildren(
+        (() => {
           const p = document.createElementNS(NS, 'path');
-          p.setAttribute('d', d);
-          p.setAttribute('class', 'at-gantt-linkpath');
+          p.setAttribute('d', preview);
+          p.setAttribute('class', 'at-gantt-linkpath preview');
           p.setAttribute('marker-end', 'url(#arrowhead)');
           return p;
-        }),
-        ...(preview
-          ? (() => {
-              const l = document.createElementNS(NS, 'line');
-              l.setAttribute('x1', preview[0]);
-              l.setAttribute('y1', preview[1]);
-              l.setAttribute('x2', preview[2]);
-              l.setAttribute('y2', preview[3]);
-              l.setAttribute('class', 'at-gantt-linkpath preview');
-              return [l];
-            })()
-          : [])
+        })()
       );
     },
   };

@@ -103,63 +103,72 @@ describe('Calculation Service', () => {
   });
 
   describe('calculateProjectTotals', () => {
-    test('should calculate totals for project with multiple sections', () => {
+    // Каркасный метод v2.0: S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС).
+    // Дефолтные настройки framework занулены, чтобы изолировать главную формулу;
+    // материалы без wasteGroup → k_отх = 0, без полей логистики → p_полн = p_отп.
+    function fwProject(resources) {
       const project = Project.default();
-      project.sections = [
-        Section.create('Section 1'),
-        Section.create('Section 2'),
-      ];
-      
-      project.sections[0].resources = [
-        Resource.create({ type: 'labor', qty: 10, price: 100 }),
-      ];
-      project.sections[1].resources = [
-        Resource.create({ type: 'material', qty: 5, price: 200 }),
-      ];
-      
+      project.framework = {
+        ...project.framework,
+        npPct: 0, vzPct: 0, zuPct: 0, ppPct: 0, garantPct: 0,
+        workDays: 0, rainDays: 0, vehicleTaxYear: 0, insuranceYear: 0,
+        scrapPricePerTon: 0, vzLiquidation: 0,
+      };
       project.rates = {
         overheadPct: 15,
         overheadBase: 'labor',
         profitPct: 10,
         profitBase: 'labor',
-        vatPct: 20,
       };
-      
+      project.sections = [Section.create('Section 1')];
+      project.sections[0].resources = resources;
+      return project;
+    }
+
+    test('should calculate totals for project with multiple sections', () => {
+      // Труд: q × (ЗП_база × 1.20); материалы: q × p_отп (без отходов/логистики)
+      const project = fwProject([
+        Resource.create({ type: 'labor', qty: 10, price: 100 }),    // 10 × 120 = 1200
+        Resource.create({ type: 'material', qty: 5, price: 200 }),  // 5 × 200 = 1000
+      ]);
+
       const totals = calculateProjectTotals(project);
-      
-      expect(totals.laborTotal).toBe(1000);
-      expect(totals.materialTotal).toBe(1000);
-      expect(totals.grandTotal).toBe(2000);
-      expect(totals.overhead).toBe(150); // 15% от labor
-      expect(totals.profit).toBe(100); // 10% от labor
-      // НДС начисляется на (итог по смете + накладные + прибыль):
-      // 20% от (2000 + 150 + 100) = 450 — корректно по методике ценообразования.
-      // Итог с НДС: 2000 + 150 + 100 + 450 = 2700.
-      expect(totals.vat).toBeCloseTo(450);
-      expect(totals.totalWithVat).toBeCloseTo(2700);
+
+      expect(totals.labor).toBeCloseTo(1200);   // наценка 20% на чел-ч
+      expect(totals.material).toBeCloseTo(1000);
+      expect(totals.pz).toBeCloseTo(2200);
+      expect(totals.nr).toBeCloseTo(180);   // 15% от ФОТ (1200)
+      expect(totals.sp).toBeCloseTo(120);   // 10% от ФОТ (d_рын = 0)
+      expect(totals.vat).toBe(0);           // НДС удалён (метод «Без НДС»)
+      expect(totals.sNoTax).toBeCloseTo(2500); // 2200 + 180 + 120 (ЛЗ = 0)
+      expect(totals.tax).toBeCloseTo(150);  // УСН 6% от S без налога
+      expect(totals.returnable.total).toBe(0);
+      expect(totals.grand).toBeCloseTo(2650); // S = 2500 + 150 − 0
     });
 
     test('should return zeros for empty project', () => {
       const project = Project.default();
       project.sections = [];
-      
+
       const totals = calculateProjectTotals(project);
-      
-      expect(totals.laborTotal).toBe(0);
-      expect(totals.machineTotal).toBe(0);
-      expect(totals.materialTotal).toBe(0);
-      expect(totals.grandTotal).toBe(0);
-      expect(totals.overhead).toBe(0);
-      expect(totals.profit).toBe(0);
+
+      expect(totals.labor).toBe(0);
+      expect(totals.machine).toBe(0);
+      expect(totals.material).toBe(0);
+      expect(totals.pz).toBe(0);
+      expect(totals.nr).toBe(0);
+      expect(totals.sp).toBe(0);
       expect(totals.vat).toBe(0);
-      expect(totals.totalWithVat).toBe(0);
+      expect(totals.grand).toBe(0);
     });
 
     test('should handle null project', () => {
       const totals = calculateProjectTotals(null);
-      
-      expect(totals.laborTotal).toBe(0);
-      expect(totals.grandTotal).toBe(0);
+
+      expect(totals.labor).toBe(0);
+      expect(totals.pz).toBe(0);
+      expect(totals.grand).toBe(0);
+      expect(totals.framework).toBe(true);
     });
   });
 

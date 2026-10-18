@@ -53,7 +53,8 @@ export const PROJECT_SCHEMA = {
 
 /** Схема настроек каркасного метода (проект.framework). */
 export const FRAMEWORK_FIELDS = [
-  'enabled', 'npPct', 'usnPct', 'vzPct', 'zuPct', 'ppPct', 'garantPct',
+  'enabled', 'npPct', 'usnPct', 'dRyn', 'vzPct', 'zuPct', 'ppPct', 'garantPct',
+  'kNight',
   'fuelPer100', 'fuelPrice', 'workerDistanceKm', 'workDays',
   'rainDays', 'monthDays', 'rainKLoss', 'rainProb',
   'buildMonths', 'vehicleTaxYear', 'insuranceYear', 'scrapPricePerTon', 'vzLiquidation',
@@ -205,7 +206,9 @@ function encodeBlock(name, fields, rows, opts = {}) {
 /** Значение по умолчанию для поля вне зависимости от схемы */
 function defaultFor(f) {
   if (f === 'resources' || f === 'children') return [];
-  if (f === 'qty' || f === 'price' || f === 'overheadPct' || f === 'profitPct' || f === 'vatPct') return 0;
+  // vatPct: legacy-поле (каркасный метод v2.0 — «Без НДС»); пустая ячейка → undefined,
+  // чтобы старый проект с пропущенным НДС не «восстанавливался» с нулевым процентом.
+  if (f === 'qty' || f === 'price' || f === 'overheadPct' || f === 'profitPct') return 0;
   if (f === 'operator' || f === 'collapsed') return false;
   if (f === 'pred' || f === 'note' || f === 'basis' || f === 'name' || f === 'type' || f === 'unit') return '';
   return null; // days, startAt, parentId, id...

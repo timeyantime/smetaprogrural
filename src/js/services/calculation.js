@@ -19,7 +19,7 @@
 
 import { Section } from '../models/Section.js';
 import { roundMoney, roundGrandTotal } from '../rounding.js';
-import { frameworkRowCost, calcFrameworkTotals } from '../framework.js';
+import { frameworkRowCost, calcFrameworkTotals, defaultFrameworkSettings } from '../framework.js';
 
 export { roundMoney, roundGrandTotal };
 
@@ -47,6 +47,7 @@ export function calculateProjectTotals(project) {
 
   // Пустой/некорректный проект — нулевая смета той же структуры.
   return {
+    settings: defaultFrameworkSettings(),
     labor: 0, machine: 0, material: 0, laborRaw: 0,
     pz: 0, nr: 0, sp: 0, vat: 0,
     lz: 0, lzParts: null, tax: 0, vehicleTax: 0,
@@ -87,6 +88,9 @@ export function calculateResourceTotal(resource, project = null) {
  * @returns {Object} Итоги каркасного метода
  */
 export function calculateFrameworkTotals(project) {
+  // Каркасный метод v2.0 — единственный расчёт в программе: флаг enabled
+  // больше не является выключателем (старый путь с НДС удалён). Нулевые/битые
+  // проекты дают нулевую смету вместо null (см. calculateProjectTotals).
   if (!project || !Array.isArray(project.sections)) return null;
 
   // ПЗ по фактическим объёмам и полным ценам (q_факт, p_полн, наценка труда)

@@ -351,14 +351,8 @@ export function validateRates(rates) {
     });
   }
 
-  // Валидация процента НДС
-  if (typeof rates.vatPct !== 'number' || rates.vatPct < 0) {
-    errors.push({
-      field: 'vatPct',
-      message: 'Процент НДС должен быть числом >= 0',
-      type: 'range',
-    });
-  }
+  // Примечание: НДС (rates.vatPct) из валидации исключён — каркасный метод
+  // v2.0 работает «Без НДС»; налог — УСН (project.framework.usnPct).
 
   return {
     valid: errors.length === 0,
@@ -500,7 +494,7 @@ function getFieldLabel(field) {
     overheadBase: 'База накладных',
     profitPct: 'Процент прибыли',
     profitBase: 'База прибыли',
-    vatPct: 'Процент НДС',
+    // vatPct убран: каркасный метод v2.0 — «Без НДС» (налог — УСН в framework.usnPct)
     mode: 'Режим округления',
     method: 'Метод округления',
   };

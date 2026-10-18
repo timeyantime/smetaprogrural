@@ -13,8 +13,8 @@
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
        (единый источник округления — src/js/rounding.js). -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-CNB28t4p.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-DK8qJwOZ.css">
+  <script type="module" crossorigin src="/assets/main-CyL1lT59.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-DaSDXTZc.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -112,6 +112,7 @@
     <!-- ===== Верхняя линия: переключатель видов (GitHub underline-style) ===== -->
     <nav class="at-views-bar">
       <div class="at-views gh-undernav">
+        <span class="at-views-spacer" aria-hidden="true"></span>
         <button class="at-view-tab" :class="{ active: viewTab === 'table' }" @click="viewTab = 'table'">
           <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M1 2h14v3H1zM1 7h14v3H1zM1 12h14v3H1z"/></svg>
           Таблица
@@ -129,6 +130,8 @@
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
           <input x-model="filter" placeholder="Поиск записей…" />
         </div>
+        <!-- правый спейсер: центрирует поле поиска в линии табов -->
+        <span class="at-views-spacer" aria-hidden="true"></span>
       </div>
     </nav>
 
@@ -417,6 +420,10 @@
           <h3 class="at-summary-title">Сводная ведомость ресурсов</h3>
           <div class="at-search"><input x-model="summarySearch" placeholder="Поиск ресурса…" /></div>
           <span class="spacer"></span>
+          <!-- Кнопка скрытия боковой панели «Сводная стоимость» (видна только когда панель свёрнута) -->
+          <button class="gh-btn gh-btn-sm" @click="sidebarCollapsed = false" title="Показать сводку стоимости">
+            ▥ Показать сводку
+          </button>
           <button class="at-btn at-btn-sm" @click="exportSummaryCsv()">⤒ CSV</button>
         </div>
         <table class="at-table summary-table">

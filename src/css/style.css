@@ -222,7 +222,7 @@ body {
 .at-main { display: flex; flex: 1; min-height: 0; }
 
 /* Колонка контента: виды сверху, панель разделов прижата снизу */
-.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; }
 
 .at-table-wrap { flex: 1; overflow: auto; min-height: 0; }
 
@@ -365,20 +365,24 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   background: #f6f8fa; position: relative; overflow-y: auto;
   transition: width .25s cubic-bezier(.4, 0, .2, 1);
 }
-/* Полностью прячется: панель схлопывается в 0, наружу торчит только тег-ручка */
-.at-sidebar.collapsed { width: 0; border-left: none; }
+/* Полностью прячется: панель схлопывается в 0, наружу торчит только тег-ручка.
+   visibility:hidden нужен, чтобы min-width внутреннего блока не мешал схлопыванию
+   и скрытая панель не перехватывала клики. */
+.at-sidebar.collapsed { width: 0; border-left: none; visibility: hidden; transition-delay: .25s; }
+.at-sidebar:not(.collapsed) { visibility: visible; }
 .at-sidebar-toggle {
   position: absolute; top: 10px; left: -1px; z-index: 20;
   transform: translateX(-100%);
   border: 1px solid var(--line-strong); border-right: none;
   background: #f6f8fa; color: #59636e;
   border-radius: 6px 0 0 6px;
-  cursor: pointer; padding: 6px 4px; font-size: 10px; line-height: 1;
-  box-shadow: none; transition: background .12s, color .12s;
+  cursor: pointer; padding: 7px 5px; font-size: 11px; line-height: 1;
+  box-shadow: 0 1px 2px rgba(31,35,40,.08); transition: background .12s, color .12s;
 }
 .at-sidebar-toggle:hover { background: #eef1f4; color: #0969da; }
+.at-sidebar.collapsed { overflow: visible; }
 .at-sidebar.collapsed .at-sidebar-toggle {
-  left: 0; transform: none;
+  left: -26px; transform: none;
   border-right: 1px solid var(--line-strong);
   border-radius: 6px 0 0 6px;
 }
@@ -479,8 +483,14 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-view-tab:hover { background: var(--hover); color: var(--text); }
 .at-view-tab.active { background: var(--accent-soft); color: var(--accent); border-color: #c4d9fb; font-weight: 600; }
 
-/* Компактный поиск в линии переключателя видов (перенесён из отдельного тулбара) */
-.at-search-inline { min-width: 0; width: 230px; margin-left: auto; background: #f6f8fa; }
+/* Компактный поиск в линии переключателя видов: спейсеры слева и справа
+   центрируют поле по горизонтали относительно строки табов */
+.at-views-spacer { flex: 1 1 0; min-width: 8px; }
+.at-search-inline {
+  flex: 0 0 auto; min-width: 0; width: 230px; background: #f6f8fa;
+  align-self: center; height: 28px; box-sizing: border-box;
+}
+.at-search-inline svg { flex-shrink: 0; }
 .at-search-inline input { min-width: 0; }
 
 /* Плашка «что запрещено» рядом с действиями шапки (GitHub note-style) */

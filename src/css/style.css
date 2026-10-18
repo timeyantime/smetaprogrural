@@ -126,39 +126,41 @@ body {
 .at-btn-sm { padding: 4px 10px; font-size: 12.5px; }
 .at-btn-primary.is-saved { background: #2a5838; border-color: #2a5838; }
 
-/* ============ Вкладки разделов + тулбар ============ */
+/* ============ Вкладки разделов (GitHub underline-nav style) + тулбар ============ */
 .at-tabs-bar { flex-shrink: 0; border-bottom: 1px solid var(--line); }
 
 .at-tabs {
-  display: flex; align-items: center; gap: 2px; padding: 6px 12px 0;
+  display: flex; align-items: flex-end; gap: 0; padding: 0 16px;
   overflow-x: auto; white-space: nowrap;
 }
 .at-tab-wrap {
   display: inline-flex; align-items: center; position: relative; flex-shrink: 0;
 }
 /* Подсветка drop-зоны при переносе вкладки раздела */
-.at-tab-wrap.tab-drop-target .at-tab { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.at-tab-wrap.tab-drop-target .at-tab { outline: 2px dashed #fd8c73; outline-offset: -4px; background: #fff8f5; }
 .at-tab-wrap[draggable="true"] { cursor: grab; }
 .at-tab-wrap[draggable="true"]:active { cursor: grabbing; }
 .at-tab-wrap:hover .at-tab-x { opacity: 1; }
 .at-tab-x {
-  opacity: 0; border: none; background: none; cursor: pointer; color: var(--muted);
-  font-size: 11px; padding: 2px 4px; margin-left: -4px; border-radius: 4px; transition: opacity .12s;
+  opacity: 0; border: none; background: none; cursor: pointer; color: #59636e;
+  font-size: 11px; padding: 2px 4px; margin-left: -6px; border-radius: 4px; transition: opacity .12s;
 }
-.at-tab-x:hover { background: var(--hover); color: var(--accent); }
+.at-tab-x:hover { background: #eef1f4; color: #0969da; }
+/* Плоская вкладка без рамок: активная подчёркивается оранжевой линией GitHub (#fd8c73) */
 .at-tab {
-  cursor: pointer; border: none; background: transparent; color: var(--muted);
-  padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 6px 6px 0 0;
+  cursor: pointer; border: none; background: transparent; color: #59636e;
+  padding: 8px 12px; font-size: 13px; font-weight: 500; border-radius: 0;
   display: inline-flex; align-items: center; gap: 6px; max-width: 220px;
-  border-bottom: 2px solid transparent;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color .12s ease, border-color .12s ease;
 }
-.at-tab:hover { background: var(--hover); color: var(--text); }
-.at-tab.active { color: var(--accent); background: var(--accent-soft); border-bottom-color: var(--accent); font-weight: 600; }
+.at-tab:hover { color: #1f2328; background: transparent; }
+.at-tab.active { color: #1f2328; font-weight: 600; border-bottom-color: #fd8c73; }
 .at-tab-icon { opacity: .7; font-size: 12px; }
-.at-tab-add { font-size: 15px; padding: 4px 10px; color: var(--muted); }
+.at-tab-add { font-size: 15px; padding: 6px 10px; color: #59636e; }
 .at-tab-rename {
-  font: inherit; border: 1px solid var(--accent); border-radius: 4px;
-  padding: 2px 6px; width: 140px; background: #fff; color: var(--text);
+  font: inherit; border: 1px solid #0969da; border-radius: 6px;
+  padding: 2px 6px; width: 140px; background: #fff; color: #1f2328;
 }
 
 .at-toolbar {
@@ -231,13 +233,17 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-row:hover td { background: var(--hover); }
 .at-row.selected td { background: var(--selected); }
 
-/* Drag & drop строк: курсор-«рука», полупрозрачный перетаскиваемый ряд,
-   подсветка drop-зоны (вставка перед/после целевой строки) */
+/* Drag & drop строк: ручка-«штрихи», анимация перетаскивания, подсветка линии вставки */
 .at-row[draggable="true"] { cursor: grab; }
-.at-row.dragging { opacity: .45; }
-.at-row.dragging td { cursor: grabbing; }
-.at-row.drop-above td { box-shadow: inset 0 2px 0 0 var(--accent); background: var(--accent-soft); }
-.at-row.drop-below td { box-shadow: inset 0 -2px 0 0 var(--accent); background: var(--accent-soft); }
+.at-row.dragging {
+  opacity: .35; background: #ddf4ff !important;
+  transition: opacity .12s ease;
+}
+.at-row.dragging td { cursor: grabbing; color: var(--muted); }
+/* «Призрачная» строка при drag + плавный сдвиг соседей к линии вставки */
+.at-row.drop-above td { box-shadow: inset 0 3px 0 -1px #fd8c73; background: #fff8f5; transition: box-shadow .12s ease, background .12s ease; }
+.at-row.drop-below td { box-shadow: inset 0 -3px 0 -1px #fd8c73; background: #fff8f5; transition: box-shadow .12s ease, background .12s ease; }
+.at-add-row td { transition: background .12s ease; }
 
 .at-cell-num {
   text-align: center; color: var(--muted); font-size: 12px; cursor: pointer;
@@ -323,18 +329,37 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-add-hint { padding: 6px 9px; display: inline-block; font-style: italic; }
 .at-add-row:hover .at-add-hint { color: var(--accent); }
 
-/* ============ Боковая сводка ============ */
+/* ============ Боковая сводка (GitHub-style) ============ */
 .at-sidebar {
   width: 300px; flex-shrink: 0; border-left: 1px solid var(--line);
-  background: #fbfcfd; position: relative; overflow-y: auto; transition: width .18s;
+  background: #f6f8fa; position: relative; overflow-y: auto;
+  transition: width .25s cubic-bezier(.4, 0, .2, 1);
 }
-.at-sidebar.collapsed { width: 34px; }
+/* Полностью прячется: панель схлопывается в 0, наружу торчит только тег-ручка */
+.at-sidebar.collapsed { width: 0; border-left: none; }
 .at-sidebar-toggle {
-  position: absolute; top: 10px; left: 6px; z-index: 5;
-  border: 1px solid var(--line-strong); background: #fff; border-radius: 4px;
-  cursor: pointer; color: var(--muted); padding: 2px 6px; font-size: 10px;
+  position: absolute; top: 10px; left: -1px; z-index: 20;
+  transform: translateX(-100%);
+  border: 1px solid var(--line-strong); border-right: none;
+  background: #f6f8fa; color: #59636e;
+  border-radius: 6px 0 0 6px;
+  cursor: pointer; padding: 6px 4px; font-size: 10px; line-height: 1;
+  box-shadow: none; transition: background .12s, color .12s;
 }
-.at-sidebar-inner { padding: 36px 16px 16px; }
+.at-sidebar-toggle:hover { background: #eef1f4; color: #0969da; }
+.at-sidebar.collapsed .at-sidebar-toggle {
+  left: 0; transform: none;
+  border-right: 1px solid var(--line-strong);
+  border-radius: 6px 0 0 6px;
+}
+.at-sidebar-inner { padding: 16px; min-width: 300px; }
+/* Анимация выезда содержимого сводки */
+.sb-enter-active { transition: opacity .25s ease, transform .25s cubic-bezier(.4, 0, .2, 1); }
+.sb-enter-start { opacity: 0; transform: translateX(24px); }
+.sb-enter-end { opacity: 1; transform: translateX(0); }
+.sb-leave-active { transition: opacity .18s ease, transform .18s cubic-bezier(.4, 0, .2, 1); }
+.sb-leave-start { opacity: 1; transform: translateX(0); }
+.sb-leave-end { opacity: 0; transform: translateX(24px); }
 .at-side-title { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
 
 .at-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
@@ -423,6 +448,25 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 }
 .at-view-tab:hover { background: var(--hover); color: var(--text); }
 .at-view-tab.active { background: var(--accent-soft); color: var(--accent); border-color: #c4d9fb; font-weight: 600; }
+
+/* Компактный поиск в линии переключателя видов (перенесён из отдельного тулбара) */
+.at-search-inline { min-width: 0; width: 230px; margin-left: auto; background: #f6f8fa; }
+.at-search-inline input { min-width: 0; }
+
+/* Плашка «что запрещено» рядом с действиями шапки (GitHub note-style) */
+.gh-notice {
+  display: inline-flex; align-items: center; gap: 6px; cursor: help;
+  font-size: 11.5px; font-weight: 500; color: #59636e;
+  background: #ddf4ff; border: 1px solid #54aeff66; border-radius: 999px;
+  padding: 3px 10px; margin-right: 4px; user-select: none;
+}
+.gh-notice svg { color: #0969da; flex-shrink: 0; }
+.gh-notice:hover { background: #b6e3ff; }
+
+/* Подсказка строки добавления записи — однострочно, без переносов */
+.at-add-hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-style: normal; color: #57606a; font-size: 12.5px; }
+.at-add-hint b { color: #0969da; font-weight: 600; }
+.at-add-hint-sub { color: #8b949e; font-weight: 400; }
 
 /* Ресайзер столбцов: невидимая полоска на правой границе заголовка */
 .at-resizer {

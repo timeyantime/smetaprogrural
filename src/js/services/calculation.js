@@ -124,8 +124,14 @@ export function calculateFrameworkTotals(project) {
     mode, method,
   );
 
-  const totals = calcFrameworkTotals(project, { pz, nr, sp, laborTotal: labor, mode, method });
-  return { ...totals, labor, machine, material, laborRaw, vat: 0, framework: true };
+  // Срок строительства (дни) — для пропорционального налога на технику
+  // (Property_Tax: Н_имущ_авто = (T_стр_мес / 12) * (Н_год + Страх_год)).
+  const durationDays = calculateProjectDuration(project);
+  const totals = calcFrameworkTotals(
+    { ...(project || {}), durationDays },
+    { pz, nr, sp, laborTotal: labor, mode, method },
+  );
+  return { ...totals, labor, machine, material, laborRaw, durationDays, vat: 0, framework: true };
 }
 
 /**

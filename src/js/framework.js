@@ -364,7 +364,12 @@ export function calcFrameworkTotals(project, { pz, nr, sp, laborTotal, mode, met
   const rnd = (v) => roundMoney(v, mode, method);
 
   const lz = calcLimitedCosts(pz, nr, sp, laborTotal, s, mode, method);
-  const vehicleTax = rnd(calcVehicleTax(s));
+  // Property_Tax: Н_имущ_авто = (T_стр_мес / 12) * (Н_транспортный_год + Страх_год)
+  // Срок строительства берётся из сметы (суммарная длительность работ в днях / 30),
+  // если работы не заданы — из настройки buildMonths (1–3 мес).
+  const durationDays = Number(project?.durationDays) || 0;
+  const durationMonths = durationDays > 0 ? durationDays / 30 : (Number(s.buildMonths) || 0);
+  const vehicleTax = rnd(calcVehicleTax(s, durationMonths));
   const subtotal = pz + nr + sp + lz.total + vehicleTax; // S без налога и возвратных
   const tax = rnd(calcTax(subtotal, s));
   const returnable = calcReturnable(flatResources(project), s);

@@ -374,7 +374,7 @@ window.smeta = function smeta() {
     selectedIds: new Set(),
     editing: null,
     expandedRow: null,
-    sidebarCollapsed: false,
+    sidebarCollapsed: true, // по умолчанию свёрнута — панель прячется полностью (кнопка «Показать сводку» / ручка ◀)
     sectionModalOpen: false,
     sectionModalMode: 'create',
     sectionDraft: { name: '', index: null },
@@ -419,6 +419,7 @@ window.smeta = function smeta() {
     ganttLinkFrom: null,
     ganttLinkPath: null,
     rowDropTarget: null, // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
+    droppedRowId: null, // id переставленной строки — зелёная вспышка row-dropped после drop
 
     // Настройки печати
     printOrientation: 'landscape',
@@ -700,6 +701,7 @@ window.smeta = function smeta() {
 
       this.$watch('columns', () => this.saveColWidths(), { deep: true });
       this.$watch('hiddenCols', () => this.saveUI());
+      this.$watch('sidebarCollapsed', () => this.saveUI());
 
       // Обработчики клавиш
       window.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -852,6 +854,9 @@ window.smeta = function smeta() {
       const ui = storage.loadUISettings();
       if (Array.isArray(ui.hiddenCols)) this.hiddenCols = ui.hiddenCols;
       if (['table', 'gantt', 'summary'].includes(ui.viewTab)) this.viewTab = ui.viewTab;
+      // Состояние сводной панели: запоминаем; на первый запуск — открыта на широких экранах
+      if (typeof ui.sidebarCollapsed === 'boolean') this.sidebarCollapsed = ui.sidebarCollapsed;
+      else if (typeof window !== 'undefined') this.sidebarCollapsed = !(window.innerWidth >= 1200);
     },
 
     /**
@@ -861,6 +866,7 @@ window.smeta = function smeta() {
       storage.saveUISettings({
         hiddenCols: this.hiddenCols,
         viewTab: this.viewTab,
+        sidebarCollapsed: this.sidebarCollapsed,
       });
     },
 

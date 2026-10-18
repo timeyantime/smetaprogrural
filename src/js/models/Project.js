@@ -58,6 +58,7 @@ function frameworkDefaults() {
     npPct: 3,
     usnPct: 6,
     dRyn: 0,
+    kNight: 1.3, // k_ночн ∈ [1.2; 1.5] — коэффициент за работу в ночь/праздник
     vzPct: 3,
     zuPct: 0,
     ppPct: 0,

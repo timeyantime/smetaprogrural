@@ -168,10 +168,14 @@ describe('Каркасный метод v2.0 (framework)', () => {
       return p;
     }
 
-    test('выключенный метод → null (обратная совместимость)', () => {
+    test('enabled = false не отключает расчёт (метод единственный), null-проект → null', () => {
       const p = project();
       p.framework.enabled = false;
-      expect(calculateFrameworkTotals(p)).toBeNull();
+      // Каркасный метод v2.0 — единственный расчёт: флаг enabled больше не
+      // выключает его (старый путь с НДС удалён). Расчёт выполняется как обычно.
+      const t = calculateFrameworkTotals(p);
+      expect(t).not.toBeNull();
+      expect(t.framework).toBe(true);
       expect(calculateFrameworkTotals(null)).toBeNull();
     });
 
@@ -243,6 +247,23 @@ describe('Каркасный метод v2.0 (framework)', () => {
       expect(row.wasteGroup).toBe('metal');
       expect(row.unitMassT).toBe(0.008);
       expect(row.night).toBe(true);
+    });
+
+    test('d_рын и k_ночн сериализуются в схеме toon (не теряются при сохранении)', () => {
+      // Регрессия на TODO п.3: поля были вне FRAMEWORK_FIELDS и пропадали в JSON.
+      const p = Project.default();
+      p.framework = { ...defaultFrameworkSettings(), dRyn: 25000, kNight: 1.45 };
+      const encoded = encodeProject(p);
+      const decoded = decodeProject(encoded.slice('TOONP1:'.length));
+      expect(decoded.framework.dRyn).toBe(25000);
+      expect(decoded.framework.kNight).toBe(1.45);
+      // СП = Н_сп * Б_сп + d_рын — надбавка участвует в расчёте после восстановления
+      p.rates = { overheadPct: 0, overheadBase: 'labor', profitPct: 10, profitBase: 'labor' };
+      p.sections = [Section.create('S1')];
+      p.sections[0].resources = [Resource.create({ type: 'labor', qty: 10, price: 100 })];
+      const t = calculateFrameworkTotals(p);
+      // labor = 10 × 100 × 1.20 = 1200; СП = 10% × 1200 + 25000 = 26200
+      expect(t.sp).toBeCloseTo(26200);
     });
 
     test('старый проект без framework декодируется без поля (миграция добавит дефолты)', () => {

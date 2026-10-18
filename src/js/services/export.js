@@ -1,16 +1,10 @@
 /**
  * Сервис экспорта данных
- * Отвечает за экспорт в JSON, CSV, Excel
+ * Отвечает за экспорт в JSON и CSV (Excel удалён по требованию)
  */
 
 import { Project } from '../models/Project.js';
 import { Resource } from '../models/Resource.js';
-// Единый источник SpreadsheetML-логики — office.js (реэкспорт ниже),
-// чтобы не дублировать генератор Excel и экранирование XML в двух местах.
-import { buildSpreadsheetML, xmlEsc } from '../office.js';
-
-export { buildSpreadsheetML, xmlEsc };
-
 /**
  * Экспортирует проект в JSON
  * @param {Object} project - Проект
@@ -110,125 +104,6 @@ export function importFromCsv(csvString) {
 }
 
 /**
- * Экспортирует проект в Excel (XLSX)
- * Использует SpreadsheetML формат для совместимости
- * @param {Object} project - Проект
- * @param {Array} columns - Колонки для экспорта
- * @returns {Blob} Blob с Excel файлом
- */
-export function exportToExcel(project, columns = null) {
-  if (!Project.validate(project)) {
-    throw new Error('Invalid project data');
-  }
-
-  const defaultColumns = ['basis', 'name', 'type', 'unit', 'qty', 'price', 'total', 'note'];
-  const cols = columns || defaultColumns;
-
-  // Создаем данные для Excel
-  const sheetBlocks = [];
-
-  // Лист с данными
-  const dataRows = [];
-
-  // Заголовок
-  dataRows.push([{ v: project.title, s: 'Title', t: 's' }]);
-  dataRows.push([]);
-
-  // Заголовки колонок
-  const headers = cols.map((col) => ({ v: getColumnLabel(col), s: 'Header', t: 's' }));
-  dataRows.push(headers);
-
-  // Данные
-  for (const section of project.sections) {
-    // Заголовок раздела
-    dataRows.push([{ v: section.name, s: 'Section', t: 's' }]);
-
-    for (const resource of section.resources) {
-      const formatted = Resource.formatForDisplay(resource);
-      const row = cols.map((col) => {
-        const value = formatted[col] !== undefined ? formatted[col] : '';
-        const style = ['price', 'total'].includes(col)
-          ? 'Money'
-          : ['qty', 'days'].includes(col)
-            ? 'Num'
-            : 'Default';
-        return { v: value, s: style };
-      });
-      dataRows.push(row);
-    }
-
-    dataRows.push([]); // Пустая строка
-  }
-
-  // Итоги
-  const totals = calculateTotals(project, cols);
-  dataRows.push([{ v: 'ИТОГО', s: 'Total', t: 's' }]);
-  dataRows.push(
-    totals.map((val) => ({ v: val, s: typeof val === 'number' ? 'Money' : 'Total', t: 's' }))
-  );
-
-  sheetBlocks.push({ name: 'Смета', rows: dataRows });
-
-  // Создаем XML
-  const xml = buildSpreadsheetML(sheetBlocks);
-
-  // Создаем Blob
-  return new Blob([xml], { type: 'application/vnd.ms-excel' });
-}
-
-/**
- * Рассчитывает итоги для Excel
- * @param {Object} project - Проект
- * @param {Array} columns - Колонки
- * @returns {Array} Массив значений итогов
- */
-function calculateTotals(project, columns) {
-  const totals = {
-    basis: '',
-    name: '',
-    type: '',
-    unit: '',
-    qty: 0,
-    price: 0,
-    total: 0,
-    note: '',
-  };
-
-  if (!project.sections) {
-    return Object.values(totals);
-  }
-
-  let laborTotal = 0;
-  let machineTotal = 0;
-  let materialTotal = 0;
-
-  for (const section of project.sections) {
-    for (const resource of section.resources) {
-      const total = resource.qty * resource.price;
-      switch (resource.type) {
-        case 'labor':
-          laborTotal += total;
-          break;
-        case 'machine':
-          machineTotal += total;
-          break;
-        case 'material':
-          materialTotal += total;
-          break;
-      }
-    }
-  }
-
-  totals.total = laborTotal + machineTotal + materialTotal;
-
-  return columns.map((col) => {
-    if (col === 'total') return totals.total;
-    if (col === 'name') return 'ИТОГО';
-    return '';
-  });
-}
-
-/**
  * Получает метку колонки
  * @param {string} key - Ключ колонки
  * @returns {string} Метка колонки
@@ -291,6 +166,5 @@ export default {
   importFromJson,
   exportToCsv,
   importFromCsv,
-  exportToExcel,
   downloadFile,
 };

@@ -487,25 +487,27 @@ window.smeta = function smeta() {
     },
 
     /**
-     * Ресурсы текущей области просмотра (без сортировки — порядок ручной/разделами)
+     * Плоский список ресурсов текущей области просмотра.
+     * ⛔ Сортировки и группировки запрещены (см. README «⛔ Запрещено»):
+     *    порядок только ручной (перетаскивание/↑↓) и разделами сметы.
      */
-    get sortedRows() {
+    get flatViewRows() {
       return this.filteredRows;
     },
 
     /**
-     * Пагинированные ресурсы
+     * Пагинированные ресурсы (50 строк на страницу)
      */
     get pagedRows() {
       const start = this.page * PAGE_SIZE;
-      return this.sortedRows.slice(start, start + PAGE_SIZE);
+      return this.flatViewRows.slice(start, start + PAGE_SIZE);
     },
 
     /**
      * Общее количество страниц
      */
     get totalPages() {
-      return Math.ceil(this.sortedRows.length / PAGE_SIZE);
+      return Math.ceil(this.flatViewRows.length / PAGE_SIZE);
     },
 
     /**

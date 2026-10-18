@@ -1,9 +1,9 @@
 /**
  * Сметная программа — основной модуль приложения
- * 
+ *
  * Это основной файл, который инициализирует Alpine.js компонент
  * и связывает все модули вместе.
- * 
+ *
  * Зависимости:
  * - Alpine.js (внешний CDN)
  * - models/ (Project, Section, Resource)
@@ -293,17 +293,41 @@ function newSection(name) {
 
 /** Новая запись ресурса с полями планирования (days/pred/startAt/operator) */
 function newRow(partial = {}) {
-  return Object.assign(Resource.create({}), {
-    days: null,
-    pred: '',
-    startAt: null,
-    operator: false,
-  }, partial);
+  return Object.assign(
+    Resource.create({}),
+    {
+      days: null,
+      pred: '',
+      startAt: null,
+      operator: false,
+    },
+    partial
+  );
 }
 
 /** Копирует каркасные метаданные (нормы отходов, логистика, ночь/праздник) из записи НСБ в строку сметы. */
 function copyFrameworkFields(from, to) {
-  const KEYS = ['wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee', 'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh', 'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'];
+  const KEYS = [
+    'wasteGroup',
+    'perUnit',
+    'unitMassT',
+    'vehicleCapT',
+    'distanceKm',
+    'tariffPerKm',
+    'supplyFee',
+    'kGabarit',
+    'manipulatorFlag',
+    'unloadMachineHr',
+    'unloadHours',
+    'moveDistM',
+    'moveSpeedMh',
+    'perPct',
+    'storePct',
+    'perOn',
+    'storeOn',
+    'night',
+    'holiday',
+  ];
   for (const k of KEYS) {
     if (from[k] !== undefined && from[k] !== null) to[k] = from[k];
   }
@@ -382,13 +406,13 @@ window.smeta = function smeta() {
     cursor: -1,
     calcTab: 'labor',
     calc: {
-      volume: 100,       // объём работ в единице из сметы
-      normTime: 1.2,     // чел-ч (или machine-часы) на единицу объёма
-      crewSize: 3,       // бригада, чел. (для машин — звено механизаторов)
-      shiftsPerDay: 1,   // смен в день
-      hoursPerShift: 8,  // часов в смене
-      ratePerHour: 250,  // стоимость одного чел-ч / маш-ч, руб.
-      days: null,        // обратный расчёт: задан срок → подобрать состав
+      volume: 100, // объём работ в единице из сметы
+      normTime: 1.2, // чел-ч (или machine-часы) на единицу объёма
+      crewSize: 3, // бригада, чел. (для машин — звено механизаторов)
+      shiftsPerDay: 1, // смен в день
+      hoursPerShift: 8, // часов в смене
+      ratePerHour: 250, // стоимость одного чел-ч / маш-ч, руб.
+      days: null, // обратный расчёт: задан срок → подобрать состав
     },
     calcModalOpen: false,
     projModalOpen: false,
@@ -399,7 +423,6 @@ window.smeta = function smeta() {
     ganttDrag: null,
     ganttLinkFrom: null,
     ganttLinkPath: null,
-    dragRow: null,
     rowDropTarget: null, // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
     toggleGroupMenu: false,
 
@@ -562,21 +585,42 @@ window.smeta = function smeta() {
       let n = 0;
       for (let si = 0; si < this.data.sections.length; si++) {
         const sec = this.data.sections[si];
-        if (!sec.name.trim()) list.push({ sev: 'warn', text: `Раздел ${si + 1}: пустое название`, si });
+        if (!sec.name.trim())
+          list.push({ sev: 'warn', text: `Раздел ${si + 1}: пустое название`, si });
         for (const r of sec.resources) {
           n++;
           const label = `№${n} «${(r.name || '').trim() || 'без наименования'}»`;
           if (!(String(r.name).trim() || String(r.basis).trim()))
-            list.push({ sev: 'err', text: `${label}: пустая запись (нет ни наименования, ни обоснования)`, si, id: r.id });
+            list.push({
+              sev: 'err',
+              text: `${label}: пустая запись (нет ни наименования, ни обоснования)`,
+              si,
+              id: r.id,
+            });
           else {
             if (!String(r.basis).trim())
-              list.push({ sev: 'warn', text: `${label}: нет обоснования (шифра расценки)`, si, id: r.id });
+              list.push({
+                sev: 'warn',
+                text: `${label}: нет обоснования (шифра расценки)`,
+                si,
+                id: r.id,
+              });
             if ((Number(r.price) || 0) <= 0)
-              list.push({ sev: 'err', text: `${label}: цена ≤ 0 — стоимость не формируется`, si, id: r.id });
+              list.push({
+                sev: 'err',
+                text: `${label}: цена ≤ 0 — стоимость не формируется`,
+                si,
+                id: r.id,
+              });
             if ((Number(r.qty) || 0) <= 0)
               list.push({ sev: 'warn', text: `${label}: количество ≤ 0`, si, id: r.id });
             if (!String(r.unit).trim())
-              list.push({ sev: 'warn', text: `${label}: не указана единица измерения`, si, id: r.id });
+              list.push({
+                sev: 'warn',
+                text: `${label}: не указана единица измерения`,
+                si,
+                id: r.id,
+              });
           }
         }
       }
@@ -657,9 +701,8 @@ window.smeta = function smeta() {
       }));
       const f = this.resSearch.trim().toLowerCase();
       if (!f) return arr.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
-      return arr.filter((r) => 
-        r.name.toLowerCase().includes(f) || 
-        r.unit.toLowerCase().includes(f)
+      return arr.filter(
+        (r) => r.name.toLowerCase().includes(f) || r.unit.toLowerCase().includes(f)
       );
     },
 
@@ -672,13 +715,17 @@ window.smeta = function smeta() {
       this.loadUI();
 
       // Автосохранение при изменении данных
-      this.$watch('data', () => {
-        if (this.data.recalcMode === 'manual') {
-          this.dirty = true;
-        } else {
-          this.saveLocal();
-        }
-      }, { deep: true });
+      this.$watch(
+        'data',
+        () => {
+          if (this.data.recalcMode === 'manual') {
+            this.dirty = true;
+          } else {
+            this.saveLocal();
+          }
+        },
+        { deep: true }
+      );
 
       this.$watch('columns', () => this.saveColWidths(), { deep: true });
       this.$watch('multiSort', () => this.saveUI());
@@ -938,7 +985,11 @@ window.smeta = function smeta() {
       const resource = section.resources.find((r) => r.id === rowId);
       if (!resource) return;
 
-      const duplicate = Resource.create({ ...resource, id: uid(), name: `${resource.name} (копия)` });
+      const duplicate = Resource.create({
+        ...resource,
+        id: uid(),
+        name: `${resource.name} (копия)`,
+      });
       section.resources.push(duplicate);
       this.pushHistory(`Дублирован ресурс "${resource.name}"`);
     },
@@ -1097,11 +1148,21 @@ window.smeta = function smeta() {
     get sums() {
       const fw = calculation.calculateFrameworkTotals(this.data);
       return {
-        labor: fw.labor, machine: fw.machine, operator: 0, material: fw.material,
-        pz: fw.pz, nr: fw.nr, sp: fw.sp,
-        lz: fw.lz, lzParts: fw.lzParts, tax: fw.tax, vehicleTax: fw.vehicleTax,
-        returnable: fw.returnable, sNoTax: fw.sNoTax,
-        grand: fw.grand, framework: true,
+        labor: fw.labor,
+        machine: fw.machine,
+        operator: 0,
+        material: fw.material,
+        pz: fw.pz,
+        nr: fw.nr,
+        sp: fw.sp,
+        lz: fw.lz,
+        lzParts: fw.lzParts,
+        tax: fw.tax,
+        vehicleTax: fw.vehicleTax,
+        returnable: fw.returnable,
+        sNoTax: fw.sNoTax,
+        grand: fw.grand,
+        framework: true,
       };
     },
 
@@ -1166,7 +1227,8 @@ window.smeta = function smeta() {
     togglePrintCol(key) {
       const arr = this.printSettings.cols;
       const i = arr.indexOf(key);
-      if (i >= 0) arr.splice(i, 1); else arr.push(key);
+      if (i >= 0) arr.splice(i, 1);
+      else arr.push(key);
       storage.savePrintSettings(this.printSettings);
     },
 
@@ -1187,7 +1249,10 @@ window.smeta = function smeta() {
       this.renamingSection = si;
       this.$nextTick(() => {
         const el = document.querySelector('.at-tab-wrap .at-tab-rename');
-        if (el) { el.focus(); el.select(); }
+        if (el) {
+          el.focus();
+          el.select();
+        }
       });
     },
 
@@ -1248,7 +1313,10 @@ window.smeta = function smeta() {
     cancelNsbEdit() {
       if (this.nsbEditId && this.nsbDraft && !String(this.nsbDraft.name || '').trim()) {
         const idx = this.nsbItems.findIndex((n) => n.id === this.nsbEditId);
-        if (idx >= 0) { this.nsbItems.splice(idx, 1); this.saveNsb(); }
+        if (idx >= 0) {
+          this.nsbItems.splice(idx, 1);
+          this.saveNsb();
+        }
       }
       this.nsbEditId = null;
       this.nsbDraft = null;
@@ -1256,7 +1324,11 @@ window.smeta = function smeta() {
 
     /** Сохранение базы НСБ в localStorage */
     saveNsb() {
-      try { localStorage.setItem(LS_NSB_KEY, toonEncode(LS_NSB_KEY, this.nsbItems)); } catch (e) { /* ignore */ }
+      try {
+        localStorage.setItem(LS_NSB_KEY, toonEncode(LS_NSB_KEY, this.nsbItems));
+      } catch (e) {
+        /* ignore */
+      }
     },
 
     /** Текущая строка формы записи (для модалки редактирования) */
@@ -1269,9 +1341,12 @@ window.smeta = function smeta() {
 
     /** Открытие модалки формы новой записи */
     openAddRecordModal() {
-      let si = this.activeTab === null
-        ? (this.data.sections.length ? this.data.sections.length - 1 : null)
-        : this.activeTab;
+      let si =
+        this.activeTab === null
+          ? this.data.sections.length
+            ? this.data.sections.length - 1
+            : null
+          : this.activeTab;
       if (si == null || !this.data.sections[si]) {
         this.addSection();
         si = this.data.sections.length - 1;
@@ -1286,7 +1361,15 @@ window.smeta = function smeta() {
     /** Отмена модалки записи (пустая новая запись удаляется) */
     cancelRecordModal() {
       const row = this.recordRow;
-      if (row && !(String(row.name).trim() || String(row.basis).trim() || Number(row.qty) || Number(row.price))) {
+      if (
+        row &&
+        !(
+          String(row.name).trim() ||
+          String(row.basis).trim() ||
+          Number(row.qty) ||
+          Number(row.price)
+        )
+      ) {
         const sec = this.data.sections[this.recordDraft.si];
         const idx = sec.resources.indexOf(row);
         if (idx >= 0) sec.resources.splice(idx, 1);
@@ -1301,8 +1384,7 @@ window.smeta = function smeta() {
       const k = this.resKey(row);
       if (!k) return;
       for (const sec of this.data.sections)
-        for (const r of sec.resources)
-          if (r !== row && this.resKey(r) === k) r.price = row.price;
+        for (const r of sec.resources) if (r !== row && this.resKey(r) === k) r.price = row.price;
     },
 
     /** Обработка правки цены в ячейке */
@@ -1320,7 +1402,10 @@ window.smeta = function smeta() {
     /** Установка предшественника по его номеру (#49) */
     setPredByNumber(row, numText) {
       const n = parseInt(numText, 10);
-      if (!isFinite(n) || n <= 0) { row.pred = ''; return; }
+      if (!isFinite(n) || n <= 0) {
+        row.pred = '';
+        return;
+      }
       const items = this.flatRows;
       const target = items[n - 1];
       row.pred = target ? String(this.rowNumber(target.row.id)) : '';
@@ -1338,7 +1423,10 @@ window.smeta = function smeta() {
     },
 
     fmtMoney(v) {
-      return (Number(v) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      return (Number(v) || 0).toLocaleString('ru-RU', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
     },
 
     typeLabel(row) {
@@ -1377,6 +1465,11 @@ window.smeta = function smeta() {
       return framework.frameworkRowCost(row, fw);
     },
 
+    /** Список групп норм отходов (для select в модалке записей). */
+    wasteNorms() {
+      return framework.WASTE_NORMS;
+    },
+
     /** Название группы норм отходов + k для отображения в проверке расчёта. */
     wasteLabel(groupId) {
       const g = framework.WASTE_NORMS.find((w) => w.id === groupId);
@@ -1399,7 +1492,9 @@ window.smeta = function smeta() {
 
     roundingLabel() {
       const r = this.data.rounding || {};
-      return (ROUND_MODES[r.mode] || ROUND_MODES.kopecks).label + ' · ' + (ROUND_METHODS[r.method] || '');
+      return (
+        (ROUND_MODES[r.mode] || ROUND_MODES.kopecks).label + ' · ' + (ROUND_METHODS[r.method] || '')
+      );
     },
 
     setRecalcMode(mode) {
@@ -1414,13 +1509,14 @@ window.smeta = function smeta() {
       setTimeout(() => (this.savedFlash = false), 1500);
     },
 
-
     goPage(delta) {
       this.page = Math.max(0, Math.min(this.pageCount - 1, this.page + delta));
       this.cursor = -1;
     },
 
-    gotoLastPage() { this.page = this.pageCount - 1; },
+    gotoLastPage() {
+      this.page = this.pageCount - 1;
+    },
 
     pageLabel() {
       return `${Math.min(this.page + 1, this.pageCount)} / ${this.pageCount}`;
@@ -1438,12 +1534,27 @@ window.smeta = function smeta() {
       const idx = vis.findIndex((c) => c.key === key);
       if (idx < 0) return 0;
       let span = 0;
-      for (let i = idx; i < vis.length; i++) span += (vis[i].key === 'name' ? 2 : 1);
+      for (let i = idx; i < vis.length; i++) span += vis[i].key === 'name' ? 2 : 1;
       return span;
     },
 
     colIcon(key) {
-      return { num: '#', basis: 'T', name: 'T', type: '⬡', unit: 'T', qty: '#', price: '$', total: '∑', note: 'T', days: '🗓', pred: '→', actions: '' }[key] || '';
+      return (
+        {
+          num: '#',
+          basis: 'T',
+          name: 'T',
+          type: '⬡',
+          unit: 'T',
+          qty: '#',
+          price: '$',
+          total: '∑',
+          note: 'T',
+          days: '🗓',
+          pred: '→',
+          actions: '',
+        }[key] || ''
+      );
     },
 
     resetColWidths() {
@@ -1455,7 +1566,10 @@ window.smeta = function smeta() {
 
     commitEdit(ev, field, item) {
       const row = item.row;
-      if (ev && ev.key === 'Escape') { this.editing = null; return; }
+      if (ev && ev.key === 'Escape') {
+        this.editing = null;
+        return;
+      }
       const input = ev && ev.target;
       let val = input ? input.value : row[field];
       if (['qty', 'price', 'days'].includes(field)) {
@@ -1487,7 +1601,11 @@ window.smeta = function smeta() {
     },
 
     addRow(si) {
-      if (si == null || si < 0 || !this.data.sections[si]) { this.createSection(); this.activeTab = this.data.sections.length - 1; return; }
+      if (si == null || si < 0 || !this.data.sections[si]) {
+        this.createSection();
+        this.activeTab = this.data.sections.length - 1;
+        return;
+      }
       this.pushHistory('Добавлена запись');
       this.data.sections[si].resources.push(Resource.create());
       const list = this.data.sections[si].resources;
@@ -1530,10 +1648,16 @@ window.smeta = function smeta() {
     startRowDrag(e, item) {
       this.dragRow = { si: item.si, id: item.row.id };
       e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', item.row.id); } catch (err) { /* ignore */ }
+      try {
+        e.dataTransfer.setData('text/plain', item.row.id);
+      } catch (err) {
+        /* ignore */
+      }
     },
 
-    endRowDrag() { this.dragRow = null; },
+    endRowDrag() {
+      this.dragRow = null;
+    },
 
     dropOnSection(si) {
       if (!this.dragRow || this.dragRow.si === si) return;
@@ -1547,7 +1671,9 @@ window.smeta = function smeta() {
     },
 
     /** Открытие модалки реквизитов проекта */
-    openProjectModal() { this.projModalOpen = true; },
+    openProjectModal() {
+      this.projModalOpen = true;
+    },
 
     /** Открытие калькулятора трудозатрат / маш-часов (#48) */
     openCalc(prefillRow) {
@@ -1565,14 +1691,23 @@ window.smeta = function smeta() {
       const c = this.calc;
       const V = Number(c.volume) || 0;
       const N = Number(c.normTime) || 0;
-      const totalHours = V * N;                                   // всего чел-ч / маш-ч
-      const dayHours = Math.max(1, (Number(c.crewSize) || 1)) * Math.max(1, Number(c.shiftsPerDay) || 1) * Math.max(1, Number(c.hoursPerShift) || 8);
+      const totalHours = V * N; // всего чел-ч / маш-ч
+      const dayHours =
+        Math.max(1, Number(c.crewSize) || 1) *
+        Math.max(1, Number(c.shiftsPerDay) || 1) *
+        Math.max(1, Number(c.hoursPerShift) || 8);
       const days = totalHours > 0 ? totalHours / dayHours : 0;
       const cost = totalHours * (Number(c.ratePerHour) || 0);
       // обратная задача: срок задан → минимальный состав бригады
-      const needCrew = (Number(c.days) > 0)
-        ? Math.ceil(totalHours / (Math.max(1, Number(c.days)) * Math.max(1, Number(c.shiftsPerDay) || 1) * Math.max(1, Number(c.hoursPerShift) || 8)))
-        : null;
+      const needCrew =
+        Number(c.days) > 0
+          ? Math.ceil(
+              totalHours /
+                (Math.max(1, Number(c.days)) *
+                  Math.max(1, Number(c.shiftsPerDay) || 1) *
+                  Math.max(1, Number(c.hoursPerShift) || 8))
+            )
+          : null;
       return { totalHours, days: Math.ceil(days), exactDays: days, cost, needCrew, dayHours };
     },
 
@@ -1580,7 +1715,11 @@ window.smeta = function smeta() {
     applyCalcToRow(item) {
       const res = this.calcResult;
       const row = item ? item.row : this.recordRow;
-      if (!row) { alert('Сначала выделите запись в таблице.'); this.calcModalOpen = false; return; }
+      if (!row) {
+        alert('Сначала выделите запись в таблице.');
+        this.calcModalOpen = false;
+        return;
+      }
       this.pushHistory('Калькулятор применён к записи');
       row.type = this.calcTab === 'labor' ? 'labor' : 'machine';
       row.price = Number(this.calc.ratePerHour) || 0;
@@ -1591,7 +1730,9 @@ window.smeta = function smeta() {
     },
 
     /** Открытие хаба ресурсов */
-    openResHub() { this.resModalOpen = true; },
+    openResHub() {
+      this.resModalOpen = true;
+    },
     // ==========================================
     // Методы UI (портировано из legacy js/app.js)
     // ==========================================
@@ -1602,24 +1743,23 @@ window.smeta = function smeta() {
       let n = 0;
       for (const sec of this.data.sections) {
         for (const r of sec.resources) {
-          if (resKey(r) === entry.key) { r.price = p; n++; }
+          if (resKey(r) === entry.key) {
+            r.price = p;
+            n++;
+          }
         }
       }
       this.pushHistory(`Цена ресурса «${entry.name}» → ${p} ₽ (${n} записей)`);
     },
 
     findResourceByName(name) {
-      const f = String(name || '').trim().toLowerCase();
+      const f = String(name || '')
+        .trim()
+        .toLowerCase();
       if (!f) return null;
       for (const sec of this.data.sections)
-        for (const r of sec.resources)
-          if (String(r.name).trim().toLowerCase() === f) return r;
+        for (const r of sec.resources) if (String(r.name).trim().toLowerCase() === f) return r;
       return null;
-    },
-
-    resetColWidths() {
-      localStorage.removeItem(LS_COLS_KEY);
-      location.reload();
     },
 
     /** Показать все скрытые колонки (пункт меню «👁 Показать все колонки») */
@@ -1640,46 +1780,13 @@ window.smeta = function smeta() {
     selectionTotal() {
       let s = 0;
       for (const sec of this.data.sections)
-        for (const r of sec.resources)
-          if (this.selectedIds.has(r.id)) s += this.rowTotal(r);
+        for (const r of sec.resources) if (this.selectedIds.has(r.id)) s += this.rowTotal(r);
       return s;
     },
 
-    get problems() {
-      const list = [];
-      let n = 0;
-      for (let si = 0; si < this.data.sections.length; si++) {
-        const sec = this.data.sections[si];
-        if (!sec.name.trim()) list.push({ sev: 'warn', text: `Раздел ${si + 1}: пустое название`, si });
-        for (const r of sec.resources) {
-          n++;
-          const label = `№${n} «${(r.name || '').trim() || 'без наименования'}»`;
-          if (!(String(r.name).trim() || String(r.basis).trim()))
-            list.push({ sev: 'err', text: `${label}: пустая запись (нет ни наименования, ни обоснования)`, si, id: r.id });
-          else {
-            if (!String(r.basis).trim())
-              list.push({ sev: 'warn', text: `${label}: нет обоснования (шифра расценки)`, si, id: r.id });
-            if ((Number(r.price) || 0) <= 0)
-              list.push({ sev: 'err', text: `${label}: цена ≤ 0 — стоимость не формируется`, si, id: r.id });
-            if ((Number(r.qty) || 0) <= 0)
-              list.push({ sev: 'warn', text: `${label}: количество ≤ 0`, si, id: r.id });
-            if (!String(r.unit).trim())
-              list.push({ sev: 'warn', text: `${label}: не указана единица измерения`, si, id: r.id });
-          }
-        }
-      }
-      return list;
+    isChapter(sec) {
+      return Array.isArray(sec.children) && sec.children.length > 0;
     },
-
-    goToProblem(p) {
-      this.activeTab = null;
-      this.page = 0;
-      if (p.si != null) this.selectTab(p.si);
-      if (p.id) this.selectedIds = new Set([p.id]);
-      this.historyOpen = false;
-    },
-
-    isChapter(sec) { return Array.isArray(sec.children) && sec.children.length > 0; },
 
     chapterTotal(sec) {
       return sec.children.reduce((s, c) => s + this.sectionTotal(c), 0);
@@ -1703,8 +1810,12 @@ window.smeta = function smeta() {
       const name = prompt('Название главы:', 'Глава 1');
       if (name == null) return;
       this.data.sections.splice(index, 0, {
-        id: uid(), name: name.trim() || 'Глава', parentId: null,
-        collapsed: false, resources: [], children: [],
+        id: uid(),
+        name: name.trim() || 'Глава',
+        parentId: null,
+        collapsed: false,
+        resources: [],
+        children: [],
       });
     },
 
@@ -1719,7 +1830,14 @@ window.smeta = function smeta() {
         this.activeTab = null;
       } else {
         this.pushHistory('Создана глава над разделом');
-        const chapter = { id: uid(), name: prev.name + ' (глава)', parentId: null, collapsed: false, resources: [], children: [prev, arr[si]] };
+        const chapter = {
+          id: uid(),
+          name: prev.name + ' (глава)',
+          parentId: null,
+          collapsed: false,
+          resources: [],
+          children: [prev, arr[si]],
+        };
         arr.splice(si - 1, 2, chapter);
         this.activeTab = null;
       }
@@ -1743,7 +1861,9 @@ window.smeta = function smeta() {
     },
 
     findChapterOf(secId) {
-      return this.data.sections.findIndex((s) => this.isChapter(s) && s.children.some((c) => c.id === secId));
+      return this.data.sections.findIndex(
+        (s) => this.isChapter(s) && s.children.some((c) => c.id === secId)
+      );
     },
 
     get tabSections() {
@@ -1763,7 +1883,10 @@ window.smeta = function smeta() {
         if (!sec) return [];
         if (this.isChapter(sec)) {
           if (sec.collapsed) return [];
-          return [{ sec, si: this.activeTab }, ...sec.children.map((c) => ({ sec: c, si: this.activeTab }))];
+          return [
+            { sec, si: this.activeTab },
+            ...sec.children.map((c) => ({ sec: c, si: this.activeTab })),
+          ];
         }
         return [{ sec, si: this.activeTab }];
       }
@@ -1781,23 +1904,12 @@ window.smeta = function smeta() {
       return Math.max(1, Math.ceil(this.flatRows.length / PAGE_SIZE));
     },
 
-    goPage(delta) {
-      this.page = Math.max(0, Math.min(this.pageCount - 1, this.page + delta));
-      this.cursor = -1;
-    },
-
-    gotoLastPage() { this.page = this.pageCount - 1; },
-
-    pageLabel() {
-      return `${Math.min(this.page + 1, this.pageCount)} / ${this.pageCount}`;
-    },
-
     get visibleGroups() {
       const groups = [];
       if (this.groupBy !== 'none') {
         const map = new Map();
         for (const item of this.flatRows) {
-          const key = this.groupBy === 'type' ? item.row.type : (item.row.unit || '—');
+          const key = this.groupBy === 'type' ? item.row.type : item.row.unit || '—';
           if (!map.has(key)) map.set(key, { key, label: this.groupLabel(key), total: 0, count: 0 });
           map.get(key).total += this.rowTotal(item.row);
           map.get(key).count++;
@@ -1805,7 +1917,13 @@ window.smeta = function smeta() {
         groups.push(...map.values());
       } else if (this.activeTab !== null) {
         const sec = this.data.sections[this.activeTab];
-        if (sec) groups.push({ key: sec.id, label: sec.name, total: this.sectionTotal(sec), count: sec.resources.length });
+        if (sec)
+          groups.push({
+            key: sec.id,
+            label: sec.name,
+            total: this.sectionTotal(sec),
+            count: sec.resources.length,
+          });
       }
       return groups;
     },
@@ -1814,7 +1932,7 @@ window.smeta = function smeta() {
       if (this.groupBy === 'none') return this.pagedRows;
       const buckets = new Map();
       for (const item of this.flatRows) {
-        const key = this.groupBy === 'type' ? item.row.type : (item.row.unit || '—');
+        const key = this.groupBy === 'type' ? item.row.type : item.row.unit || '—';
         if (!buckets.has(key)) buckets.set(key, []);
         buckets.get(key).push(item);
       }
@@ -1830,18 +1948,30 @@ window.smeta = function smeta() {
       this.groupCollapsed = { ...this.groupCollapsed, [key]: !this.groupCollapsed[key] };
     },
 
-    groupCollapsedFn(key) { return !!this.groupCollapsed[key]; },
+    groupCollapsedFn(key) {
+      return !!this.groupCollapsed[key];
+    },
 
     groupLabel(key) {
       if (this.groupBy === 'unit') return key;
-      return { labor: 'ЗТ — затраты труда', machine: 'ОМ — эксплуатация машин', material: 'М — материалы' }[key] || key;
+      return (
+        {
+          labor: 'ЗТ — затраты труда',
+          machine: 'ОМ — эксплуатация машин',
+          material: 'М — материалы',
+        }[key] || key
+      );
     },
 
     groupByLabel() {
       return { type: 'По типу ресурса', unit: 'По единице измерения' }[this.groupBy] || '';
     },
 
-    setGroupBy(v) { this.groupBy = v; this.toggleGroupMenu = false; this.saveUI(); },
+    setGroupBy(v) {
+      this.groupBy = v;
+      this.toggleGroupMenu = false;
+      this.saveUI();
+    },
 
     get summaryResources() {
       const map = new Map();
@@ -1851,7 +1981,16 @@ window.smeta = function smeta() {
           for (const r of s.resources) {
             const k = resKey(r);
             if (!k) continue;
-            if (!map.has(k)) map.set(k, { name: r.name, type: r.type, unit: r.unit, qty: 0, cost: 0, bases: new Set(), uses: 0 });
+            if (!map.has(k))
+              map.set(k, {
+                name: r.name,
+                type: r.type,
+                unit: r.unit,
+                qty: 0,
+                cost: 0,
+                bases: new Set(),
+                uses: 0,
+              });
             const e = map.get(k);
             e.qty += Number(r.qty) || 0;
             e.cost += this.rowTotal(r);
@@ -1870,70 +2009,26 @@ window.smeta = function smeta() {
     matchesFilter(row) {
       const f = this.filter.trim().toLowerCase();
       if (!f) return true;
-      return (row.name || '').toLowerCase().includes(f)
-        || (row.basis || '').toLowerCase().includes(f)
-        || (row.note || '').toLowerCase().includes(f);
+      return (
+        (row.name || '').toLowerCase().includes(f) ||
+        (row.basis || '').toLowerCase().includes(f) ||
+        (row.note || '').toLowerCase().includes(f)
+      );
     },
 
     hiddenCount() {
       let hidden = 0;
       for (const sec of this.data.sections)
-        for (const r of sec.resources)
-          if (!this.matchesFilter(r)) hidden++;
+        for (const r of sec.resources) if (!this.matchesFilter(r)) hidden++;
       return hidden;
     },
 
-    visibleCount() { return this.flatRows.length; },
+    visibleCount() {
+      return this.flatRows.length;
+    },
 
     totalCount() {
       return this.data.sections.reduce((s, sec) => s + sec.resources.length, 0);
-    },
-
-    fmtNum(v) {
-      const n = Number(v) || 0;
-      return n.toLocaleString('ru-RU', { maximumFractionDigits: 6 });
-    },
-
-    fmtMoney(v) {
-      return (Number(v) || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    },
-
-    typeLabel(row) {
-      if (row.type === 'labor') return 'ЗТ · труд';
-      if (row.type === 'machine') return row.operator ? 'ОМ · Тмр' : 'ОМ · машины';
-      return 'М · материал';
-    },
-
-    setType(row, t) {
-      row.type = t;
-      if (t !== 'machine') row.operator = false;
-    },
-
-    commitEdit(ev, field, item) {
-      const row = item.row;
-      if (ev && ev.key === 'Escape') { this.editing = null; return; }
-      const input = ev && ev.target;
-      let val = input ? input.value : row[field];
-      if (['qty', 'price', 'days'].includes(field)) {
-        val = String(val).replace(',', '.');
-        const n = parseFloat(val);
-        row[field] = isFinite(n) ? n : 0;
-      } else if (field === 'pred') {
-        this.setPredByNumber(row, val);
-      } else {
-        row[field] = String(val).trim();
-      }
-      if (field === 'price') this.onPriceEdited(row);
-      this.pushHistory(`Правка поля «${field}»`);
-      this.editing = null;
-      // Tab — переход к следующей редактируемой ячейке строки (#37)
-      if (ev && ev.key === 'Tab') {
-        ev.preventDefault();
-        const order = ['basis', 'name', 'unit', 'qty', 'price', 'note', 'days', 'pred'];
-        const i = order.indexOf(field);
-        const next = order[(i + 1) % order.length];
-        this.$nextTick(() => this.openCell(next, item));
-      }
     },
 
     selectOnly(id) {
@@ -1944,10 +2039,6 @@ window.smeta = function smeta() {
       const s = new Set(this.selectedIds);
       s.has(id) ? s.delete(id) : s.add(id);
       this.selectedIds = s;
-    },
-
-    openRowModal(item) {
-      this.expandedRow = { ...item };
     },
 
     openAddSectionModal() {
@@ -1964,7 +2055,10 @@ window.smeta = function smeta() {
 
     saveSectionModal() {
       const name = (this.sectionDraft.name || '').trim();
-      if (!name) { this.sectionModalOpen = false; return; }
+      if (!name) {
+        this.sectionModalOpen = false;
+        return;
+      }
       if (this.sectionModalMode === 'create') {
         this.data.sections.push(newSection(name));
         this.activeTab = this.data.sections.length - 1;
@@ -2073,7 +2167,9 @@ window.smeta = function smeta() {
     applySortToSections() {
       const levels = this.multiSort.length
         ? this.multiSort
-        : (this.sortState.field ? [this.sortState] : []);
+        : this.sortState.field
+          ? [this.sortState]
+          : [];
       if (!levels.length) {
         // сортировка снята — восстановить ручной порядок (drag&drop, #15)
         this.restoreManualOrder();
@@ -2092,64 +2188,21 @@ window.smeta = function smeta() {
       for (const sec of this.data.sections) {
         sec.resources.sort((a, b) => {
           for (const { field, dir } of levels) {
-            const va = val(a, field), vb = val(b, field);
+            const va = val(a, field),
+              vb = val(b, field);
             if (va < vb) return -dir;
             if (va > vb) return dir;
           }
           return 0;
         });
       }
-      this.logActivity('Сортировка: ' + levels.map((l) => l.field + (l.dir > 0 ? '↑' : '↓')).join(', '));
+      this.logActivity(
+        'Сортировка: ' + levels.map((l) => l.field + (l.dir > 0 ? '↑' : '↓')).join(', ')
+      );
     },
 
     currentTargetSection() {
       return this.activeTab === null ? this.data.sections.length - 1 : this.activeTab;
-    },
-
-    addRow(si) {
-      if (si == null || si < 0 || !this.data.sections[si]) { this.addSection(); return; }
-      this.pushHistory('Добавлена запись');
-      this.data.sections[si].resources.push(Resource.create());
-      const list = this.data.sections[si].resources;
-      const created = list[list.length - 1];
-      this.openCell('name', { row: created });
-    },
-
-    saveRecordModal() {
-      const row = this.recordRow;
-      if (row && !(String(row.name).trim() || String(row.basis).trim())) {
-        // пустая запись — удалить
-        const idx = this.data.sections[this.recordDraft.si].resources.indexOf(row);
-        if (idx >= 0) this.data.sections[this.recordDraft.si].resources.splice(idx, 1);
-      } else if (row) {
-        this.syncResourcePrice(row);
-      }
-      this.recordModalOpen = false;
-      this.recordDraft = null;
-    },
-
-    removeRowById(si, id) {
-      this.pushHistory('Удалена запись');
-      const arr = this.data.sections[si].resources;
-      const idx = arr.findIndex((r) => r.id === id);
-      if (idx >= 0) arr.splice(idx, 1);
-      this.selectedIds.delete(id);
-    },
-
-    moveRow(item, delta) {
-      const sec = this.data.sections[item.si];
-      const from = sec.resources.findIndex((r) => r.id === item.row.id);
-      const to = from + delta;
-      if (from < 0 || to < 0 || to >= sec.resources.length) return;
-      this.pushHistory('Перемещение записи');
-      const [moved] = sec.resources.splice(from, 1);
-      sec.resources.splice(to, 0, moved);
-    },
-
-    startRowDrag(e, item) {
-      this.dragRow = { si: item.si, id: item.row.id };
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', item.row.id); } catch (err) { /* ignore */ }
     },
 
     /** Завершение перетаскивания строки — сброс состояния drag/drop-подсветки. */
@@ -2170,7 +2223,8 @@ window.smeta = function smeta() {
       }
       const pos = this._rowDropPos(e);
       const key = item.si + '|' + item.row.id;
-      if (this.rowDropTarget && this.rowDropTarget.key === key && this.rowDropTarget.pos === pos) return;
+      if (this.rowDropTarget && this.rowDropTarget.key === key && this.rowDropTarget.pos === pos)
+        return;
       this.rowDropTarget = { key, pos };
     },
 
@@ -2197,31 +2251,24 @@ window.smeta = function smeta() {
       const toArr = this.data.sections[item.si].resources;
       let to = toArr.findIndex((r) => r.id === item.row.id);
       if (to < 0) to = toArr.length;
-      else if ((target && target.pos === 'below')) to += 1;
+      else if (target && target.pos === 'below') to += 1;
       toArr.splice(to, 0, moved);
-      this.dragRow = null;
-    },
-
-    endRowDrag() { this.dragRow = null; this.rowDropTarget = null; },
-
-    dropOnSection(si) {
-      if (!this.dragRow || this.dragRow.si === si) return;
-      this.pushHistory('Запись перенесена в другой раздел');
-      const fromArr = this.data.sections[this.dragRow.si].resources;
-      const idx = fromArr.findIndex((r) => r.id === this.dragRow.id);
-      if (idx < 0) return;
-      const [moved] = fromArr.splice(idx, 1);
-      this.data.sections[si].resources.push(moved);
       this.dragRow = null;
     },
 
     openCtxMenu(e, item) {
       e.preventDefault();
       if (!this.selectedIds.has(item.row.id)) this.selectOnly(item.row.id);
-      this.ctxMenu = { x: Math.min(e.clientX, window.innerWidth - 220), y: Math.min(e.clientY, window.innerHeight - 260), item };
+      this.ctxMenu = {
+        x: Math.min(e.clientX, window.innerWidth - 220),
+        y: Math.min(e.clientY, window.innerHeight - 260),
+        item,
+      };
     },
 
-    closeCtxMenu() { this.ctxMenu = null; },
+    closeCtxMenu() {
+      this.ctxMenu = null;
+    },
 
     ctxAction(fn) {
       const m = this.ctxMenu;
@@ -2231,7 +2278,9 @@ window.smeta = function smeta() {
     },
 
     ctxEditRow() {
-      this.ctxAction((item) => { this.expandedRow = { ...item }; });
+      this.ctxAction((item) => {
+        this.expandedRow = { ...item };
+      });
     },
 
     ctxDuplicate() {
@@ -2252,13 +2301,19 @@ window.smeta = function smeta() {
 
     ctxApplyNsb() {
       this.ctxAction((item) => {
-        const hit = this.nsbItems.find((n) =>
-          (n.basis && n.basis.trim().toLowerCase() === String(item.row.basis).trim().toLowerCase()) ||
-          (n.name && n.name.trim().toLowerCase() === String(item.row.name).trim().toLowerCase()));
+        const hit = this.nsbItems.find(
+          (n) =>
+            (n.basis &&
+              n.basis.trim().toLowerCase() === String(item.row.basis).trim().toLowerCase()) ||
+            (n.name && n.name.trim().toLowerCase() === String(item.row.name).trim().toLowerCase())
+        );
         if (hit) {
           this.pushHistory('Применена расценка НСБ');
-          item.row.basis = hit.basis; item.row.name = hit.name; item.row.type = hit.type;
-          item.row.unit = hit.unit; item.row.price = hit.price;
+          item.row.basis = hit.basis;
+          item.row.name = hit.name;
+          item.row.type = hit.type;
+          item.row.unit = hit.unit;
+          item.row.price = hit.price;
           copyFrameworkFields(hit, item.row);
         } else {
           alert('В НСБ нет расценки с таким шифром или наименованием.');
@@ -2291,12 +2346,17 @@ window.smeta = function smeta() {
       this.selectedIds = s;
     },
 
-    clearSelection() { this.selectedIds = new Set(); this.batchBar = false; },
+    clearSelection() {
+      this.selectedIds = new Set();
+      this.batchBar = false;
+    },
 
     openBatchBar() {
       this.batchBar = true;
       this.ctxMenu = null;
-      this.batchPrice = ''; this.batchQty = ''; this.batchUnit = '';
+      this.batchPrice = '';
+      this.batchQty = '';
+      this.batchUnit = '';
     },
 
     batchApply() {
@@ -2332,9 +2392,15 @@ window.smeta = function smeta() {
 
     exportGanttPng() {
       const svg = this.buildGanttSVG();
-      if (!svg) { alert('Нет работ для экспорта: задайте длительность хотя бы одной записи.'); return; }
+      if (!svg) {
+        alert('Нет работ для экспорта: задайте длительность хотя бы одной записи.');
+        return;
+      }
       svgToPng(svg, 2, (blob) => {
-        if (!blob) { alert('Не удалось создать изображение.'); return; }
+        if (!blob) {
+          alert('Не удалось создать изображение.');
+          return;
+        }
         this.downloadBlob('gantt.png', blob);
         this.logActivity('Экспорт диаграммы Ганта (PNG)');
       });
@@ -2342,7 +2408,10 @@ window.smeta = function smeta() {
 
     exportGanttSvg() {
       const svg = this.buildGanttSVG();
-      if (!svg) { alert('Нет работ для экспорта.'); return; }
+      if (!svg) {
+        alert('Нет работ для экспорта.');
+        return;
+      }
       this.download('gantt.svg', svg, 'image/svg+xml');
       this.logActivity('Экспорт диаграммы Ганта (SVG)');
     },
@@ -2350,30 +2419,58 @@ window.smeta = function smeta() {
     buildGanttSVG() {
       const g = this.ganttData;
       if (!g.rows.length && !g.sections.length) return null;
-      const DAYW = 34, ROWH = 26, SECH = 30, NAMEW = 260, TOP = 46;
+      const DAYW = 34,
+        ROWH = 26,
+        SECH = 30,
+        NAMEW = 260,
+        TOP = 46;
       const width = NAMEW + g.totalDays * DAYW + 40;
       const height = TOP + g.sections.length * SECH + g.rows.length * ROWH + 30;
-      const colors = { labor: '#0052cc', machine: '#ff8b00', material: '#36b37e', section: '#4c9aff' };
+      const colors = {
+        labor: '#0052cc',
+        machine: '#ff8b00',
+        material: '#36b37e',
+        section: '#4c9aff',
+      };
       const parts = [];
-      parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
+      parts.push(
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`
+      );
       parts.push(`<rect width="${width}" height="${height}" fill="#ffffff"/>`);
-      parts.push(`<text x="12" y="24" font-family="Arial" font-size="15" font-weight="bold" fill="#172b4d">${xmlEsc(this.data.title)} — график работ</text>`);
+      parts.push(
+        `<text x="12" y="24" font-family="Arial" font-size="15" font-weight="bold" fill="#172b4d">${xmlEsc(this.data.title)} — график работ</text>`
+      );
       // шкала
       for (let d = 0; d <= g.totalDays; d++) {
         const x = NAMEW + d * DAYW;
-        parts.push(`<line x1="${x}" y1="${TOP - 8}" x2="${x}" y2="${height - 10}" stroke="#eaebf0" stroke-width="1"/>`);
-        if (d % 5 === 0) parts.push(`<text x="${x + 2}" y="${TOP - 12}" font-family="Arial" font-size="10" fill="#7a8699">${this.ganttDateLabel(d)}</text>`);
+        parts.push(
+          `<line x1="${x}" y1="${TOP - 8}" x2="${x}" y2="${height - 10}" stroke="#eaebf0" stroke-width="1"/>`
+        );
+        if (d % 5 === 0)
+          parts.push(
+            `<text x="${x + 2}" y="${TOP - 12}" font-family="Arial" font-size="10" fill="#7a8699">${this.ganttDateLabel(d)}</text>`
+          );
       }
       let y = TOP;
       for (const s of g.sections) {
-        parts.push(`<text x="8" y="${y + 18}" font-family="Arial" font-size="12" font-weight="bold" fill="#172b4d">${xmlEsc((s.si + 1) + '. ' + s.name).slice(0, 34)}</text>`);
-        parts.push(`<rect x="${NAMEW + s.leftDays * DAYW}" y="${y + 8}" width="${Math.max(6, s.spanDays * DAYW - 4)}" height="12" rx="3" fill="${colors.section}"/>`);
+        parts.push(
+          `<text x="8" y="${y + 18}" font-family="Arial" font-size="12" font-weight="bold" fill="#172b4d">${xmlEsc(s.si + 1 + '. ' + s.name).slice(0, 34)}</text>`
+        );
+        parts.push(
+          `<rect x="${NAMEW + s.leftDays * DAYW}" y="${y + 8}" width="${Math.max(6, s.spanDays * DAYW - 4)}" height="12" rx="3" fill="${colors.section}"/>`
+        );
         y += SECH;
       }
       for (const r of g.rows) {
-        parts.push(`<text x="22" y="${y + 17}" font-family="Arial" font-size="11" fill="#344563">${xmlEsc(r.name).slice(0, 40)}</text>`);
-        parts.push(`<rect x="${NAMEW + r.leftDays * DAYW}" y="${y + 5}" width="${Math.max(6, r.spanDays * DAYW - 4)}" height="16" rx="4" fill="${colors[r.type] || colors.material}"/>`);
-        parts.push(`<text x="${NAMEW + r.leftDays * DAYW + 6}" y="${y + 17}" font-family="Arial" font-size="10" fill="#fff">${r.days} дн.</text>`);
+        parts.push(
+          `<text x="22" y="${y + 17}" font-family="Arial" font-size="11" fill="#344563">${xmlEsc(r.name).slice(0, 40)}</text>`
+        );
+        parts.push(
+          `<rect x="${NAMEW + r.leftDays * DAYW}" y="${y + 5}" width="${Math.max(6, r.spanDays * DAYW - 4)}" height="16" rx="4" fill="${colors[r.type] || colors.material}"/>`
+        );
+        parts.push(
+          `<text x="${NAMEW + r.leftDays * DAYW + 6}" y="${y + 17}" font-family="Arial" font-size="10" fill="#fff">${r.days} дн.</text>`
+        );
         y += ROWH;
       }
       parts.push('</svg>');
@@ -2418,18 +2515,20 @@ window.smeta = function smeta() {
       const DAY = 86400000;
       const start = new Date(this.data.startDate || defaultStartDate()).getTime();
       // если активна вкладка раздела — диаграмма строится только по работам этого раздела
-      const scoped = this.activeTab === null
-        ? (() => {
-            const out = [];
-            this.data.sections.forEach((sec, si) => {
-              out.push({ sec, si });
-              if (this.isChapter(sec) && !sec.collapsed) sec.children.forEach((c) => out.push({ sec: c, si }));
-            });
-            return out;
-          })()
-        : [{ sec: this.data.sections[this.activeTab], si: this.activeTab }].filter((x) => x.sec);
+      const scoped =
+        this.activeTab === null
+          ? (() => {
+              const out = [];
+              this.data.sections.forEach((sec, si) => {
+                out.push({ sec, si });
+                if (this.isChapter(sec) && !sec.collapsed)
+                  sec.children.forEach((c) => out.push({ sec: c, si }));
+              });
+              return out;
+            })()
+          : [{ sec: this.data.sections[this.activeTab], si: this.activeTab }].filter((x) => x.sec);
       const rows = [];
-      const skipped = [];   // записи без длительности — не попадают на диаграмму
+      const skipped = []; // записи без длительности — не попадают на диаграмму
       let prevEnd = start;
       let maxEnd = start;
       for (const { sec, si } of scoped) {
@@ -2440,14 +2539,24 @@ window.smeta = function smeta() {
           // Длительность 0 или не задана → запись НЕ отображается на диаграмме
           // (в том числе дробная < 1 дня округляется до 0 и скрывается).
           const raw = Number(r.days);
-          if (!isFinite(raw) || raw <= 0) { skipped.push(r); continue; }
+          if (!isFinite(raw) || raw <= 0) {
+            skipped.push(r);
+            continue;
+          }
           const dur = Math.round(raw);
-          if (dur <= 0) { skipped.push(r); continue; }
+          if (dur <= 0) {
+            skipped.push(r);
+            continue;
+          }
           const from = cur;
           const to = from + dur * DAY;
           rows.push({
-            row: r, si, name: r.name || '(без наименования)', type: r.type,
-            total: this.rowTotal(r), days: dur,
+            row: r,
+            si,
+            name: r.name || '(без наименования)',
+            type: r.type,
+            total: this.rowTotal(r),
+            days: dur,
             leftDays: Math.round((from - start) / DAY),
             spanDays: dur,
           });
@@ -2463,7 +2572,8 @@ window.smeta = function smeta() {
       const moved = rows.some((g) => Number(g.row.startAt) >= 0);
       if (moved) {
         rows.forEach((g, i) => {
-          if (Number(g.row.startAt) >= 0) g.leftDays = Math.max(0, Math.round(Number(g.row.startAt)));
+          if (Number(g.row.startAt) >= 0)
+            g.leftDays = Math.max(0, Math.round(Number(g.row.startAt)));
         });
       }
       const links = [];
@@ -2502,34 +2612,47 @@ window.smeta = function smeta() {
         return len;
       };
       const maxChain = rows.reduce((m, g) => Math.max(m, chainLen(g)), 0);
-      rows.forEach((g) => { g.isCritical = this.ganttCritical && chainLen(g) === maxChain; });
+      rows.forEach((g) => {
+        g.isCritical = this.ganttCritical && chainLen(g) === maxChain;
+      });
       const sections = [];
       for (const { sec, si } of scoped) {
         const gr = rows.filter((g) => g.row && sec.resources.includes(g.row));
         if (!gr.length) continue;
         const left = Math.min(...gr.map((g) => g.leftDays));
         const right = Math.max(...gr.map((g) => g.leftDays + g.spanDays));
-        sections.push({ id: sec.id, si, name: sec.name, leftDays: left, spanDays: right - left, total: this.sectionTotal(sec) });
+        sections.push({
+          id: sec.id,
+          si,
+          name: sec.name,
+          leftDays: left,
+          spanDays: right - left,
+          total: this.sectionTotal(sec),
+        });
       }
       return { rows, sections, skipped, links, totalDays, workedDays, start, origLeft };
     },
 
     get ganttLinkLines() {
       const w = this.ganttDayWidth();
-      const ROWH = 34, SECH = 38, TOP = 34;
+      const ROWH = 34,
+        SECH = 38,
+        TOP = 34;
       const rows = this.ganttData.rows;
       const secCount = this.ganttData.sections.length;
-      return this.ganttData.links.map((l) => {
-        const fi = rows.indexOf(l.from);
-        const ti = rows.indexOf(l.to);
-        if (fi < 0 || ti < 0) return null;
-        const x1 = TOP * 0 + l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
-        const y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
-        const x2 = l.to.leftDays * w;
-        const y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
-        const midX = Math.max(x1 + 8, x2 - 14);
-        return `M${x1},${y1} H${midX} V${y2} H${Math.max(0, x2 - 6)}`;
-      }).filter(Boolean);
+      return this.ganttData.links
+        .map((l) => {
+          const fi = rows.indexOf(l.from);
+          const ti = rows.indexOf(l.to);
+          if (fi < 0 || ti < 0) return null;
+          const x1 = TOP * 0 + l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
+          const y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
+          const x2 = l.to.leftDays * w;
+          const y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
+          const midX = Math.max(x1 + 8, x2 - 14);
+          return `M${x1},${y1} H${midX} V${y2} H${Math.max(0, x2 - 6)}`;
+        })
+        .filter(Boolean);
     },
 
     trackGanttLink(e) {
@@ -2598,13 +2721,17 @@ window.smeta = function smeta() {
         if (this.ganttLinkFrom !== g) {
           this.pushHistory('Создана связь Ганта');
           g.row.pred = String(this.rowNumber(this.ganttLinkFrom.row.id));
-          this.logActivity(`Связь: №${this.rowNumber(this.ganttLinkFrom.row.id)} → №${this.rowNumber(g.row.id)}`);
+          this.logActivity(
+            `Связь: №${this.rowNumber(this.ganttLinkFrom.row.id)} → №${this.rowNumber(g.row.id)}`
+          );
         }
         this.ganttLinkFrom = null;
       }
     },
 
-    removePred(row) { row.pred = ''; },
+    removePred(row) {
+      row.pred = '';
+    },
 
     ganttDateLabel(offsetDays) {
       const d = new Date(this.ganttData.start + offsetDays * 86400000);
@@ -2664,9 +2791,13 @@ window.smeta = function smeta() {
     get summaryRows() {
       const f = this.summarySearch.trim().toLowerCase();
       const all = this.summaryResources.filter(
-        (e) => !f || String(e.name).toLowerCase().includes(f) || String(e.unit).toLowerCase().includes(f)
+        (e) =>
+          !f || String(e.name).toLowerCase().includes(f) || String(e.unit).toLowerCase().includes(f)
       );
-      const withAvg = all.map((e) => ({ ...e, avgPrice: e.qty > 0 ? e.cost / e.qty : e.price || 0 }));
+      const withAvg = all.map((e) => ({
+        ...e,
+        avgPrice: e.qty > 0 ? e.cost / e.qty : e.price || 0,
+      }));
       if (this.summaryGroup === 'none') {
         return withAvg.map((e, i) => ({ key: 'r' + i, num: i + 1, e, avgPrice: e.avgPrice }));
       }
@@ -2680,11 +2811,14 @@ window.smeta = function smeta() {
       let num = 0;
       for (const [k, list] of groups) {
         out.push({
-          key: 'g-' + k, header: true, label: this.summaryGroup === 'type' ? this.groupTypeLabel(k) : k,
+          key: 'g-' + k,
+          header: true,
+          label: this.summaryGroup === 'type' ? this.groupTypeLabel(k) : k,
           groupTotal: list.reduce((s, e) => s + e.cost, 0),
           groupCount: list.reduce((s, e) => s + e.qty, 0),
         });
-        for (const e of list) out.push({ key: 'g-' + k + '-' + ++num, num, e, avgPrice: e.avgPrice });
+        for (const e of list)
+          out.push({ key: 'g-' + k + '-' + ++num, num, e, avgPrice: e.avgPrice });
       }
       return out;
     },
@@ -2694,28 +2828,22 @@ window.smeta = function smeta() {
       const lines = ['№;Наименование;Тип;Ед.;Кол-во;Средняя цена;Стоимость;Расценки'];
       let n = 0;
       for (const e of this.summaryResources) {
-        lines.push([++n, e.name, this.groupTypeLabel(e.type), e.unit, e.qty,
-          (e.qty > 0 ? e.cost / e.qty : 0).toFixed(2), e.cost.toFixed(2), [...e.bases].join(' / ')].map(esc).join(';'));
+        lines.push(
+          [
+            ++n,
+            e.name,
+            this.groupTypeLabel(e.type),
+            e.unit,
+            e.qty,
+            (e.qty > 0 ? e.cost / e.qty : 0).toFixed(2),
+            e.cost.toFixed(2),
+            [...e.bases].join(' / '),
+          ]
+            .map(esc)
+            .join(';')
+        );
       }
       this.download('svod-resursy.csv', '\ufeff' + lines.join('\r\n'), 'text/csv;charset=utf-8');
-    },
-
-    totalTableWidth() {
-      return this.visibleColumns().reduce((s, c) => s + c.width, 0);
-    },
-
-    colSpanFor(key) {
-      // ячейка-разделитель на всю ширину таблицы: суммарный colspan видимых колонок
-      const vis = this.visibleColumns();
-      const idx = vis.findIndex((c) => c.key === key);
-      if (idx < 0) return 0;
-      let span = 0;
-      for (let i = idx; i < vis.length; i++) span += (vis[i].key === 'name' ? 2 : 1);
-      return span;
-    },
-
-    colIcon(key) {
-      return { num: '#', basis: 'T', name: 'T', type: '⬡', unit: 'T', qty: '#', price: '$', total: '∑', note: 'T', days: '🗓', pred: '→', actions: '' }[key] || '';
     },
 
     sortDescOrAsc2(field) {
@@ -2728,14 +2856,24 @@ window.smeta = function smeta() {
     get nsbFiltered() {
       const f = this.nsbSearch.trim().toLowerCase();
       if (!f) return this.nsbItems;
-      return this.nsbItems.filter((n) =>
-        (n.name || '').toLowerCase().includes(f) ||
-        (n.basis || '').toLowerCase().includes(f) ||
-        (n.unit || '').toLowerCase().includes(f));
+      return this.nsbItems.filter(
+        (n) =>
+          (n.name || '').toLowerCase().includes(f) ||
+          (n.basis || '').toLowerCase().includes(f) ||
+          (n.unit || '').toLowerCase().includes(f)
+      );
     },
 
     nsbAddNew() {
-      const item = { id: uid(), basis: '', name: '', type: 'material', unit: '', price: 0, note: '' };
+      const item = {
+        id: uid(),
+        basis: '',
+        name: '',
+        type: 'material',
+        unit: '',
+        price: 0,
+        note: '',
+      };
       this.nsbItems.unshift(item);
       this.nsbEditId = item.id;
       this.nsbDraft = { ...item };
@@ -2763,14 +2901,23 @@ window.smeta = function smeta() {
       if (!item) return;
       if (!confirm(`Удалить из НСБ «${item.name || item.basis}»?`)) return;
       this.nsbItems = this.nsbItems.filter((n) => n.id !== id);
-      if (this.nsbEditId === id) { this.nsbEditId = null; this.nsbDraft = null; }
+      if (this.nsbEditId === id) {
+        this.nsbEditId = null;
+        this.nsbDraft = null;
+      }
       this.saveNsb();
     },
 
     nsbResetDefaults() {
-      if (!confirm('Восстановить стартовый набор расценок НСБ? Текущие изменения базы будут потеряны.')) return;
+      if (
+        !confirm(
+          'Восстановить стартовый набор расценок НСБ? Текущие изменения базы будут потеряны.'
+        )
+      )
+        return;
       this.nsbItems = defaultNsb();
-      this.nsbEditId = null; this.nsbDraft = null;
+      this.nsbEditId = null;
+      this.nsbDraft = null;
       this.saveNsb();
     },
 
@@ -2780,7 +2927,10 @@ window.smeta = function smeta() {
       if (targetId) {
         for (const sec of this.data.sections) {
           const r = sec.resources.find((x) => x.id === targetId);
-          if (r) { appliedTo = r; break; }
+          if (r) {
+            appliedTo = r;
+            break;
+          }
         }
       }
       if (!appliedTo) {
@@ -2804,15 +2954,22 @@ window.smeta = function smeta() {
     },
 
     nsbApplyToSelected() {
-      if (!this.selectedIds.size) { alert('Сначала выделите записи в таблице (клик по номеру строки, Ctrl+A — все видимые).'); return; }
+      if (!this.selectedIds.size) {
+        alert('Сначала выделите записи в таблице (клик по номеру строки, Ctrl+A — все видимые).');
+        return;
+      }
       this.pushHistory('Применены цены НСБ к выделению');
       let updated = 0;
       for (const sec of this.data.sections) {
         for (const r of sec.resources) {
           if (!this.selectedIds.has(r.id)) continue;
-          const hit = this.nsbItems.find((n) =>
-            (r.basis && n.basis && r.basis.trim().toLowerCase() === n.basis.trim().toLowerCase()) ||
-            (r.name && n.name && r.name.trim().toLowerCase() === n.name.trim().toLowerCase()));
+          const hit = this.nsbItems.find(
+            (n) =>
+              (r.basis &&
+                n.basis &&
+                r.basis.trim().toLowerCase() === n.basis.trim().toLowerCase()) ||
+              (r.name && n.name && r.name.trim().toLowerCase() === n.name.trim().toLowerCase())
+          );
           if (hit) {
             r.price = hit.price;
             if (!r.unit) r.unit = hit.unit;
@@ -2821,9 +2978,11 @@ window.smeta = function smeta() {
           }
         }
       }
-      alert(updated
-        ? `Цены из НСБ обновлены в ${updated} выделенных записях.`
-        : 'Среди выделенных записей нет совпадений с НСБ (по шифру или наименованию).');
+      alert(
+        updated
+          ? `Цены из НСБ обновлены в ${updated} выделенных записях.`
+          : 'Среди выделенных записей нет совпадений с НСБ (по шифру или наименованию).'
+      );
     },
 
     exportNsb() {
@@ -2838,9 +2997,37 @@ window.smeta = function smeta() {
         try {
           const arr = JSON.parse(reader.result);
           if (!Array.isArray(arr)) throw new Error('ожидается массив записей');
-          const FW_KEYS = ['wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee', 'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh', 'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'];
+          const FW_KEYS = [
+            'wasteGroup',
+            'perUnit',
+            'unitMassT',
+            'vehicleCapT',
+            'distanceKm',
+            'tariffPerKm',
+            'supplyFee',
+            'kGabarit',
+            'manipulatorFlag',
+            'unloadMachineHr',
+            'unloadHours',
+            'moveDistM',
+            'moveSpeedMh',
+            'perPct',
+            'storePct',
+            'perOn',
+            'storeOn',
+            'night',
+            'holiday',
+          ];
           this.nsbItems = arr.map((n) => {
-            const base = { id: n.id || uid(), basis: n.basis || '', name: n.name || '', type: n.type || 'material', unit: n.unit || '', price: Number(n.price) || 0, note: n.note || '' };
+            const base = {
+              id: n.id || uid(),
+              basis: n.basis || '',
+              name: n.name || '',
+              type: n.type || 'material',
+              unit: n.unit || '',
+              price: Number(n.price) || 0,
+              note: n.note || '',
+            };
             for (const k of FW_KEYS) if (n[k] !== undefined) base[k] = n[k];
             return base;
           });
@@ -2874,7 +3061,8 @@ window.smeta = function smeta() {
     },
 
     acceptSuggestion(item, field, value) {
-      if (field === 'qty' || field === 'price' || field === 'days') item.row[field] = Number(value) || 0;
+      if (field === 'qty' || field === 'price' || field === 'days')
+        item.row[field] = Number(value) || 0;
       else item.row[field] = value;
       this.editing = null;
       if (field === 'price') this.syncResourcePrice(item.row);
@@ -2882,7 +3070,7 @@ window.smeta = function smeta() {
 
     mergeSameResources(groupKey) {
       const items = this.groupedFlatRows.filter((i) => {
-        const k = this.groupBy === 'type' ? i.row.type : (i.row.unit || '—');
+        const k = this.groupBy === 'type' ? i.row.type : i.row.unit || '—';
         return k === groupKey;
       });
       const byName = new Map();
@@ -2897,7 +3085,9 @@ window.smeta = function smeta() {
         if (list.length < 2) continue;
         const first = list[0];
         for (const dup of list.slice(1)) {
-          first.row.qty = Number(((Number(first.row.qty) || 0) + (Number(dup.row.qty) || 0)).toFixed(6));
+          first.row.qty = Number(
+            ((Number(first.row.qty) || 0) + (Number(dup.row.qty) || 0)).toFixed(6)
+          );
           if (!first.row.basis && dup.row.basis) first.row.basis = dup.row.basis;
           if (!first.row.note && dup.row.note) first.row.note = dup.row.note;
           const sec = this.data.sections[dup.si];
@@ -2908,8 +3098,6 @@ window.smeta = function smeta() {
       if (merged) this.pushHistory(`Объединено дублей ресурсов: ${merged}`);
       else alert('В этой группе нет повторяющихся ресурсов с одинаковым наименованием и ценой.');
     },
-
-
   };
 };
 
@@ -2929,13 +3117,17 @@ window.ganttLinks = function ganttLinks() {
           p.setAttribute('marker-end', 'url(#arrowhead)');
           return p;
         }),
-        ...(preview ? (() => {
-          const l = document.createElementNS(NS, 'line');
-          l.setAttribute('x1', preview[0]); l.setAttribute('y1', preview[1]);
-          l.setAttribute('x2', preview[2]); l.setAttribute('y2', preview[3]);
-          l.setAttribute('class', 'at-gantt-linkpath preview');
-          return [l];
-        })() : []),
+        ...(preview
+          ? (() => {
+              const l = document.createElementNS(NS, 'line');
+              l.setAttribute('x1', preview[0]);
+              l.setAttribute('y1', preview[1]);
+              l.setAttribute('x2', preview[2]);
+              l.setAttribute('y2', preview[3]);
+              l.setAttribute('class', 'at-gantt-linkpath preview');
+              return [l];
+            })()
+          : [])
       );
     },
   };
@@ -2949,4 +3141,4 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-export default smeta;
+export default window.smeta;

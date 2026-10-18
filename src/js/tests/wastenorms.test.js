@@ -15,7 +15,7 @@ describe('НОРМЫ ОТХОДОВ И ЗАПАСОВ (waste_norms, 12 груп�
     ['paint', 'Краски, грунтовки, шпатлевки', 0.08],
     ['floor', 'Чистовые полы (ламинат, плитка, кварцвинил)', 0.07],
     ['insul', 'Утеплитель (минвата, ЭППС, PIR)', 0.04],
-    ['roof', 'Кровельные (металлочерепица, мягкая кровля)', 0.10],
+    ['roof', 'Кровельные (металлочерепица, мягкая кровля)', 0.1],
     ['cable', 'Кабель и проводка', 0.08],
     ['pipe', 'Трубы (сантехника, отопление, канализация)', 0.05],
   ];
@@ -40,10 +40,10 @@ describe('НОРМЫ ОТХОДОВ И ЗАПАСОВ (waste_norms, 12 груп�
   });
 
   test('q_факт = q_нетто × (1 + k_отх)', () => {
-    expect(factQty(100, 'block')).toBeCloseTo(104);   // +4%
-    expect(factQty(100, 'roof')).toBeCloseTo(110);    // +10%
-    expect(factQty(100, 'metal')).toBeCloseTo(103);   // +3%
-    expect(factQty(50, '')).toBeCloseTo(50);          // без нормы — без запаса
+    expect(factQty(100, 'block')).toBeCloseTo(104); // +4%
+    expect(factQty(100, 'roof')).toBeCloseTo(110); // +10%
+    expect(factQty(100, 'metal')).toBeCloseTo(103); // +3%
+    expect(factQty(50, '')).toBeCloseTo(50); // без нормы — без запаса
     expect(factQty(0, 'lumber')).toBe(0);
   });
 });

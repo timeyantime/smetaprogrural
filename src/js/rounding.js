@@ -4,12 +4,12 @@
 
 const ROUND_MODES = {
   kopecks: { label: 'Копейки (2 знака)', digits: 2 },
-  rubles:  { label: 'Рубли (0 знаков)',  digits: 0 },
+  rubles: { label: 'Рубли (0 знаков)', digits: 0 },
 };
 
 const ROUND_METHODS = {
-  math:     'Математическое (5 и выше — вверх)',
-  bank:     'Банковское (до ближайшего чётного)',
+  math: 'Математическое (5 и выше — вверх)',
+  bank: 'Банковское (до ближайшего чётного)',
   truncate: 'Отбрасывание остатка (вниз)',
 };
 
@@ -25,7 +25,7 @@ function roundMoney(value, mode, method) {
       const floor = Math.floor(scaled);
       const diff = scaled - floor;
       if (Math.abs(diff - 0.5) < 1e-9) {
-        r = (floor % 2 === 0 ? floor : floor + 1); // ровно .5 → к ближайшему чётному
+        r = floor % 2 === 0 ? floor : floor + 1; // ровно .5 → к ближайшему чётному
       } else {
         r = Math.round(scaled);
       }

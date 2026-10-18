@@ -4,11 +4,23 @@
  */
 
 import {
-  WASTE_NORMS, wasteK, factQty,
-  LABOR_MARKUP, laborRateFact,
-  deliveryPerUnit, unloadingPerUnit, resourceFullPrice,
-  calcWorkerTransport, calcRain, calcTax, calcVehicleTax, calcReturnable,
-  defaultFrameworkSettings, frameworkRowCost, calcFrameworkTotals, FRAMEWORK_META,
+  WASTE_NORMS,
+  wasteK,
+  factQty,
+  LABOR_MARKUP,
+  laborRateFact,
+  deliveryPerUnit,
+  unloadingPerUnit,
+  resourceFullPrice,
+  calcWorkerTransport,
+  calcRain,
+  calcTax,
+  calcVehicleTax,
+  calcReturnable,
+  defaultFrameworkSettings,
+  frameworkRowCost,
+  calcFrameworkTotals,
+  FRAMEWORK_META,
 } from '../framework.js';
 import { calculateFrameworkTotals } from '../services/calculation.js';
 import { encodeProject, decodeProject } from '../toon.js';
@@ -32,7 +44,7 @@ describe('Каркасный метод v2.0 (framework)', () => {
       expect(wasteK('paint')).toBe(0.08);
       expect(wasteK('floor')).toBe(0.07);
       expect(wasteK('insul')).toBe(0.04);
-      expect(wasteK('roof')).toBe(0.10);
+      expect(wasteK('roof')).toBe(0.1);
       expect(wasteK('cable')).toBe(0.08);
       expect(wasteK('pipe')).toBe(0.05);
       expect(wasteK('unknown')).toBe(0);
@@ -41,8 +53,8 @@ describe('Каркасный метод v2.0 (framework)', () => {
 
     test('q_факт = q_нетто * (1 + k_отх)', () => {
       expect(factQty(100, 'lumber')).toBeCloseTo(108); // 100 * 1.08
-      expect(factQty(10, 'roof')).toBeCloseTo(11);     // 10 * 1.10
-      expect(factQty(50, '')).toBe(50);                // без запаса
+      expect(factQty(10, 'roof')).toBeCloseTo(11); // 10 * 1.10
+      expect(factQty(50, '')).toBe(50); // без запаса
     });
   });
 
@@ -60,7 +72,15 @@ describe('Каркасный метод v2.0 (framework)', () => {
 
   describe('Логистика материала (p_полн без тары/погрузки)', () => {
     test('Д_перевозка: n_рейсов = ОКРУГЛ_ВВЕРХ(q*масса/грузоподъемность)', () => {
-      const m = { qty: 10, unitMassT: 0.5, vehicleCapT: 4, distanceKm: 50, tariffPerKm: 80, supplyFee: 500, kGabarit: 1 };
+      const m = {
+        qty: 10,
+        unitMassT: 0.5,
+        vehicleCapT: 4,
+        distanceKm: 50,
+        tariffPerKm: 80,
+        supplyFee: 500,
+        kGabarit: 1,
+      };
       // 10*0.5=5 т / 4 т = 1.25 → ceil = 2 рейса; 2*(500+50*80)=9000 → /10 ед = 900
       expect(deliveryPerUnit(m)).toBeCloseTo(900);
       // k_габарит 1.2 → 1080
@@ -70,9 +90,16 @@ describe('Каркасный метод v2.0 (framework)', () => {
     });
 
     test('Р_разгрузка с манипулятором дешевле на 90% крановой части', () => {
-      const base = { qty: 10, unloadMachineHr: 2000, unloadHours: 2, supplyFee: 500, moveDistM: 0, moveSpeedMh: 0 };
+      const base = {
+        qty: 10,
+        unloadMachineHr: 2000,
+        unloadHours: 2,
+        supplyFee: 500,
+        moveDistM: 0,
+        moveSpeedMh: 0,
+      };
       const without = unloadingPerUnit({ ...base, manipulatorFlag: false }); // 1*(2000*2+0.5*500)/10 = 425
-      const withM = unloadingPerUnit({ ...base, manipulatorFlag: true });    // 0.1*4250/10 = 42.5
+      const withM = unloadingPerUnit({ ...base, manipulatorFlag: true }); // 0.1*4250/10 = 42.5
       expect(without).toBeCloseTo(425);
       expect(withM).toBeCloseTo(42.5);
       // перемещение S_м / V_перем добавляется
@@ -81,8 +108,16 @@ describe('Каркасный метод v2.0 (framework)', () => {
     });
 
     test('p_полн = p_отп + Д + Р + 1per·П + 1hran·Х (тара/погрузка исключены)', () => {
-      const m = { perUnit: 1000, qty: 10, unitMassT: 0, vehicleCapT: 0, unloadHours: 0, unloadMachineHr: 0,
-        perPct: 5, storePct: 2 };
+      const m = {
+        perUnit: 1000,
+        qty: 10,
+        unitMassT: 0,
+        vehicleCapT: 0,
+        unloadHours: 0,
+        unloadMachineHr: 0,
+        perPct: 5,
+        storePct: 2,
+      };
       const fp = resourceFullPrice(m);
       expect(fp.priceFull).toBeCloseTo(1000 + 50 + 20);
     });
@@ -104,10 +139,12 @@ describe('Каркасный метод v2.0 (framework)', () => {
       expect(calcRain(100000, s)).toBeCloseTo(1000);
     });
     test('помесячный режим: сумма по месяцам', () => {
-      const s = { rainMonths: [
-        { kLoss: 0.2, prob: 0.5, rainDays: 10, monthDays: 30 },
-        { kLoss: 0.1, prob: 0.5, rainDays: 3, monthDays: 30 },
-      ] };
+      const s = {
+        rainMonths: [
+          { kLoss: 0.2, prob: 0.5, rainDays: 10, monthDays: 30 },
+          { kLoss: 0.1, prob: 0.5, rainDays: 3, monthDays: 30 },
+        ],
+      };
       // ФОТ 90000 → share 45000: 45000*0.2*0.5*(10/30)=1500; 45000*0.1*0.5*(3/30)=225
       expect(calcRain(90000, s)).toBeCloseTo(1725);
     });
@@ -126,7 +163,7 @@ describe('Каркасный метод v2.0 (framework)', () => {
       const s = { scrapPricePerTon: 15000, vzLiquidation: 20000 };
       const rows = [
         { type: 'material', wasteGroup: 'metal', qty: 100, unitMassT: 0.01 }, // 100*1.03*0.01*0.03=0.0309 т
-        { type: 'material', wasteGroup: 'lumber', qty: 50, unitMassT: 0.5 },  // не металл — игнор
+        { type: 'material', wasteGroup: 'lumber', qty: 50, unitMassT: 0.5 }, // не металл — игнор
       ];
       const r = calcReturnable(rows, s);
       expect(r.scrap).toBeCloseTo(0.0309 * 15000);
@@ -159,10 +196,29 @@ describe('Каркасный метод v2.0 (framework)', () => {
   describe('Главная формула S = ПЗ + НР + СП + ЛЗ + Нал − Возвр', () => {
     function project() {
       const p = Project.default();
-      p.framework = { ...defaultFrameworkSettings(), enabled: true, npPct: 0, usnPct: 6,
-        vzPct: 0, zuPct: 0, ppPct: 0, garantPct: 0, rainDays: 0, workDays: 0,
-        vehicleTaxYear: 0, insuranceYear: 0, scrapPricePerTon: 0, vzLiquidation: 0 };
-      p.rates = { overheadPct: 0, overheadBase: 'labor', profitPct: 0, profitBase: 'labor', vatPct: 20 };
+      p.framework = {
+        ...defaultFrameworkSettings(),
+        enabled: true,
+        npPct: 0,
+        usnPct: 6,
+        vzPct: 0,
+        zuPct: 0,
+        ppPct: 0,
+        garantPct: 0,
+        rainDays: 0,
+        workDays: 0,
+        vehicleTaxYear: 0,
+        insuranceYear: 0,
+        scrapPricePerTon: 0,
+        vzLiquidation: 0,
+      };
+      p.rates = {
+        overheadPct: 0,
+        overheadBase: 'labor',
+        profitPct: 0,
+        profitBase: 'labor',
+        vatPct: 20,
+      };
       p.rounding = { mode: 'kopecks', method: 'math' };
       p.sections = [Section.create('S1')];
       return p;
@@ -195,7 +251,13 @@ describe('Каркасный метод v2.0 (framework)', () => {
     test('НП = 3% входит в ЛЗ; возвратные вычитаются', () => {
       const p = project();
       p.sections[0].resources = [
-        Resource.create({ type: 'material', qty: 1000, price: 10, wasteGroup: 'metal', unitMassT: 0.01 }),
+        Resource.create({
+          type: 'material',
+          qty: 1000,
+          price: 10,
+          wasteGroup: 'metal',
+          unitMassT: 0.01,
+        }),
       ];
       p.framework.scrapPricePerTon = 15000;
       p.framework.npPct = 3; // НП = (ПЗ + НР) * 0.03
@@ -209,8 +271,10 @@ describe('Каркасный метод v2.0 (framework)', () => {
 
     test('НР/СП считаются от выбранной базы', () => {
       const p = project();
-      p.rates.overheadPct = 15; p.rates.overheadBase = 'labor';
-      p.rates.profitPct = 10; p.rates.profitBase = 'labor';
+      p.rates.overheadPct = 15;
+      p.rates.overheadBase = 'labor';
+      p.rates.profitPct = 10;
+      p.rates.profitBase = 'labor';
       p.sections[0].resources = [Resource.create({ type: 'labor', qty: 10, price: 250 })];
       const t = calculateFrameworkTotals(p);
       // труд: 10 * 250*1.2 = 3000 → НР 450, СП 300
@@ -222,7 +286,14 @@ describe('Каркасный метод v2.0 (framework)', () => {
     test('calcFrameworkTotals напрямую (низкий уровень)', () => {
       const p = project();
       p.framework.npPct = 3; // НП = (ПЗ + НР) * 0.03 — строго по TOON, база без СП
-      const fw = calcFrameworkTotals(p, { pz: 100000, nr: 15000, sp: 10000, laborTotal: 50000, mode: 'kopecks', method: 'math' });
+      const fw = calcFrameworkTotals(p, {
+        pz: 100000,
+        nr: 15000,
+        sp: 10000,
+        laborTotal: 50000,
+        mode: 'kopecks',
+        method: 'math',
+      });
       // НП = (100000+15000)*0.03 = 3450; ЛЗ=3450; Нал = 6%*(125000+3450)=7707
       expect(fw.lzParts.np).toBeCloseTo(3450);
       expect(fw.tax).toBeCloseTo(7707);
@@ -233,9 +304,22 @@ describe('Каркасный метод v2.0 (framework)', () => {
   describe('Сохранение/TOON-roundtrip с framework', () => {
     test('проект с каркасными настройками восстанавливается 1-в-1', () => {
       const p = Project.default();
-      p.framework = { ...defaultFrameworkSettings(), enabled: true, workerDistanceKm: 35, rainKLoss: 0.25 };
+      p.framework = {
+        ...defaultFrameworkSettings(),
+        enabled: true,
+        workerDistanceKm: 35,
+        rainKLoss: 0.25,
+      };
       p.sections[0].resources = [
-        Resource.create({ type: 'material', name: 'Профиль ЛСТК', qty: 50, price: 300, wasteGroup: 'metal', unitMassT: 0.008, night: true }),
+        Resource.create({
+          type: 'material',
+          name: 'Профиль ЛСТК',
+          qty: 50,
+          price: 300,
+          wasteGroup: 'metal',
+          unitMassT: 0.008,
+          night: true,
+        }),
       ];
       const encoded = encodeProject(p);
       expect(encoded.startsWith('TOONP1:')).toBe(true);
@@ -259,7 +343,16 @@ describe('Каркасный метод v2.0 (framework)', () => {
       expect(decoded.framework.kNight).toBe(1.45);
       // СП = Н_сп * Б_сп + d_рын — надбавка участвует в расчёте после восстановления.
       // Лимитированные обнулены, чтобы sp был изолирован (дождь по дефолту даёт 120 ₽ на ФОТ 1200).
-      p.framework = { ...p.framework, npPct: 0, vzPct: 0, zuPct: 0, ppPct: 0, garantPct: 0, rainDays: 0, workDays: 0 };
+      p.framework = {
+        ...p.framework,
+        npPct: 0,
+        vzPct: 0,
+        zuPct: 0,
+        ppPct: 0,
+        garantPct: 0,
+        rainDays: 0,
+        workDays: 0,
+      };
       p.rates = { overheadPct: 0, overheadBase: 'labor', profitPct: 10, profitBase: 'labor' };
       p.sections = [Section.create('S1')];
       p.sections[0].resources = [Resource.create({ type: 'labor', qty: 10, price: 100 })];

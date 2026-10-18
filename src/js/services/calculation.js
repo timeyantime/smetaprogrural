@@ -48,11 +48,22 @@ export function calculateProjectTotals(project) {
   // Пустой/некорректный проект — нулевая смета той же структуры.
   return {
     settings: defaultFrameworkSettings(),
-    labor: 0, machine: 0, material: 0, laborRaw: 0,
-    pz: 0, nr: 0, sp: 0, vat: 0,
-    lz: 0, lzParts: null, tax: 0, vehicleTax: 0,
+    labor: 0,
+    machine: 0,
+    material: 0,
+    laborRaw: 0,
+    pz: 0,
+    nr: 0,
+    sp: 0,
+    vat: 0,
+    lz: 0,
+    lzParts: null,
+    tax: 0,
+    vehicleTax: 0,
     returnable: { scrap: 0, liquidation: 0, total: 0 },
-    sNoTax: 0, grand: 0, framework: true,
+    sNoTax: 0,
+    grand: 0,
+    framework: true,
   };
 }
 
@@ -95,14 +106,18 @@ export function calculateFrameworkTotals(project) {
 
   // ПЗ по фактическим объёмам и полным ценам (q_факт, p_полн, наценка труда)
   let laborRaw = 0; // «голый» ФОТ без наценки — не используется, но полезен для отчётов
-  let labor = 0, machine = 0, material = 0;
+  let labor = 0,
+    machine = 0,
+    material = 0;
   const fwSettings = project.framework || {};
   for (const sec of project.sections) {
     const walk = (s) => {
       for (const r of s.resources || []) {
         const c = frameworkRowCost(r, fwSettings);
-        if (r.type === 'labor') { labor += c.total; laborRaw += (Number(r.qty) || 0) * (Number(r.price) || 0); }
-        else if (r.type === 'machine') machine += c.total;
+        if (r.type === 'labor') {
+          labor += c.total;
+          laborRaw += (Number(r.qty) || 0) * (Number(r.price) || 0);
+        } else if (r.type === 'machine') machine += c.total;
         else material += c.total;
       }
       for (const sub of s.children || []) walk(sub);
@@ -117,11 +132,16 @@ export function calculateFrameworkTotals(project) {
   // НР и СП: % от базы (ФОТ или ПЗ); к нормативной СП добавляется
   // рыночная надбавка d_рын (framework.dRyn, ₽): СП = Н_сп * Б_сп + d_рын.
   const baseFor = (base) => (base === 'pz' ? pz : labor);
-  const nr = roundMoney((baseFor(project.rates?.overheadBase) * (Number(project.rates?.overheadPct) || 0)) / 100, mode, method);
+  const nr = roundMoney(
+    (baseFor(project.rates?.overheadBase) * (Number(project.rates?.overheadPct) || 0)) / 100,
+    mode,
+    method
+  );
   const sp = roundMoney(
-    (baseFor(project.rates?.profitBase) * (Number(project.rates?.profitPct) || 0)) / 100
-      + (Number(fwSettings.dRyn) || 0),
-    mode, method,
+    (baseFor(project.rates?.profitBase) * (Number(project.rates?.profitPct) || 0)) / 100 +
+      (Number(fwSettings.dRyn) || 0),
+    mode,
+    method
   );
 
   // Срок строительства (дни) — для пропорционального налога на технику
@@ -129,7 +149,7 @@ export function calculateFrameworkTotals(project) {
   const durationDays = calculateProjectDuration(project);
   const totals = calcFrameworkTotals(
     { ...(project || {}), durationDays },
-    { pz, nr, sp, laborTotal: labor, mode, method },
+    { pz, nr, sp, laborTotal: labor, mode, method }
   );
   return { ...totals, labor, machine, material, laborRaw, durationDays, vat: 0, framework: true };
 }

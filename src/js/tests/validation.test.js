@@ -3,15 +3,15 @@
  * Проверка валидации данных
  */
 
-import { 
-  validateProject, 
-  validateSection, 
-  validateResource, 
-  validateRates, 
+import {
+  validateProject,
+  validateSection,
+  validateResource,
+  validateRates,
   validateRounding,
   validateNumber,
   validateString,
-  formatValidationErrors
+  formatValidationErrors,
 } from '../services/validation.js';
 import { Project, Section, Resource } from '../models/Project.js';
 
@@ -80,7 +80,7 @@ describe('Validation Service', () => {
         price: 100,
         unit: 'шт',
       });
-      
+
       const result = validateResource(resource);
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
@@ -91,10 +91,10 @@ describe('Validation Service', () => {
         name: 'Test Resource',
         type: 'invalid',
       });
-      
+
       const result = validateResource(resource);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'type')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'type')).toBe(true);
     });
 
     test('should reject negative qty', () => {
@@ -103,10 +103,10 @@ describe('Validation Service', () => {
         type: 'material',
         qty: -5,
       });
-      
+
       const result = validateResource(resource);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'qty')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'qty')).toBe(true);
     });
 
     test('should reject negative price', () => {
@@ -115,20 +115,18 @@ describe('Validation Service', () => {
         type: 'material',
         price: -100,
       });
-      
+
       const result = validateResource(resource);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'price')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'price')).toBe(true);
     });
   });
 
   describe('validateSection', () => {
     test('should validate valid section', () => {
       const section = Section.create('Test Section');
-      section.resources = [
-        Resource.create({ name: 'Resource 1', type: 'material' }),
-      ];
-      
+      section.resources = [Resource.create({ name: 'Resource 1', type: 'material' })];
+
       const result = validateSection(section);
       expect(result.valid).toBe(true);
     });
@@ -136,10 +134,10 @@ describe('Validation Service', () => {
     test('should reject section without name', () => {
       const section = Section.create('');
       section.name = '';
-      
+
       const result = validateSection(section);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'name')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'name')).toBe(true);
     });
 
     test('should reject section with invalid resources', () => {
@@ -147,7 +145,7 @@ describe('Validation Service', () => {
       section.resources = [
         { id: '1', name: 'Invalid' }, // Missing type
       ];
-      
+
       const result = validateSection(section);
       expect(result.valid).toBe(false);
     });
@@ -162,7 +160,7 @@ describe('Validation Service', () => {
         profitBase: 'pz',
         vatPct: 20,
       };
-      
+
       const result = validateRates(rates);
       expect(result.valid).toBe(true);
     });
@@ -175,10 +173,10 @@ describe('Validation Service', () => {
         profitBase: 'pz',
         vatPct: 20,
       };
-      
+
       const result = validateRates(rates);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'overheadPct')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'overheadPct')).toBe(true);
     });
 
     test('should reject invalid base', () => {
@@ -189,10 +187,10 @@ describe('Validation Service', () => {
         profitBase: 'pz',
         vatPct: 20,
       };
-      
+
       const result = validateRates(rates);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'overheadBase')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'overheadBase')).toBe(true);
     });
   });
 
@@ -202,7 +200,7 @@ describe('Validation Service', () => {
         mode: 'kopecks',
         method: 'math',
       };
-      
+
       const result = validateRounding(rounding);
       expect(result.valid).toBe(true);
     });
@@ -212,10 +210,10 @@ describe('Validation Service', () => {
         mode: 'invalid',
         method: 'math',
       };
-      
+
       const result = validateRounding(rounding);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'mode')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'mode')).toBe(true);
     });
 
     test('should reject invalid method', () => {
@@ -223,10 +221,10 @@ describe('Validation Service', () => {
         mode: 'kopecks',
         method: 'invalid',
       };
-      
+
       const result = validateRounding(rounding);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'method')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'method')).toBe(true);
     });
   });
 
@@ -240,10 +238,10 @@ describe('Validation Service', () => {
     test('should reject project without title', () => {
       const project = Project.default();
       project.title = '';
-      
+
       const result = validateProject(project);
       expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.field === 'title')).toBe(true);
+      expect(result.errors.some((e) => e.field === 'title')).toBe(true);
     });
 
     test('should reject project with invalid sections', () => {
@@ -251,7 +249,7 @@ describe('Validation Service', () => {
       project.sections = [
         { id: '1', name: 'Invalid' }, // Missing resources
       ];
-      
+
       const result = validateProject(project);
       expect(result.valid).toBe(false);
     });
@@ -259,10 +257,8 @@ describe('Validation Service', () => {
 
   describe('formatValidationErrors', () => {
     test('should format single error', () => {
-      const errors = [
-        { field: 'name', message: 'Required', type: 'required' },
-      ];
-      
+      const errors = [{ field: 'name', message: 'Required', type: 'required' }];
+
       const result = formatValidationErrors(errors);
       expect(result).toContain('Название');
       expect(result).toContain('Required');
@@ -273,7 +269,7 @@ describe('Validation Service', () => {
         { field: 'name', message: 'Required', type: 'required' },
         { field: 'qty', message: 'Invalid', type: 'range' },
       ];
-      
+
       const result = formatValidationErrors(errors);
       expect(result).toContain('Название');
       expect(result).toContain('Количество');

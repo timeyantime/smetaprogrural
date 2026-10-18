@@ -163,6 +163,37 @@ function defaultNsb() {
     }),
     Resource.create({
       id: uid(),
+      basis: 'ФЕРр-81-02-14-01-01',
+      name: 'Монтаж каркаса ЛСТК (стенки, перекрытия)',
+      type: 'labor',
+      unit: 'чел.-ч',
+      price: 320,
+      note: 'ЗП_база; в расчёте применяется наценка ×1.20 (k_ночн — при ночь/праздник)',
+    }),
+    Resource.create({
+      id: uid(),
+      basis: 'НСБ-МТЛ-ЛСТК-01',
+      name: 'Профиль ЛСТК C90x50x3 мм',
+      type: 'material',
+      unit: 'м.п.',
+      price: 410,
+      wasteGroup: 'metal',
+      perUnit: 385,
+      unitMassT: 0.0043,
+      vehicleCapT: 10,
+      distanceKm: 45,
+      tariffPerKm: 95,
+      supplyFee: 1500,
+      manipulatorFlag: true,
+      unloadMachineHr: 1200,
+      unloadHours: 0.5,
+      perPct: 4,
+      storePct: 2,
+      storeOn: true,
+      note: 'p_полн = p_отп + перевозка + разгрузка + П + Х (тара/погрузка — поставщик)',
+    }),
+    Resource.create({
+      id: uid(),
       basis: 'Гэснр 81-02-01-01-01',
       name: 'Экскаватор одноковшовый 0,4 м³',
       type: 'machine',
@@ -267,6 +298,14 @@ function newRow(partial = {}) {
     startAt: null,
     operator: false,
   }, partial);
+}
+
+/** Копирует каркасные метаданные (нормы отходов, логистика, ночь/праздник) из записи НСБ в строку сметы. */
+function copyFrameworkFields(from, to) {
+  const KEYS = ['wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee', 'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh', 'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'];
+  for (const k of KEYS) {
+    if (from[k] !== undefined && from[k] !== null) to[k] = from[k];
+  }
 }
 
 /** Стартовая дата сметы по умолчанию (сегодня) */
@@ -1318,10 +1357,11 @@ window.smeta = function smeta() {
       return JSON.parse(JSON.stringify(this.data));
     },
 
-    /* ---------- вычисления (#11) ---------- */
+    /* ---------- вычисления (#11) — каркасный метод v2.0 ---------- */
 
     rowTotal(row) {
-      return (Number(row.qty) || 0) * (Number(row.price) || 0);
+      const fw = this.data && this.data.framework ? this.data.framework : null;
+      return calculation.frameworkRowCost(row, fw).total;
     },
 
     sectionTotal(section) {
@@ -1345,11 +1385,6 @@ window.smeta = function smeta() {
       setTimeout(() => (this.savedFlash = false), 1500);
     },
 
-    /* ---------- пагинация (#38) ---------- */
-
-    get pageCount() {
-      return Math.max(1, this.totalPages);
-    },
 
     goPage(delta) {
       this.page = Math.max(0, Math.min(this.pageCount - 1, this.page + delta));
@@ -1571,33 +1606,21 @@ window.smeta = function smeta() {
       return Math.max(0, this.columns.length - 1 - lastIdx);
     },
 
-    exportable() {
-      return JSON.parse(JSON.stringify(this.data));
-    },
+    /* ---------- Каркасный метод v2.0: строки считаются по frameworkRowCost ---------- */
 
     rowTotal(row) {
-      return (Number(row.qty) || 0) * (Number(row.price) || 0);
+      const fw = this.data && this.data.framework ? this.data.framework : null;
+      return calculation.frameworkRowCost(row, fw).total;
+    },
+
+    /** Детализация стоимости строки: q_факт, p_полн и состав (для проверки расчётов). */
+    rowBreakdown(row) {
+      const fw = this.data && this.data.framework ? this.data.framework : null;
+      return calculation.frameworkRowCost(row, fw);
     },
 
     sectionTotal(section) {
       return section.resources.reduce((s, r) => s + this.rowTotal(r), 0);
-    },
-
-    roundingLabel() {
-      const r = this.data.rounding || {};
-      return (ROUND_MODES[r.mode] || ROUND_MODES.kopecks).label + ' · ' + (ROUND_METHODS[r.method] || '');
-    },
-
-    setRecalcMode(mode) {
-      this.data.recalcMode = mode;
-      if (mode === 'auto' && this.dirty) this.saveLocal();
-      this.logActivity('Режим пересчёта: ' + (mode === 'auto' ? 'автоматический' : 'ручной'));
-    },
-
-    forceRecalc() {
-      this.saveLocal();
-      this.savedFlash = true;
-      setTimeout(() => (this.savedFlash = false), 1500);
     },
 
     selectionTotal() {
@@ -2072,7 +2095,7 @@ window.smeta = function smeta() {
     addRow(si) {
       if (si == null || si < 0 || !this.data.sections[si]) { this.addSection(); return; }
       this.pushHistory('Добавлена запись');
-      this.data.sections[si].resources.push(newRow());
+      this.data.sections[si].resources.push(Resource.create());
       const list = this.data.sections[si].resources;
       const created = list[list.length - 1];
       this.openCell('name', { row: created });
@@ -2222,6 +2245,7 @@ window.smeta = function smeta() {
           this.pushHistory('Применена расценка НСБ');
           item.row.basis = hit.basis; item.row.name = hit.name; item.row.type = hit.type;
           item.row.unit = hit.unit; item.row.price = hit.price;
+          copyFrameworkFields(hit, item.row);
         } else {
           alert('В НСБ нет расценки с таким шифром или наименованием.');
         }
@@ -2761,6 +2785,7 @@ window.smeta = function smeta() {
       appliedTo.type = item.type;
       appliedTo.unit = item.unit;
       appliedTo.price = item.price;
+      copyFrameworkFields(item, appliedTo);
       this.nsbModalOpen = false;
     },
 
@@ -2799,7 +2824,12 @@ window.smeta = function smeta() {
         try {
           const arr = JSON.parse(reader.result);
           if (!Array.isArray(arr)) throw new Error('ожидается массив записей');
-          this.nsbItems = arr.map((n) => ({ id: n.id || uid(), basis: n.basis || '', name: n.name || '', type: n.type || 'material', unit: n.unit || '', price: Number(n.price) || 0, note: n.note || '' }));
+          const FW_KEYS = ['wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee', 'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh', 'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'];
+          this.nsbItems = arr.map((n) => {
+            const base = { id: n.id || uid(), basis: n.basis || '', name: n.name || '', type: n.type || 'material', unit: n.unit || '', price: Number(n.price) || 0, note: n.note || '' };
+            for (const k of FW_KEYS) if (n[k] !== undefined) base[k] = n[k];
+            return base;
+          });
           this.saveNsb();
         } catch (e) {
           alert('Не удалось прочитать НСБ: ' + e.message);

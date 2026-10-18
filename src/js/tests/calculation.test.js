@@ -3,14 +3,14 @@
  * Проверка расчетов сметы
  */
 
-import { 
+import {
   calculateProjectTotals,
   calculateSectionTotals,
   calculateResourceTotal,
   roundValue,
   roundGrandTotal,
   calculateSectionDuration,
-  calculateProjectDuration
+  calculateProjectDuration,
 } from '../services/calculation.js';
 import { Project, Section, Resource } from '../models/Project.js';
 
@@ -21,7 +21,7 @@ describe('Calculation Service', () => {
         qty: 10,
         price: 100,
       });
-      
+
       const total = calculateResourceTotal(resource);
       expect(total).toBe(1000);
     });
@@ -31,7 +31,7 @@ describe('Calculation Service', () => {
         qty: 0,
         price: 100,
       });
-      
+
       const total = calculateResourceTotal(resource);
       expect(total).toBe(0);
     });
@@ -41,7 +41,7 @@ describe('Calculation Service', () => {
         qty: 10,
         price: 0,
       });
-      
+
       const total = calculateResourceTotal(resource);
       expect(total).toBe(0);
     });
@@ -51,7 +51,7 @@ describe('Calculation Service', () => {
         qty: 2.5,
         price: 40,
       });
-      
+
       const total = calculateResourceTotal(resource);
       expect(total).toBe(100);
     });
@@ -64,10 +64,10 @@ describe('Calculation Service', () => {
         Resource.create({ type: 'labor', qty: 10, price: 100 }),
         Resource.create({ type: 'labor', qty: 5, price: 200 }),
       ];
-      
+
       const rates = { overheadPct: 15, overheadBase: 'labor' };
       const totals = calculateSectionTotals(section, rates);
-      
+
       expect(totals.laborTotal).toBe(2000); // 10*100 + 5*200
       expect(totals.machineTotal).toBe(0);
       expect(totals.materialTotal).toBe(0);
@@ -81,10 +81,10 @@ describe('Calculation Service', () => {
         Resource.create({ type: 'machine', qty: 5, price: 200 }),
         Resource.create({ type: 'material', qty: 2, price: 500 }),
       ];
-      
+
       const rates = {};
       const totals = calculateSectionTotals(section, rates);
-      
+
       expect(totals.laborTotal).toBe(1000);
       expect(totals.machineTotal).toBe(1000);
       expect(totals.materialTotal).toBe(1000);
@@ -94,7 +94,7 @@ describe('Calculation Service', () => {
     test('should return zeros for empty section', () => {
       const section = Section.create('Empty Section');
       const totals = calculateSectionTotals(section, {});
-      
+
       expect(totals.laborTotal).toBe(0);
       expect(totals.machineTotal).toBe(0);
       expect(totals.materialTotal).toBe(0);
@@ -110,9 +110,17 @@ describe('Calculation Service', () => {
       const project = Project.default();
       project.framework = {
         ...project.framework,
-        npPct: 0, vzPct: 0, zuPct: 0, ppPct: 0, garantPct: 0,
-        workDays: 0, rainDays: 0, vehicleTaxYear: 0, insuranceYear: 0,
-        scrapPricePerTon: 0, vzLiquidation: 0,
+        npPct: 0,
+        vzPct: 0,
+        zuPct: 0,
+        ppPct: 0,
+        garantPct: 0,
+        workDays: 0,
+        rainDays: 0,
+        vehicleTaxYear: 0,
+        insuranceYear: 0,
+        scrapPricePerTon: 0,
+        vzLiquidation: 0,
       };
       project.rates = {
         overheadPct: 15,
@@ -128,20 +136,20 @@ describe('Calculation Service', () => {
     test('should calculate totals for project with multiple sections', () => {
       // Труд: q × (ЗП_база × 1.20); материалы: q × p_отп (без отходов/логистики)
       const project = fwProject([
-        Resource.create({ type: 'labor', qty: 10, price: 100 }),    // 10 × 120 = 1200
-        Resource.create({ type: 'material', qty: 5, price: 200 }),  // 5 × 200 = 1000
+        Resource.create({ type: 'labor', qty: 10, price: 100 }), // 10 × 120 = 1200
+        Resource.create({ type: 'material', qty: 5, price: 200 }), // 5 × 200 = 1000
       ]);
 
       const totals = calculateProjectTotals(project);
 
-      expect(totals.labor).toBeCloseTo(1200);   // наценка 20% на чел-ч
+      expect(totals.labor).toBeCloseTo(1200); // наценка 20% на чел-ч
       expect(totals.material).toBeCloseTo(1000);
       expect(totals.pz).toBeCloseTo(2200);
-      expect(totals.nr).toBeCloseTo(180);   // 15% от ФОТ (1200)
-      expect(totals.sp).toBeCloseTo(120);   // 10% от ФОТ (d_рын = 0)
-      expect(totals.vat).toBe(0);           // НДС удалён (метод «Без НДС»)
+      expect(totals.nr).toBeCloseTo(180); // 15% от ФОТ (1200)
+      expect(totals.sp).toBeCloseTo(120); // 10% от ФОТ (d_рын = 0)
+      expect(totals.vat).toBe(0); // НДС удалён (метод «Без НДС»)
       expect(totals.sNoTax).toBeCloseTo(2500); // 2200 + 180 + 120 (ЛЗ = 0)
-      expect(totals.tax).toBeCloseTo(150);  // УСН 6% от S без налога
+      expect(totals.tax).toBeCloseTo(150); // УСН 6% от S без налога
       expect(totals.returnable.total).toBe(0);
       expect(totals.grand).toBeCloseTo(2650); // S = 2500 + 150 − 0
     });
@@ -227,18 +235,15 @@ describe('Calculation Service', () => {
         Resource.create({ days: 10 }),
         Resource.create({ days: 3 }),
       ];
-      
+
       const duration = calculateSectionDuration(section);
       expect(duration).toBe(10);
     });
 
     test('should return 0 for section without days', () => {
       const section = Section.create('Test Section');
-      section.resources = [
-        Resource.create({ days: null }),
-        Resource.create({ days: null }),
-      ];
-      
+      section.resources = [Resource.create({ days: null }), Resource.create({ days: null })];
+
       const duration = calculateSectionDuration(section);
       expect(duration).toBe(0);
     });
@@ -253,20 +258,11 @@ describe('Calculation Service', () => {
   describe('calculateProjectDuration', () => {
     test('should sum durations of all sections', () => {
       const project = Project.default();
-      project.sections = [
-        Section.create('Section 1'),
-        Section.create('Section 2'),
-      ];
-      
-      project.sections[0].resources = [
-        Resource.create({ days: 5 }),
-        Resource.create({ days: 10 }),
-      ];
-      project.sections[1].resources = [
-        Resource.create({ days: 3 }),
-        Resource.create({ days: 7 }),
-      ];
-      
+      project.sections = [Section.create('Section 1'), Section.create('Section 2')];
+
+      project.sections[0].resources = [Resource.create({ days: 5 }), Resource.create({ days: 10 })];
+      project.sections[1].resources = [Resource.create({ days: 3 }), Resource.create({ days: 7 })];
+
       const duration = calculateProjectDuration(project);
       // Внутри раздела ресурсы идут параллельно → max(5,10)=10 и max(3,7)=7;
       // разделы последовательно → 10 + 7 = 17 дней.
@@ -276,7 +272,7 @@ describe('Calculation Service', () => {
     test('should return 0 for empty project', () => {
       const project = Project.default();
       project.sections = [];
-      
+
       const duration = calculateProjectDuration(project);
       expect(duration).toBe(0);
     });

@@ -4,8 +4,11 @@
 
 function xmlEsc(s) {
   return String(s ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 /* sheetBlocks: [{ name, rows: [[{v?, s?, t?}, ...], ...] }]
@@ -14,19 +17,23 @@ function buildSpreadsheetML(sheetBlocks) {
   const parts = [];
   parts.push('<?xml version="1.0" encoding="UTF-8"?>');
   parts.push('<?mso-application progid="Excel.Sheet"?>');
-  parts.push('<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' +
-    ' xmlns:o="urn:schemas-microsoft-com:office:office"' +
-    ' xmlns:x="urn:schemas-microsoft-com:office:excel"' +
-    ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">');
-  parts.push('<Styles>' +
-    '<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>' +
-    '<Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="13" ss:Bold="1"/></Style>' +
-    '<Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="10" ss:BOLD="1" ss:Color="#FFFFFF"/><Interior ss:Color="#172B4D" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>' +
-    '<Style ss:ID="Money"><NumberFormat ss:Format="#,##0.00"/><Alignment ss:Horizontal="Right"/></Style>' +
-    '<Style ss:ID="Num"><NumberFormat ss:Format="#,##0.####"/><Alignment ss:Horizontal="Right"/></Style>' +
-    '<Style ss:ID="Section"><Font ss:FontName="Calibri" ss:Size="11" ss:BOLD="1"/><Interior ss:Color="#DEEBFF" ss:Pattern="Solid"/></Style>' +
-    '<Style ss:ID="Total"><Font ss:FontName="Calibri" ss:Size="11" ss:BOLD="1"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>' +
-    '</Styles>');
+  parts.push(
+    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"' +
+      ' xmlns:o="urn:schemas-microsoft-com:office:office"' +
+      ' xmlns:x="urn:schemas-microsoft-com:office:excel"' +
+      ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'
+  );
+  parts.push(
+    '<Styles>' +
+      '<Style ss:ID="Default" ss:Name="Normal"><Alignment ss:Vertical="Center"/><Font ss:FontName="Calibri" ss:Size="11"/></Style>' +
+      '<Style ss:ID="Title"><Font ss:FontName="Calibri" ss:Size="13" ss:Bold="1"/></Style>' +
+      '<Style ss:ID="Header"><Font ss:FontName="Calibri" ss:Size="10" ss:BOLD="1" ss:Color="#FFFFFF"/><Interior ss:Color="#172B4D" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>' +
+      '<Style ss:ID="Money"><NumberFormat ss:Format="#,##0.00"/><Alignment ss:Horizontal="Right"/></Style>' +
+      '<Style ss:ID="Num"><NumberFormat ss:Format="#,##0.####"/><Alignment ss:Horizontal="Right"/></Style>' +
+      '<Style ss:ID="Section"><Font ss:FontName="Calibri" ss:Size="11" ss:BOLD="1"/><Interior ss:Color="#DEEBFF" ss:Pattern="Solid"/></Style>' +
+      '<Style ss:ID="Total"><Font ss:FontName="Calibri" ss:Size="11" ss:BOLD="1"/><Borders><Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/></Borders></Style>' +
+      '</Styles>'
+  );
   for (const block of sheetBlocks) {
     parts.push(`<Worksheet ss:Name="${xmlEsc(block.name.slice(0, 31))}"><Table>`);
     for (const row of block.rows) {
@@ -44,7 +51,9 @@ function buildSpreadsheetML(sheetBlocks) {
       }
       parts.push('</Row>');
     }
-    parts.push('</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"/></Worksheet>');
+    parts.push(
+      '</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"/></Worksheet>'
+    );
   }
   parts.push('</Workbook>');
   return parts.join('\n');

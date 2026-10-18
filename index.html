@@ -826,20 +826,22 @@
                     <details style="margin-top:4px;">
                       <summary style="cursor:pointer;">Логистика и надбавки (заполняется при импорте из НСБ)</summary>
                       <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:6px;">
-                        <label><span>Отпускная цена, ₽/ед.</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.perUnit" /></label>
-                        <label><span>Масса ед., кг</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.massPerUnit" /></label>
-                        <label><span>Грузоподъёмность, т</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.capacityT" /></label>
-                        <label><span>Плечо перевозки, км</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.transportKm" /></label>
+                        <label><span>Отпускная цена p_отп, ₽/ед. (0 → из цены строки)</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.perUnit" /></label>
+                        <label><span>Масса ед., т</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.unitMassT" /></label>
+                        <label><span>Грузоподъёмность, т</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.vehicleCapT" /></label>
+                        <label><span>Плечо перевозки, км</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.distanceKm" /></label>
                         <label><span>Тариф, ₽/км</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.tariffPerKm" /></label>
-                        <label><span>Стопка подачи, ₽</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.deliveryFixed" /></label>
+                        <label><span>Подача ТС, ₽</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.supplyFee" /></label>
                         <label><span>Коэф. габарита</span><input type="number" step="0.05" min="1" x-model.number="expandedRow.row.kGabarit" /></label>
-                        <label><span>Манипулятор (разгрузка)</span><input type="checkbox" x-model="expandedRow.row.manipulator" style="width:auto;display:block" /></label>
-                        <label><span>Машина, ₽/ч</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.machineRate" /></label>
+                        <label><span>Манипулятор (разгрузка)</span><input type="checkbox" x-model="expandedRow.row.manipulatorFlag" style="width:auto;display:block" /></label>
+                        <label><span>Машина разгрузки, ₽/ч</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.unloadMachineHr" /></label>
                         <label><span>Время разгрузки, ч</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.unloadHours" /></label>
-                        <label><span>Перемещение, м</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.moveMeters" /></label>
-                        <label><span>Скорость перемещения, м/ч</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.moveSpeed" /></label>
-                        <label><span>Наценка П, %</span><input type="number" step="0.5" min="0" x-model.number="expandedRow.row.surchP" /></label>
-                        <label><span>Наценка Х, %</span><input type="number" step="0.5" min="0" x-model.number="expandedRow.row.surchH" /></label>
+                        <label><span>Перемещение, м</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.moveDistM" /></label>
+                        <label><span>Скорость перемещения, м/ч</span><input type="number" step="any" min="0" x-model.number="expandedRow.row.moveSpeedMh" /></label>
+                        <label><span>Наценка П, %</span><input type="number" step="0.5" min="0" x-model.number="expandedRow.row.perPct" /></label>
+                        <label><span>Наценка Х, %</span><input type="number" step="0.5" min="0" x-model.number="expandedRow.row.storePct" /></label>
+                        <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" x-model="expandedRow.row.perOn" style="width:auto" /> Применять П</label>
+                        <label style="display:flex;gap:4px;align-items:center;"><input type="checkbox" x-model="expandedRow.row.storeOn" style="width:auto" /> Применять Х</label>
                       </div>
                     </details>
                   </div>

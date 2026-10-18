@@ -9,7 +9,7 @@ describe('Models', () => {
   describe('Project', () => {
     test('should create default project', () => {
       const project = Project.default();
-      
+
       expect(project.title).toBe('Локальная смета № 1');
       expect(Array.isArray(project.sections)).toBe(true);
       expect(project.sections.length).toBe(2);
@@ -41,7 +41,7 @@ describe('Models', () => {
     test('should clone project', () => {
       const project = Project.default();
       const clone = Project.clone(project);
-      
+
       expect(clone).not.toBe(project);
       expect(clone.title).toBe(project.title);
       expect(clone.sections).not.toBe(project.sections);
@@ -56,7 +56,7 @@ describe('Models', () => {
   describe('Section', () => {
     test('should create section with name', () => {
       const section = Section.create('Test Section');
-      
+
       expect(section.name).toBe('Test Section');
       expect(section.id).toBeDefined();
       expect(section.parentId).toBeNull();
@@ -67,7 +67,7 @@ describe('Models', () => {
 
     test('should create default section with resources', () => {
       const section = Section.createDefaultSection('Земляные работы');
-      
+
       expect(section.name).toBe('Земляные работы');
       expect(section.resources.length).toBeGreaterThan(0);
     });
@@ -86,9 +86,9 @@ describe('Models', () => {
     test('should add resource to section', () => {
       const section = Section.create('Test Section');
       const resource = Resource.create({ name: 'Test Resource' });
-      
+
       Section.addResource(section, resource);
-      
+
       expect(section.resources.length).toBe(1);
       expect(section.resources[0]).toBe(resource);
     });
@@ -97,9 +97,9 @@ describe('Models', () => {
       const section = Section.create('Test Section');
       const resource = Resource.create({ id: 'test-id', name: 'Test Resource' });
       section.resources.push(resource);
-      
+
       Section.removeResource(section, 'test-id');
-      
+
       expect(section.resources.length).toBe(0);
     });
 
@@ -107,7 +107,7 @@ describe('Models', () => {
       const section = Section.create('Test Section');
       const resource = Resource.create({ id: 'test-id', name: 'Test Resource' });
       section.resources.push(resource);
-      
+
       const found = Section.findResource(section, 'test-id');
       expect(found).toBe(resource);
     });
@@ -122,9 +122,9 @@ describe('Models', () => {
       const section = Section.create('Test Section');
       const resource = Resource.create({ id: 'test-id', name: 'Test Resource', qty: 10 });
       section.resources.push(resource);
-      
+
       Section.updateResource(section, 'test-id', { qty: 20 });
-      
+
       expect(section.resources[0].qty).toBe(20);
     });
 
@@ -134,9 +134,9 @@ describe('Models', () => {
         Resource.create({ type: 'labor', qty: 10, price: 100 }),
         Resource.create({ type: 'material', qty: 5, price: 200 }),
       ];
-      
+
       const totals = Section.calculateTotals(section, {});
-      
+
       expect(totals.laborTotal).toBe(1000);
       expect(totals.materialTotal).toBe(1000);
       expect(totals.grandTotal).toBe(2000);
@@ -146,7 +146,7 @@ describe('Models', () => {
   describe('Resource', () => {
     test('should create resource with defaults', () => {
       const resource = Resource.create();
-      
+
       expect(resource.id).toBeDefined();
       expect(resource.name).toBe('');
       expect(resource.type).toBe('material');
@@ -167,7 +167,7 @@ describe('Models', () => {
         price: 100,
         unit: 'чел.-ч',
       });
-      
+
       expect(resource.name).toBe('Test Resource');
       expect(resource.type).toBe('labor');
       expect(resource.qty).toBe(10);
@@ -204,9 +204,9 @@ describe('Models', () => {
         qty: 10,
         price: 100,
       });
-      
+
       const formatted = Resource.formatForDisplay(resource);
-      
+
       expect(formatted.name).toBe('Test Resource');
       expect(formatted.typeLabel).toBe('Работа');
       expect(formatted.total).toBe(1000);
@@ -223,7 +223,7 @@ describe('Models', () => {
         type: 'labor',
         unit: 'чел.-ч',
       });
-      
+
       const key = Resource.getKey(resource);
       expect(key).toBe('l|test resource|чел.-ч');
     });
@@ -236,7 +236,7 @@ describe('Models', () => {
     test('should create resource from CSV', () => {
       const csv = 'BASIS-01;Test Resource;material;шт;10;100;Note';
       const resource = Resource.fromCSV(csv);
-      
+
       expect(resource.basis).toBe('BASIS-01');
       expect(resource.name).toBe('Test Resource');
       expect(resource.type).toBe('material');
@@ -256,7 +256,7 @@ describe('Models', () => {
         price: 100,
         note: 'Note',
       });
-      
+
       const csv = Resource.toCSV(resource);
       expect(csv).toContain('BASIS-01');
       expect(csv).toContain('Test Resource');
@@ -289,9 +289,9 @@ describe('Models', () => {
           vatPct: 20,
         },
       };
-      
+
       const migrated = migrateV3toV4(oldData);
-      
+
       expect(migrated.title).toBe('Old Smeta');
       expect(migrated.sections.length).toBe(1);
       expect(migrated.sections[0].name).toBe('Section 1');
@@ -309,9 +309,9 @@ describe('Models', () => {
         title: 'Test',
         sections: [],
       };
-      
+
       const migrated = migrateV3toV4(oldData);
-      
+
       expect(migrated.recalcMode).toBe('auto');
       expect(migrated.rates).toBeDefined();
       expect(migrated.rounding).toBeDefined();

@@ -15,7 +15,7 @@
 export function debounce(func, wait, options = {}) {
   let lastArgs = null;
   let lastThis = null;
-  let maxWait = options.maxWait || 0;
+  const maxWait = options.maxWait || 0;
   let timerId = null;
   let lastInvokeTime = 0;
   let maxing = false;
@@ -43,11 +43,7 @@ export function debounce(func, wait, options = {}) {
 
   function shouldInvoke(time) {
     const timeSinceLastInvoke = time - lastInvokeTime;
-    return (
-      lastInvokeTime === 0 ||
-      timeSinceLastInvoke >= wait ||
-      timeSinceLastInvoke >= maxWait
-    );
+    return lastInvokeTime === 0 || timeSinceLastInvoke >= wait || timeSinceLastInvoke >= maxWait;
   }
 
   function trailingEdge(time) {
@@ -172,12 +168,15 @@ export function throttle(func, limit) {
       lastRan = Date.now();
     } else {
       clearTimeout(lastFunc);
-      lastFunc = setTimeout(() => {
-        if (Date.now() - lastRan >= limit) {
-          func.apply(context, args);
-          lastRan = Date.now();
-        }
-      }, limit - (Date.now() - lastRan));
+      lastFunc = setTimeout(
+        () => {
+          if (Date.now() - lastRan >= limit) {
+            func.apply(context, args);
+            lastRan = Date.now();
+          }
+        },
+        limit - (Date.now() - lastRan)
+      );
     }
   };
 }

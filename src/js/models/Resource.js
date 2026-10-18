@@ -152,13 +152,17 @@ export class Resource {
       return null;
     }
 
-    const name = String(resource.name || '').trim().toLowerCase();
+    const name = String(resource.name || '')
+      .trim()
+      .toLowerCase();
     if (!name) {
       return null;
     }
 
     const type = resource.type === 'labor' ? 'l' : resource.type === 'machine' ? 'm' : 'c';
-    const unit = String(resource.unit || '').trim().toLowerCase();
+    const unit = String(resource.unit || '')
+      .trim()
+      .toLowerCase();
 
     return `${type}|${name}|${unit}`;
   }

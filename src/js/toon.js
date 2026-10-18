@@ -28,12 +28,48 @@ export const TOON_KEYS = Object.freeze({
 
 // Табличные схемы по ключам
 const TOON_SCHEMAS = {
-  [TOON_KEYS.NSB]: ['id', 'basis', 'name', 'type', 'unit', 'price', 'note',
+  [TOON_KEYS.NSB]: [
+    'id',
+    'basis',
+    'name',
+    'type',
+    'unit',
+    'price',
+    'note',
     // Каркасный метод v2.0: метаданные расценок (нормы отходов, логистика, ночь/праздник)
-    'wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee',
-    'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh',
-    'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'],
-  [TOON_KEYS.RESOURCES]: ['id', 'basis', 'name', 'type', 'unit', 'code', 'labor', 'mach', 'mat', 'qty', 'price'],
+    'wasteGroup',
+    'perUnit',
+    'unitMassT',
+    'vehicleCapT',
+    'distanceKm',
+    'tariffPerKm',
+    'supplyFee',
+    'kGabarit',
+    'manipulatorFlag',
+    'unloadMachineHr',
+    'unloadHours',
+    'moveDistM',
+    'moveSpeedMh',
+    'perPct',
+    'storePct',
+    'perOn',
+    'storeOn',
+    'night',
+    'holiday',
+  ],
+  [TOON_KEYS.RESOURCES]: [
+    'id',
+    'basis',
+    'name',
+    'type',
+    'unit',
+    'code',
+    'labor',
+    'mach',
+    'mat',
+    'qty',
+    'price',
+  ],
   [TOON_KEYS.HISTORY]: ['time', 'text'],
 };
 
@@ -48,20 +84,66 @@ export const PROJECT_SCHEMA = {
   rounding: ['mode', 'method'],
   // полные списки полей моделей: значения по умолчанию живут в models/*, не в хранилище
   section: ['id', 'name', 'parentId', 'collapsed', 'children'],
-  row: ['id', 'basis', 'name', 'type', 'operator', 'unit', 'qty', 'price', 'note', 'days', 'pred', 'startAt',
+  row: [
+    'id',
+    'basis',
+    'name',
+    'type',
+    'operator',
+    'unit',
+    'qty',
+    'price',
+    'note',
+    'days',
+    'pred',
+    'startAt',
     // Каркасный метод v2.0 (framework.js): метаданные строки
-    'wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee',
-    'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh',
-    'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'],
+    'wasteGroup',
+    'perUnit',
+    'unitMassT',
+    'vehicleCapT',
+    'distanceKm',
+    'tariffPerKm',
+    'supplyFee',
+    'kGabarit',
+    'manipulatorFlag',
+    'unloadMachineHr',
+    'unloadHours',
+    'moveDistM',
+    'moveSpeedMh',
+    'perPct',
+    'storePct',
+    'perOn',
+    'storeOn',
+    'night',
+    'holiday',
+  ],
 };
 
 /** Схема настроек каркасного метода (проект.framework). */
 export const FRAMEWORK_FIELDS = [
-  'enabled', 'npPct', 'usnPct', 'dRyn', 'vzPct', 'zuPct', 'ppPct', 'garantPct',
+  'enabled',
+  'npPct',
+  'usnPct',
+  'dRyn',
+  'vzPct',
+  'zuPct',
+  'ppPct',
+  'garantPct',
   'kNight',
-  'fuelPer100', 'fuelPrice', 'workerDistanceKm', 'workDays',
-  'rainDays', 'monthDays', 'rainKLoss', 'rainProb',
-  'buildMonths', 'vehicleTaxYear', 'insuranceYear', 'scrapPricePerTon', 'vzLiquidation',
+  'fuelPer100',
+  'fuelPrice',
+  'workerDistanceKm',
+  'workDays',
+  'rainDays',
+  'monthDays',
+  'rainKLoss',
+  'rainProb',
+  'buildMonths',
+  'vehicleTaxYear',
+  'insuranceYear',
+  'scrapPricePerTon',
+  'vzLiquidation',
 ];
 
 const NUM_RE = /^-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i;
@@ -79,7 +161,7 @@ function escCell(v) {
   if (t === 'string') {
     if (v === '') return '""';
     const ambiguous = v === 'true' || v === 'false' || v === 'null' || NUM_RE.test(v);
-    return (/[",\\\n\r]/.test(v) || /^\s|\s$/.test(v) || ambiguous) ? quoted(v) : v;
+    return /[",\\\n\r]/.test(v) || /^\s|\s$/.test(v) || ambiguous ? quoted(v) : v;
   }
   return quoted(JSON.stringify(v)); // объекты/массивы в ячейке
 }
@@ -102,9 +184,12 @@ function parseCells(line) {
         openQ = false;
       } else cur += ch;
     } else if (ch === '"') {
-      openQ = true; q = true;
+      openQ = true;
+      q = true;
     } else if (ch === ',') {
-      cells.push({ v: cur, q }); cur = ''; q = false;
+      cells.push({ v: cur, q });
+      cur = '';
+      q = false;
     } else cur += ch;
   }
   cells.push({ v: cur, q });
@@ -134,12 +219,18 @@ export function encodeTable(arr, fields) {
   const cols = fields.concat(['_']);
   const lines = [`[${cols.join(',')}]`];
   for (const item of arr) {
-    if (!item) { lines.push(''); continue; }
+    if (!item) {
+      lines.push('');
+      continue;
+    }
     const cells = fields.map((f) => escCell(item[f]));
     const rest = {};
     let hasRest = false;
     for (const k of Object.keys(item)) {
-      if (!fields.includes(k)) { rest[k] = item[k]; hasRest = true; }
+      if (!fields.includes(k)) {
+        rest[k] = item[k];
+        hasRest = true;
+      }
     }
     cells.push(hasRest ? escCell(rest) : '');
     lines.push(cells.join(','));
@@ -154,7 +245,9 @@ export function encodeTable(arr, fields) {
  * @returns {Array<Object>}
  */
 export function decodeTable(src, fields) {
-  const text = String(src).replace(/^\ufeff/, '').trim();
+  const text = String(src)
+    .replace(/^\ufeff/, '')
+    .trim();
   const nl = text.indexOf('\n');
   const m = /^\[(.+)\]$/.exec((nl === -1 ? text : text.slice(0, nl)).trim());
   if (!m) throw new Error('TOON: bad header');
@@ -162,13 +255,22 @@ export function decodeTable(src, fields) {
   const body = nl === -1 ? [] : text.slice(nl + 1).split('\n');
   const out = [];
   for (const line of body) {
-    if (line === '') { out.push(null); continue; }
+    if (line === '') {
+      out.push(null);
+      continue;
+    }
     const cells = parseCells(line);
     const obj = {};
     cells.forEach((cell, i) => {
       const col = cols[i];
       if (col === '_' || col === undefined) {
-        if (cell.v && cell.v.startsWith('{')) { try { Object.assign(obj, JSON.parse(cell.v)); } catch (e) { /* ignore */ } }
+        if (cell.v && cell.v.startsWith('{')) {
+          try {
+            Object.assign(obj, JSON.parse(cell.v));
+          } catch (e) {
+            /* ignore */
+          }
+        }
         return;
       }
       obj[col] = cellValue(cell);
@@ -193,12 +295,20 @@ function encodeBlock(name, fields, rows, opts = {}) {
   if (cf && !allFields.includes(cf)) allFields.push(cf);
   const lines = [`@${name}[${allFields.join(',')}]`];
   for (const item of rows || []) {
-    if (!item) { lines.push(''); continue; }
-    const cells = allFields.map((f) => (jsonFields.has(f) ? quoted(JSON.stringify(item[f] || [])) : escCell(item[f])));
+    if (!item) {
+      lines.push('');
+      continue;
+    }
+    const cells = allFields.map((f) =>
+      jsonFields.has(f) ? quoted(JSON.stringify(item[f] || [])) : escCell(item[f])
+    );
     const rest = {};
     let hasRest = false;
     for (const k of Object.keys(item)) {
-      if (!allFields.includes(k)) { rest[k] = item[k]; hasRest = true; }
+      if (!allFields.includes(k)) {
+        rest[k] = item[k];
+        hasRest = true;
+      }
     }
     while (cells.length && cells[cells.length - 1] === '') cells.pop(); // пустые хвостовые ячейки не пишем
     if (hasRest) cells.push(escCell(rest));
@@ -214,7 +324,8 @@ function defaultFor(f) {
   // чтобы старый проект с пропущенным НДС не «восстанавливался» с нулевым процентом.
   if (f === 'qty' || f === 'price' || f === 'overheadPct' || f === 'profitPct') return 0;
   if (f === 'operator' || f === 'collapsed') return false;
-  if (f === 'pred' || f === 'note' || f === 'basis' || f === 'name' || f === 'type' || f === 'unit') return '';
+  if (f === 'pred' || f === 'note' || f === 'basis' || f === 'name' || f === 'type' || f === 'unit')
+    return '';
   return null; // days, startAt, parentId, id...
 }
 
@@ -222,17 +333,31 @@ function decodeBlockRows(lines, fields, jsonCols) {
   const jc = jsonCols || [];
   const out = [];
   for (const line of lines) {
-    if (line === '') { out.push(null); continue; }
+    if (line === '') {
+      out.push(null);
+      continue;
+    }
     const cells = parseCells(line);
     const obj = {};
     cells.forEach((cell, i) => {
       const f = fields[i];
-      if (!f) { // хвостовая JSON-ячейка с extra-полями за схемой
-        if (cell.v && cell.v.startsWith('{')) { try { Object.assign(obj, JSON.parse(cell.v)); } catch (e) { /* ignore */ } }
+      if (!f) {
+        // хвостовая JSON-ячейка с extra-полями за схемой
+        if (cell.v && cell.v.startsWith('{')) {
+          try {
+            Object.assign(obj, JSON.parse(cell.v));
+          } catch (e) {
+            /* ignore */
+          }
+        }
         return;
       }
       if (jc.includes(f)) {
-        try { obj[f] = JSON.parse(cell.v); } catch (e) { obj[f] = defaultFor(f); }
+        try {
+          obj[f] = JSON.parse(cell.v);
+        } catch (e) {
+          obj[f] = defaultFor(f);
+        }
         return;
       }
       obj[f] = cellValue(cell);
@@ -255,8 +380,14 @@ export function encodeProject(project) {
   const restMeta = {};
   let hasRestMeta = false;
   for (const k of Object.keys(project)) {
-    if (k === 'sections' || S.top.includes(k) || ['company', 'rates', 'rounding', 'framework'].includes(k)) continue;
-    restMeta[k] = project[k]; hasRestMeta = true;
+    if (
+      k === 'sections' ||
+      S.top.includes(k) ||
+      ['company', 'rates', 'rounding', 'framework'].includes(k)
+    )
+      continue;
+    restMeta[k] = project[k];
+    hasRestMeta = true;
   }
   if (hasRestMeta) metaFields.push('_');
   const metaCells = metaFields.map((f) => escCell(f === '_' ? restMeta : project[f]));
@@ -268,16 +399,25 @@ export function encodeProject(project) {
   if (project.framework) {
     const fw = project.framework;
     const cells = FRAMEWORK_FIELDS.map((f) => escCell(fw[f]));
-    const jsons = [JSON.stringify(fw.rainRows || []), JSON.stringify(fw.rainMonths || [])].map((j) => quoted(j));
+    const jsons = [JSON.stringify(fw.rainRows || []), JSON.stringify(fw.rainMonths || [])].map(
+      (j) => quoted(j)
+    );
     const restFw = {};
     let hasRestFw = false;
     for (const k of Object.keys(fw)) {
-      if (!FRAMEWORK_FIELDS.includes(k) && k !== 'rainRows' && k !== 'rainMonths') { restFw[k] = fw[k]; hasRestFw = true; }
+      if (!FRAMEWORK_FIELDS.includes(k) && k !== 'rainRows' && k !== 'rainMonths') {
+        restFw[k] = fw[k];
+        hasRestFw = true;
+      }
     }
-    parts.push(`@framework[${[...FRAMEWORK_FIELDS, 'rainRows', 'rainMonths', ...(hasRestFw ? ['_'] : [])].join(',')}]`);
+    parts.push(
+      `@framework[${[...FRAMEWORK_FIELDS, 'rainRows', 'rainMonths', ...(hasRestFw ? ['_'] : [])].join(',')}]`
+    );
     parts.push([...cells, ...jsons, ...(hasRestFw ? [escCell(restFw)] : [])].join(','));
   }
-  parts.push(encodeBlock('sections', S.section, project.sections || [], { jsonFields: ['children'] }));
+  parts.push(
+    encodeBlock('sections', S.section, project.sections || [], { jsonFields: ['children'] })
+  );
   const allSecs = [];
   for (const sec of project.sections || []) {
     allSecs.push(sec);
@@ -307,10 +447,11 @@ export function decodeProject(payload) {
     }
   }
   // заголовок блока: '@name[cols]' — ищем по точному имени до '['
-  const find = (name) => blocks.find((b) => {
-    const nm = b.header.slice(0, b.header.indexOf('['));
-    return nm === name;
-  });
+  const find = (name) =>
+    blocks.find((b) => {
+      const nm = b.header.slice(0, b.header.indexOf('['));
+      return nm === name;
+    });
   const project = {};
   const metaB = find('meta');
   if (metaB) {
@@ -320,7 +461,13 @@ export function decodeProject(payload) {
     cells.forEach((cell, i) => {
       const col = cols[i];
       if (col === '_') {
-        if (cell.v && cell.v.startsWith('{')) { try { Object.assign(project, JSON.parse(cell.v)); } catch (e) { /* ignore */ } }
+        if (cell.v && cell.v.startsWith('{')) {
+          try {
+            Object.assign(project, JSON.parse(cell.v));
+          } catch (e) {
+            /* ignore */
+          }
+        }
       } else {
         project[col] = cellValue(cell);
       }
@@ -346,9 +493,19 @@ export function decodeProject(payload) {
         const col = cols[i];
         if (!col) return;
         if (col === '_') {
-          if (cell.v && cell.v.startsWith('{')) { try { Object.assign(fw, JSON.parse(cell.v)); } catch (e) { /* ignore */ } }
+          if (cell.v && cell.v.startsWith('{')) {
+            try {
+              Object.assign(fw, JSON.parse(cell.v));
+            } catch (e) {
+              /* ignore */
+            }
+          }
         } else if (col === 'rainRows' || col === 'rainMonths') {
-          try { fw[col] = JSON.parse(cell.v); } catch (e) { fw[col] = []; }
+          try {
+            fw[col] = JSON.parse(cell.v);
+          } catch (e) {
+            fw[col] = [];
+          }
         } else {
           fw[col] = cellValue(cell);
         }
@@ -357,7 +514,9 @@ export function decodeProject(payload) {
     }
   }
   const secB = find('sections');
-  project.sections = (secB ? decodeBlockRows(secB.lines, S.section, ['children']) : []).filter(Boolean);
+  project.sections = (secB ? decodeBlockRows(secB.lines, S.section, ['children']) : []).filter(
+    Boolean
+  );
   const attach = (sec) => {
     const rb = find(`rows:${sec.id}`);
     sec.resources = rb ? decodeBlockRows(rb.lines, S.row).filter(Boolean) : [];
@@ -401,4 +560,14 @@ export function decodeValue(key, raw) {
   return JSON.parse(raw);
 }
 
-export default { encodeTable, decodeTable, encodeProject, decodeProject, schemaFor, encodeValue, decodeValue, TOON_KEYS, PROJECT_SCHEMA };
+export default {
+  encodeTable,
+  decodeTable,
+  encodeProject,
+  decodeProject,
+  schemaFor,
+  encodeValue,
+  decodeValue,
+  TOON_KEYS,
+  PROJECT_SCHEMA,
+};

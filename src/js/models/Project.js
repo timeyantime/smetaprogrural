@@ -252,10 +252,27 @@ export function migrateV3toV4(oldData) {
           newResource.pred = resource.pred || resource.predecessor || '';
           newResource.startAt = resource.startAt || null;
           // Метаданные каркасного метода (framework v2.0) — переносим, если есть
-          for (const fk of ['wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm',
-            'tariffPerKm', 'supplyFee', 'kGabarit', 'manipulatorFlag', 'unloadMachineHr',
-            'unloadHours', 'moveDistM', 'moveSpeedMh', 'perPct', 'storePct', 'perOn',
-            'storeOn', 'night', 'holiday']) {
+          for (const fk of [
+            'wasteGroup',
+            'perUnit',
+            'unitMassT',
+            'vehicleCapT',
+            'distanceKm',
+            'tariffPerKm',
+            'supplyFee',
+            'kGabarit',
+            'manipulatorFlag',
+            'unloadMachineHr',
+            'unloadHours',
+            'moveDistM',
+            'moveSpeedMh',
+            'perPct',
+            'storePct',
+            'perOn',
+            'storeOn',
+            'night',
+            'holiday',
+          ]) {
             if (resource[fk] !== undefined && resource[fk] !== null) newResource[fk] = resource[fk];
           }
           return newResource;

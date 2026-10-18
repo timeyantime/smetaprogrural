@@ -39,18 +39,90 @@ export const FRAMEWORK_META = Object.freeze({
  * ====================================================================== */
 
 export const WASTE_NORMS = Object.freeze([
-  { id: 'block',    material_group: 'Блочные (газобетон, кирпич)',                  k: 0.04, pct: '4%',  explanation: 'Бой при транспортировке, обрезка под размер' },
-  { id: 'sheet',    material_group: 'Листовые (ГКЛ, ОСБ, фанера)',                   k: 0.06, pct: '6%',  explanation: 'Раскрой, неликвидные обрезки' },
-  { id: 'roll',     material_group: 'Рулонные (гидроизоляция, подложка)',            k: 0.08, pct: '8%',  explanation: 'Технологический нахлест, обрезка краев' },
-  { id: 'lumber',   material_group: 'Пиломатериалы (доска, брус, рейка)',            k: 0.08, pct: '8%',  explanation: 'Обзол, торцовка, естественная усушка' },
-  { id: 'metal',    material_group: 'Металлоконструкции (ЛСТК, профиль, уголок)',    k: 0.03, pct: '3%',  explanation: 'Обрезки при сверловке и подгонке' },
-  { id: 'concrete', material_group: 'Растворы и бетон (готовые смеси)',              k: 0.04, pct: '4%',  explanation: 'Потери при транспортировке, налипание на тару, перерасход' },
-  { id: 'paint',    material_group: 'Краски, грунтовки, шпатлевки',                  k: 0.08, pct: '8%',  explanation: 'Остатки в таре, потери при нанесении, очистка инструмента' },
-  { id: 'floor',    material_group: 'Чистовые полы (ламинат, плитка, кварцвинил)',   k: 0.07, pct: '7%',  explanation: 'Подрезка у стен, бой плитки, подгонка рисунка' },
-  { id: 'insul',    material_group: 'Утеплитель (минвата, ЭППС, PIR)',               k: 0.04, pct: '4%',  explanation: 'Сжатие при монтаже, обрезка под нестандартные узлы' },
-  { id: 'roof',     material_group: 'Кровельные (металлочерепица, мягкая кровля)',   k: 0.10, pct: '10%', explanation: 'Средний процент на обрезку скатов (до 15% на сложных крышах)' },
-  { id: 'cable',    material_group: 'Кабель и проводка',                             k: 0.08, pct: '8%',  explanation: 'Запас на разделку, подключение в щитах и розетках, изгибы' },
-  { id: 'pipe',     material_group: 'Трубы (сантехника, отопление, канализация)',    k: 0.05, pct: '5%',  explanation: 'Нарезка резьбы, фитинговые соединения, обрезки' },
+  {
+    id: 'block',
+    material_group: 'Блочные (газобетон, кирпич)',
+    k: 0.04,
+    pct: '4%',
+    explanation: 'Бой при транспортировке, обрезка под размер',
+  },
+  {
+    id: 'sheet',
+    material_group: 'Листовые (ГКЛ, ОСБ, фанера)',
+    k: 0.06,
+    pct: '6%',
+    explanation: 'Раскрой, неликвидные обрезки',
+  },
+  {
+    id: 'roll',
+    material_group: 'Рулонные (гидроизоляция, подложка)',
+    k: 0.08,
+    pct: '8%',
+    explanation: 'Технологический нахлест, обрезка краев',
+  },
+  {
+    id: 'lumber',
+    material_group: 'Пиломатериалы (доска, брус, рейка)',
+    k: 0.08,
+    pct: '8%',
+    explanation: 'Обзол, торцовка, естественная усушка',
+  },
+  {
+    id: 'metal',
+    material_group: 'Металлоконструкции (ЛСТК, профиль, уголок)',
+    k: 0.03,
+    pct: '3%',
+    explanation: 'Обрезки при сверловке и подгонке',
+  },
+  {
+    id: 'concrete',
+    material_group: 'Растворы и бетон (готовые смеси)',
+    k: 0.04,
+    pct: '4%',
+    explanation: 'Потери при транспортировке, налипание на тару, перерасход',
+  },
+  {
+    id: 'paint',
+    material_group: 'Краски, грунтовки, шпатлевки',
+    k: 0.08,
+    pct: '8%',
+    explanation: 'Остатки в таре, потери при нанесении, очистка инструмента',
+  },
+  {
+    id: 'floor',
+    material_group: 'Чистовые полы (ламинат, плитка, кварцвинил)',
+    k: 0.07,
+    pct: '7%',
+    explanation: 'Подрезка у стен, бой плитки, подгонка рисунка',
+  },
+  {
+    id: 'insul',
+    material_group: 'Утеплитель (минвата, ЭППС, PIR)',
+    k: 0.04,
+    pct: '4%',
+    explanation: 'Сжатие при монтаже, обрезка под нестандартные узлы',
+  },
+  {
+    id: 'roof',
+    material_group: 'Кровельные (металлочерепица, мягкая кровля)',
+    k: 0.1,
+    pct: '10%',
+    explanation: 'Средний процент на обрезку скатов (до 15% на сложных крышах)',
+  },
+  {
+    id: 'cable',
+    material_group: 'Кабель и проводка',
+    k: 0.08,
+    pct: '8%',
+    explanation: 'Запас на разделку, подключение в щитах и розетках, изгибы',
+  },
+  {
+    id: 'pipe',
+    material_group: 'Трубы (сантехника, отопление, канализация)',
+    k: 0.05,
+    pct: '5%',
+    explanation: 'Нарезка резьбы, фитинговые соединения, обрезки',
+  },
 ]);
 
 const WASTE_BY_ID = new Map(WASTE_NORMS.map((w) => [w.id, w]));
@@ -85,7 +157,7 @@ export const NIGHT_RANGE = [1.2, 1.5]; // типовой диапазон k_но
  */
 export function laborRateFact(baseRate, { night = false, holiday = false, kNight = 1.3 } = {}) {
   let r = (Number(baseRate) || 0) * LABOR_MARKUP;
-  if (night || holiday) r *= (Number(kNight) || 1);
+  if (night || holiday) r *= Number(kNight) || 1;
   return r;
 }
 
@@ -105,8 +177,8 @@ export function resourceFullPrice(m, settings = null) {
   const perUnit = Number(m.perUnit) || 0; // p_отп на единицу измерения
   const delivery = deliveryPerUnit(m);
   const unloading = unloadingPerUnit(m);
-  const surchPer = perUnit * ((Number(m.perPct) || 0) / 100);      // 1per · П
-  const surchStore = perUnit * ((Number(m.storePct) || 0) / 100);  // 1hran · Х
+  const surchPer = perUnit * ((Number(m.perPct) || 0) / 100); // 1per · П
+  const surchStore = perUnit * ((Number(m.storePct) || 0) / 100); // 1hran · Х
   return {
     priceFull: perUnit + delivery + unloading + surchPer + surchStore,
     delivery,
@@ -124,8 +196,8 @@ export function resourceFullPrice(m, settings = null) {
  */
 export function deliveryPerUnit(m) {
   const qty = Number(m.qty) || 0;
-  const mass = Number(m.unitMassT) || 0;      // Масса_ед, т
-  const cap = Number(m.vehicleCapT) || 0;     // Грузоподъемность_т
+  const mass = Number(m.unitMassT) || 0; // Масса_ед, т
+  const cap = Number(m.vehicleCapT) || 0; // Грузоподъемность_т
   if (!qty || !cap || mass <= 0) return 0;
   const trips = Math.ceil((qty * mass) / cap);
   const km = Number(m.distanceKm) || 0;
@@ -144,11 +216,11 @@ export function unloadingPerUnit(m) {
   const qty = Number(m.qty) || 0;
   if (!qty) return 0;
   const machineHr = Number(m.unloadMachineHr) || 0; // C_маш_ч, ₽/ч
-  const hours = Number(m.unloadHours) || 0;         // t_час, ч
-  const supply = Number(m.supplyFee) || 0;          // C_подачи, ₽
-  const manip = Number(m.manipulatorFlag) ? 1 : 0;  // Флаг_манипулятор 0|1
-  const distM = Number(m.moveDistM) || 0;           // S_м, м
-  const moveSpeed = Number(m.moveSpeedMh) || 0;     // V_перем, м/ч
+  const hours = Number(m.unloadHours) || 0; // t_час, ч
+  const supply = Number(m.supplyFee) || 0; // C_подачи, ₽
+  const manip = Number(m.manipulatorFlag) ? 1 : 0; // Флаг_манипулятор 0|1
+  const distM = Number(m.moveDistM) || 0; // S_м, м
+  const moveSpeed = Number(m.moveSpeedMh) || 0; // V_перем, м/ч
   const cranePart = (1 - 0.9 * manip) * (machineHr * hours + 0.5 * supply);
   const movePart = moveSpeed > 0 ? (machineHr * distM) / moveSpeed : 0;
   return (cranePart + movePart) / qty;
@@ -156,34 +228,35 @@ export function unloadingPerUnit(m) {
 
 /** Значения метаданных ресурса по умолчанию (логистика/условия труда). */
 export const RESOURCE_DEFAULT_META = Object.freeze({
-  wasteGroup: '',        // id группы из WASTE_NORMS ('' = запас не применять)
-  perUnit: 0,            // p_отп — отпускная цена за единицу, ₽ (0 → брать resource.price)
-  unitMassT: 0,          // Масса_ед, т
-  vehicleCapT: 0,        // Грузоподъёмность ТС, т
-  distanceKm: 0,         // L_км плечо перевозки
-  tariffPerKm: 0,        // C_тариф_км, ₽/км
-  supplyFee: 0,          // C_подачи, ₽ (подача ТС)
-  kGabarit: 1,           // k_габарит
-  manipulatorFlag: false,// Флаг_манипулятор
-  unloadMachineHr: 0,    // C_маш_ч разгрузки, ₽/ч
-  unloadHours: 0,        // t_час, ч
-  moveDistM: 0,          // S_м перемещение после разгрузки, м
-  moveSpeedMh: 0,        // V_перем, м/ч
-  perPct: 0,             // П — надбавка за сезонность/риски, % (1per ∈ {0,1})
-  storePct: 0,           // Х — хранение на складе, % (1hran ∈ {0,1})
-  perOn: true,           // 1per
-  storeOn: false,        // 1hran
-  night: false,          // работа в ночную смену
-  holiday: false,        // работа в праздник
+  wasteGroup: '', // id группы из WASTE_NORMS ('' = запас не применять)
+  perUnit: 0, // p_отп — отпускная цена за единицу, ₽ (0 → брать resource.price)
+  unitMassT: 0, // Масса_ед, т
+  vehicleCapT: 0, // Грузоподъёмность ТС, т
+  distanceKm: 0, // L_км плечо перевозки
+  tariffPerKm: 0, // C_тариф_км, ₽/км
+  supplyFee: 0, // C_подачи, ₽ (подача ТС)
+  kGabarit: 1, // k_габарит
+  manipulatorFlag: false, // Флаг_манипулятор
+  unloadMachineHr: 0, // C_маш_ч разгрузки, ₽/ч
+  unloadHours: 0, // t_час, ч
+  moveDistM: 0, // S_м перемещение после разгрузки, м
+  moveSpeedMh: 0, // V_перем, м/ч
+  perPct: 0, // П — надбавка за сезонность/риски, % (1per ∈ {0,1})
+  storePct: 0, // Х — хранение на складе, % (1hran ∈ {0,1})
+  perOn: true, // 1per
+  storeOn: false, // 1hran
+  night: false, // работа в ночную смену
+  holiday: false, // работа в праздник
 });
 
 /** Объединяет метаданные ресурса со значениями по умолчанию. */
 export function normalizeResMeta(resource) {
   const out = {};
   for (const k of Object.keys(RESOURCE_DEFAULT_META)) {
-    out[k] = resource && resource[k] !== undefined && resource[k] !== null
-      ? resource[k]
-      : RESOURCE_DEFAULT_META[k];
+    out[k] =
+      resource && resource[k] !== undefined && resource[k] !== null
+        ? resource[k]
+        : RESOURCE_DEFAULT_META[k];
   }
   return out;
 }
@@ -230,13 +303,17 @@ export function calcLimitedCosts(pz, nr, spres, laborTotal, settings, mode, meth
 
 // Строки прямых лимитированных затрат передаются отдельно (см. collect в app.js)
 let _limitedRows = [];
-function resOf() { return _limitedRows; }
+function resOf() {
+  return _limitedRows;
+}
 function directSum(kind, rows) {
   let sum = 0;
   for (const r of rows) if (r.kind === kind) sum += (Number(r.qty) || 0) * (Number(r.price) || 0);
   return sum;
 }
-export function setLimitedRows(rows) { _limitedRows = Array.isArray(rows) ? rows : []; }
+export function setLimitedRows(rows) {
+  _limitedRows = Array.isArray(rows) ? rows : [];
+}
 
 /* ========================================================================
  * 6. ТРАНСПОРТ ПЕРСОНАЛА (worker_transport)
@@ -245,9 +322,9 @@ export function setLimitedRows(rows) { _limitedRows = Array.isArray(rows) ? rows
 
 export function calcWorkerTransport(_laborTotal, s) {
   const consumption = Number(s.fuelPer100) || 0; // Расход_л_100, л/100км
-  const km = Number(s.workerDistanceKm) || 0;    // L_км (в одну сторону)
-  const fuelPrice = Number(s.fuelPrice) || 0;    // Цена_топл, ₽/л
-  const days = Number(s.workDays) || 0;          // Дни_раб — фактические дни бригады
+  const km = Number(s.workerDistanceKm) || 0; // L_км (в одну сторону)
+  const fuelPrice = Number(s.fuelPrice) || 0; // Цена_топл, ₽/л
+  const days = Number(s.workDays) || 0; // Дни_раб — фактические дни бригады
   return (consumption / 100) * km * 2 * fuelPrice * 1.05 * days;
 }
 
@@ -267,7 +344,11 @@ export function calcRain(laborTotal, s) {
   const share = laborTotal / months.length; // ФОТ распределяется по месяцам равномерно
   let sum = 0;
   for (const m of months) {
-    sum += share * (Number(m.kLoss) || 0) * (Number(m.prob) || 0) * ((Number(m.rainDays) || 0) / (Number(m.monthDays) || 30));
+    sum +=
+      share *
+      (Number(m.kLoss) || 0) *
+      (Number(m.prob) || 0) *
+      ((Number(m.rainDays) || 0) / (Number(m.monthDays) || 30));
   }
   return sum;
 }
@@ -278,7 +359,7 @@ export function calcRain(laborTotal, s) {
 
 /** Налог_УСН = S_без_НДС * 0.06 (ставка настраивается, по умолчанию 6%). */
 export function calcTax(baseWithoutTax, s) {
-  return baseWithoutTax * ((Number(s.usnPct ?? 6) / 100));
+  return baseWithoutTax * (Number(s.usnPct ?? 6) / 100);
 }
 
 /**
@@ -323,33 +404,33 @@ export function calcReturnable(resources, s) {
 /** Дефолтные настройки каркасного метода (соответствуют блоку structural_info). */
 export function defaultFrameworkSettings() {
   return {
-    enabled: true,           // каркасный метод v2.0 — единственный расчёт в программе
-    npPct: 3,                // НП = 3% (каркас: стандартная предсказуемость)
-    usnPct: 6,               // Налог_УСН = 6%
-    dRyn: 0,                 // d_рын — рыночная надбавка к сметной прибыли, ₽ (СП = Н_сп*Б_сп + d_рын)
-    kNight: 1.3,             // k_ночн ∈ [1.2; 1.5] — работа в ночь/праздник (Labor_Condition)
-    vzPct: 3,                // ВЗ, % от С_СМР (нормативный способ)
-    zuPct: 0,                // ЗУ (для каркаса в тёплый период обычно 0)
-    ppPct: 0,                // ПП, % от С_СМР
-    garantPct: 0,            // Гарантийное удержание (3–5%), влияет на cash flow
+    enabled: true, // каркасный метод v2.0 — единственный расчёт в программе
+    npPct: 3, // НП = 3% (каркас: стандартная предсказуемость)
+    usnPct: 6, // Налог_УСН = 6%
+    dRyn: 0, // d_рын — рыночная надбавка к сметной прибыли, ₽ (СП = Н_сп*Б_сп + d_рын)
+    kNight: 1.3, // k_ночн ∈ [1.2; 1.5] — работа в ночь/праздник (Labor_Condition)
+    vzPct: 3, // ВЗ, % от С_СМР (нормативный способ)
+    zuPct: 0, // ЗУ (для каркаса в тёплый период обычно 0)
+    ppPct: 0, // ПП, % от С_СМР
+    garantPct: 0, // Гарантийное удержание (3–5%), влияет на cash flow
     // Транспорт персонала
-    fuelPer100: 12,          // Расход_л_100, л/100км
-    fuelPrice: 60,           // Цена_топл, ₽/л
-    workerDistanceKm: 0,     // L_км до объекта (в одну сторону)
-    workDays: 0,             // Дни_раб — фактические дни присутствия бригады
+    fuelPer100: 12, // Расход_л_100, л/100км
+    fuelPrice: 60, // Цена_топл, ₽/л
+    workerDistanceKm: 0, // L_км до объекта (в одну сторону)
+    workDays: 0, // Дни_раб — фактические дни присутствия бригады
     // Дожди (упрощённый однофазный режим; для помесячного — rainMonths)
-    rainDays: 0,             // d_дождь, дни
-    monthDays: 30,           // D_мес, дни
-    rainKLoss: 0.1,          // k_потерь ∈ [0.05; 0.30]
-    rainProb: 0.5,           // p_вероятн
-    rainMonths: [],          // [{kLoss, prob, rainDays, monthDays}, ...]
+    rainDays: 0, // d_дождь, дни
+    monthDays: 30, // D_мес, дни
+    rainKLoss: 0.1, // k_потерь ∈ [0.05; 0.30]
+    rainProb: 0.5, // p_вероятн
+    rainMonths: [], // [{kLoss, prob, rainDays, monthDays}, ...]
     // Техника: налоги/страховка
-    buildMonths: 2,          // T_стр_мес (1–3)
-    vehicleTaxYear: 0,       // Н_транспортный_год, ₽
-    insuranceYear: 0,        // ОСАГО/КАСКО, ₽/год
+    buildMonths: 2, // T_стр_мес (1–3)
+    vehicleTaxYear: 0, // Н_транспортный_год, ₽
+    insuranceYear: 0, // ОСАГО/КАСКО, ₽/год
     // Возвратные суммы
     scrapPricePerTon: 15000, // реализация металлолома, ₽/т
-    vzLiquidation: 0,        // ликвидационная стоимость ВЗ, ₽
+    vzLiquidation: 0, // ликвидационная стоимость ВЗ, ₽
   };
 }
 
@@ -368,7 +449,7 @@ export function calcFrameworkTotals(project, { pz, nr, sp, laborTotal, mode, met
   // Срок строительства берётся из сметы (суммарная длительность работ в днях / 30),
   // если работы не заданы — из настройки buildMonths (1–3 мес).
   const durationDays = Number(project?.durationDays) || 0;
-  const durationMonths = durationDays > 0 ? durationDays / 30 : (Number(s.buildMonths) || 0);
+  const durationMonths = durationDays > 0 ? durationDays / 30 : Number(s.buildMonths) || 0;
   const vehicleTax = rnd(calcVehicleTax(s, durationMonths));
   const subtotal = pz + nr + sp + lz.total + vehicleTax; // S без налога и возвратных
   const tax = rnd(calcTax(subtotal, s));
@@ -377,7 +458,9 @@ export function calcFrameworkTotals(project, { pz, nr, sp, laborTotal, mode, met
 
   return {
     settings: s,
-    pz, nr, sp,
+    pz,
+    nr,
+    sp,
     lzParts: lz,
     lz: lz.total,
     vehicleTax,
@@ -411,35 +494,65 @@ export function frameworkRowCost(resource, settings = null) {
 
   if (resource.type === 'labor') {
     const rate = laborRateFact(resource.price, {
-      night: !!meta.night, holiday: !!meta.holiday, kNight: Number(s.kNight) || 1.3,
+      night: !!meta.night,
+      holiday: !!meta.holiday,
+      kNight: Number(s.kNight) || 1.3,
     });
-    return { qtyFact: q, priceFull: rate, total: q * rate, parts: { markup: rate - (Number(resource.price) || 0) } };
+    return {
+      qtyFact: q,
+      priceFull: rate,
+      total: q * rate,
+      parts: { markup: rate - (Number(resource.price) || 0) },
+    };
   }
 
   if (resource.type === 'machine') {
     // Машины: наценка не применяется (это не чел-ч), но учитываются ночь/праздник
-    const rate = (meta.night || meta.holiday)
-      ? q * (Number(resource.price) || 0) * (Number(s.kNight) || 1.3) / q
-      : (Number(resource.price) || 0);
+    const rate =
+      meta.night || meta.holiday
+        ? (q * (Number(resource.price) || 0) * (Number(s.kNight) || 1.3)) / q
+        : Number(resource.price) || 0;
     return { qtyFact: q, priceFull: rate, total: q * rate, parts: {} };
   }
 
   // Материалы: q_факт = q_нетто*(1+k_отх); p_полн = p_отп + доставка + разгрузка + П + Х
   const qtyFact = factQty(q, meta.wasteGroup);
-  const m = { ...meta, qty: q, perUnit: meta.perUnit || (Number(resource.price) || 0) };
+  const m = { ...meta, qty: q, perUnit: meta.perUnit || Number(resource.price) || 0 };
   const fp = resourceFullPrice(m, s);
   return {
     qtyFact,
     priceFull: fp.priceFull,
     total: qtyFact * fp.priceFull,
-    parts: { delivery: fp.delivery * qtyFact, unloading: fp.unloading * qtyFact, surchPer: fp.surchPer * qtyFact, surchStore: fp.surchStore * qtyFact },
+    parts: {
+      delivery: fp.delivery * qtyFact,
+      unloading: fp.unloading * qtyFact,
+      surchPer: fp.surchPer * qtyFact,
+      surchStore: fp.surchStore * qtyFact,
+    },
   };
 }
 
 export default {
-  FRAMEWORK_META, WASTE_NORMS, LABOR_MARKUP, NIGHT_RANGE, RESOURCE_DEFAULT_META,
-  wasteK, factQty, laborRateFact, resourceFullPrice, deliveryPerUnit, unloadingPerUnit,
-  normalizeResMeta, calcLimitedCosts, setLimitedRows, calcWorkerTransport, calcRain,
-  calcTax, calcVehicleTax, calcReturnable, calcFrameworkTotals, frameworkRowCost,
+  FRAMEWORK_META,
+  WASTE_NORMS,
+  LABOR_MARKUP,
+  NIGHT_RANGE,
+  RESOURCE_DEFAULT_META,
+  wasteK,
+  factQty,
+  laborRateFact,
+  resourceFullPrice,
+  deliveryPerUnit,
+  unloadingPerUnit,
+  normalizeResMeta,
+  calcLimitedCosts,
+  setLimitedRows,
+  calcWorkerTransport,
+  calcRain,
+  calcTax,
+  calcVehicleTax,
+  calcReturnable,
+  calcFrameworkTotals,
+  frameworkRowCost,
   defaultFrameworkSettings,
 };

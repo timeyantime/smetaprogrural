@@ -4,7 +4,12 @@
  */
 
 import { Project, migrateV3toV4 } from '../models/Project.js';
-import { encodeValue as toonEncode, decodeValue as toonDecode, encodeProject as toonEncodeProject, decodeProject as toonDecodeProject } from '../toon.js';
+import {
+  encodeValue as toonEncode,
+  decodeValue as toonDecode,
+  encodeProject as toonEncodeProject,
+  decodeProject as toonDecodeProject,
+} from '../toon.js';
 
 /**
  * Ключи для localStorage
@@ -56,7 +61,7 @@ export function saveProject(project) {
 export function loadProject() {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.DATA);
-    
+
     if (!data) {
       // Пробуем мигрировать из старой версии
       const oldData = localStorage.getItem(STORAGE_KEYS.MIGRATE_FROM);
@@ -70,7 +75,9 @@ export function loadProject() {
     }
 
     // Автоопределение формата: компактный TOON-блок или классический JSON
-    const project = data.startsWith('TOONP1:') ? toonDecodeProject(data.slice('TOONP1:'.length)) : JSON.parse(data);
+    const project = data.startsWith('TOONP1:')
+      ? toonDecodeProject(data.slice('TOONP1:'.length))
+      : JSON.parse(data);
 
     if (!Project.validate(project)) {
       console.error('Invalid project data in storage');
@@ -187,10 +194,16 @@ export function loadPrintSettings() {
         return { cols: settings.cols, titleSheet: !!settings.titleSheet };
       }
     }
-    return { cols: ['basis', 'name', 'type', 'unit', 'qty', 'price', 'total', 'note'], titleSheet: false };
+    return {
+      cols: ['basis', 'name', 'type', 'unit', 'qty', 'price', 'total', 'note'],
+      titleSheet: false,
+    };
   } catch (error) {
     console.error('Failed to load print settings:', error);
-    return { cols: ['basis', 'name', 'type', 'unit', 'qty', 'price', 'total', 'note'], titleSheet: false };
+    return {
+      cols: ['basis', 'name', 'type', 'unit', 'qty', 'price', 'total', 'note'],
+      titleSheet: false,
+    };
   }
 }
 
@@ -216,7 +229,8 @@ export function saveColumnWidths(widths) {
  */
 export function loadColumnWidths() {
   try {
-    const data = localStorage.getItem(STORAGE_KEYS.COLS) || localStorage.getItem('smetapro.v3.cols');
+    const data =
+      localStorage.getItem(STORAGE_KEYS.COLS) || localStorage.getItem('smetapro.v3.cols');
     return data ? JSON.parse(data) : {};
   } catch (error) {
     console.error('Failed to load column widths:', error);

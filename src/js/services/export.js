@@ -59,7 +59,7 @@ export function exportToCsv(project, columns = null) {
   const lines = [];
 
   // Заголовок
-  lines.push(cols.map(col => getColumnLabel(col)).join(';'));
+  lines.push(cols.map((col) => getColumnLabel(col)).join(';'));
 
   // Данные
   for (const section of project.sections) {
@@ -68,7 +68,7 @@ export function exportToCsv(project, columns = null) {
 
     for (const resource of section.resources) {
       const formatted = Resource.formatForDisplay(resource);
-      const row = cols.map(col => {
+      const row = cols.map((col) => {
         const value = formatted[col] !== undefined ? formatted[col] : '';
         return formatCsvValue(value);
       });
@@ -135,7 +135,7 @@ export function exportToExcel(project, columns = null) {
   dataRows.push([]);
 
   // Заголовки колонок
-  const headers = cols.map(col => ({ v: getColumnLabel(col), s: 'Header', t: 's' }));
+  const headers = cols.map((col) => ({ v: getColumnLabel(col), s: 'Header', t: 's' }));
   dataRows.push(headers);
 
   // Данные
@@ -145,10 +145,13 @@ export function exportToExcel(project, columns = null) {
 
     for (const resource of section.resources) {
       const formatted = Resource.formatForDisplay(resource);
-      const row = cols.map(col => {
+      const row = cols.map((col) => {
         const value = formatted[col] !== undefined ? formatted[col] : '';
-        const style = ['price', 'total'].includes(col) ? 'Money' : 
-                      ['qty', 'days'].includes(col) ? 'Num' : 'Default';
+        const style = ['price', 'total'].includes(col)
+          ? 'Money'
+          : ['qty', 'days'].includes(col)
+            ? 'Num'
+            : 'Default';
         return { v: value, s: style };
       });
       dataRows.push(row);
@@ -160,7 +163,9 @@ export function exportToExcel(project, columns = null) {
   // Итоги
   const totals = calculateTotals(project, cols);
   dataRows.push([{ v: 'ИТОГО', s: 'Total', t: 's' }]);
-  dataRows.push(totals.map(val => ({ v: val, s: typeof val === 'number' ? 'Money' : 'Total', t: 's' })));
+  dataRows.push(
+    totals.map((val) => ({ v: val, s: typeof val === 'number' ? 'Money' : 'Total', t: 's' }))
+  );
 
   sheetBlocks.push({ name: 'Смета', rows: dataRows });
 
@@ -216,7 +221,7 @@ function calculateTotals(project, columns) {
 
   totals.total = laborTotal + machineTotal + materialTotal;
 
-  return columns.map(col => {
+  return columns.map((col) => {
     if (col === 'total') return totals.total;
     if (col === 'name') return 'ИТОГО';
     return '';

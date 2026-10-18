@@ -10,7 +10,12 @@ import smetaModule from '../app.js';
 const proto = smetaModule();
 if (!Object.prototype.hasOwnProperty.call(proto, '$nextTick')) {
   Object.defineProperty(proto, '$nextTick', {
-    value: function (fn) { fn && fn(); }, configurable: true, enumerable: false, writable: true,
+    value: function (fn) {
+      fn && fn();
+    },
+    configurable: true,
+    enumerable: false,
+    writable: true,
   });
 }
 
@@ -64,7 +69,12 @@ describe('фаза 1: форматирование и отображение', (
 
   it('rowTotal/sectionTotal считают стоимость', () => {
     expect(obj.rowTotal({ qty: 2, price: 150 })).toBe(300);
-    const sec = { resources: [{ qty: 1, price: 100 }, { qty: 2, price: 50 }] };
+    const sec = {
+      resources: [
+        { qty: 1, price: 100 },
+        { qty: 2, price: 50 },
+      ],
+    };
     expect(obj.sectionTotal(sec)).toBe(200);
   });
 
@@ -126,10 +136,18 @@ describe('фаза 1: форматирование и отображение', (
 
 describe('фаза 1: проблемы сметы (#10)', () => {
   const obj = mk();
-  const mkSection = (name, resources = []) => ({ id: 's1', name, parentId: null, collapsed: false, resources });
+  const mkSection = (name, resources = []) => ({
+    id: 's1',
+    name,
+    parentId: null,
+    collapsed: false,
+    resources,
+  });
   const origSections = () => JSON.parse(JSON.stringify(obj.data.sections));
 
-  beforeEach(() => { obj.data.sections = origSections(); });
+  beforeEach(() => {
+    obj.data.sections = origSections();
+  });
 
   it('пустое название раздела — warn', () => {
     obj.data.sections = [mkSection('')];
@@ -138,7 +156,9 @@ describe('фаза 1: проблемы сметы (#10)', () => {
   });
 
   it('цена ≤ 0 — err, количество ≤ 0 и без единицы — warn', () => {
-    obj.data.sections = [mkSection('S', [{ id: 'r1', name: 'Работа', basis: '', unit: '', qty: 0, price: 0 }])];
+    obj.data.sections = [
+      mkSection('S', [{ id: 'r1', name: 'Работа', basis: '', unit: '', qty: 0, price: 0 }]),
+    ];
     const p = obj.problems.filter((x) => x.id === 'r1');
     expect(p.some((x) => x.sev === 'err' && /цена/.test(x.text))).toBe(true);
     expect(p.some((x) => x.sev === 'warn' && /количество/.test(x.text))).toBe(true);
@@ -146,20 +166,28 @@ describe('фаза 1: проблемы сметы (#10)', () => {
   });
 
   it('корректная запись не даёт проблем', () => {
-    obj.data.sections = [mkSection('S', [{ id: 'r2', name: 'Работа', basis: 'ГЭСН 01', unit: 'м2', qty: 10, price: 500 }])];
+    obj.data.sections = [
+      mkSection('S', [
+        { id: 'r2', name: 'Работа', basis: 'ГЭСН 01', unit: 'м2', qty: 10, price: 500 },
+      ]),
+    ];
     expect(obj.problems.length).toBe(0);
     expect(obj.problemCount()).toBe(0);
   });
 
   it('problemCount фильтрует по severity', () => {
-    obj.data.sections = [mkSection('S', [{ id: 'r3', name: 'Р', basis: '', unit: 'м', qty: 5, price: 0 }])];
+    obj.data.sections = [
+      mkSection('S', [{ id: 'r3', name: 'Р', basis: '', unit: 'м', qty: 5, price: 0 }]),
+    ];
     expect(obj.problemCount('err')).toBe(1);
     expect(obj.problemCount('warn')).toBe(1);
     expect(obj.problemCount()).toBe(2);
   });
 
   it('goToProblem переходит к разделу и записи', () => {
-    obj.data.sections = [mkSection('S', [{ id: 'r9', name: 'Р', basis: 'Б', unit: 'м', qty: 1, price: 1 }])];
+    obj.data.sections = [
+      mkSection('S', [{ id: 'r9', name: 'Р', basis: 'Б', unit: 'м', qty: 1, price: 1 }]),
+    ];
     obj.activeTab = null;
     obj.selectedIds = new Set(['other']);
     obj.historyOpen = true;
@@ -185,7 +213,14 @@ describe('фаза 1: пагинация (#38)', () => {
 
   it('goPage листает с клампом, gotoLastPage ведёт на последнюю', () => {
     // 55 строк → 2 страницы
-    const rows = Array.from({ length: 55 }, (_, i) => ({ id: 'r' + i, name: 'N' + i, basis: '', unit: 'м', qty: 1, price: 1 }));
+    const rows = Array.from({ length: 55 }, (_, i) => ({
+      id: 'r' + i,
+      name: 'N' + i,
+      basis: '',
+      unit: 'м',
+      qty: 1,
+      price: 1,
+    }));
     obj.data.sections[0].resources = rows;
     expect(obj.pageCount).toBe(2);
     obj.goPage(1);
@@ -202,10 +237,32 @@ describe('фаза 1: пагинация (#38)', () => {
 
 describe('фаза 1: редактирование ячеек и строк', () => {
   const obj = mk();
-  const mkRow = (over = {}) => ({ id: 'r1', name: '', basis: '', type: 'material', operator: false, unit: '', qty: 0, price: 0, note: '', days: null, pred: '', startAt: null, ...over });
-  const mkSection = (name, resources = []) => ({ id: 's1', name, parentId: null, collapsed: false, resources });
+  const mkRow = (over = {}) => ({
+    id: 'r1',
+    name: '',
+    basis: '',
+    type: 'material',
+    operator: false,
+    unit: '',
+    qty: 0,
+    price: 0,
+    note: '',
+    days: null,
+    pred: '',
+    startAt: null,
+    ...over,
+  });
+  const mkSection = (name, resources = []) => ({
+    id: 's1',
+    name,
+    parentId: null,
+    collapsed: false,
+    resources,
+  });
 
-  beforeEach(() => { obj.data.sections = [mkSection('S', [])]; });
+  beforeEach(() => {
+    obj.data.sections = [mkSection('S', [])];
+  });
 
   it('commitEdit: Escape закрывает редактирование без изменений', () => {
     const row = mkRow({ name: 'старое' });
@@ -312,10 +369,7 @@ describe('фаза 1: редактирование ячеек и строк', ()
 
   it('drag&drop: startRowDrag запоминает строку, dropOnSection переносит', () => {
     const row = mkRow({ id: 'rd' });
-    obj.data.sections = [
-      mkSection('A', [row]),
-      mkSection('B', []),
-    ];
+    obj.data.sections = [mkSection('A', [row]), mkSection('B', [])];
     const dt = { effectAllowed: null, setData: vi.fn() };
     obj.startRowDrag({ dataTransfer: dt }, { si: 0, row });
     expect(obj.dragRow).toEqual({ si: 0, id: 'rd' });

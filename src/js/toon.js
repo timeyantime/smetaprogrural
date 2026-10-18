@@ -28,7 +28,11 @@ export const TOON_KEYS = Object.freeze({
 
 // Табличные схемы по ключам
 const TOON_SCHEMAS = {
-  [TOON_KEYS.NSB]: ['id', 'basis', 'name', 'type', 'unit', 'code', 'labor', 'mach', 'mat'],
+  [TOON_KEYS.NSB]: ['id', 'basis', 'name', 'type', 'unit', 'price', 'note',
+    // Каркасный метод v2.0: метаданные расценок (нормы отходов, логистика, ночь/праздник)
+    'wasteGroup', 'perUnit', 'unitMassT', 'vehicleCapT', 'distanceKm', 'tariffPerKm', 'supplyFee',
+    'kGabarit', 'manipulatorFlag', 'unloadMachineHr', 'unloadHours', 'moveDistM', 'moveSpeedMh',
+    'perPct', 'storePct', 'perOn', 'storeOn', 'night', 'holiday'],
   [TOON_KEYS.RESOURCES]: ['id', 'basis', 'name', 'type', 'unit', 'code', 'labor', 'mach', 'mat', 'qty', 'price'],
   [TOON_KEYS.HISTORY]: ['time', 'text'],
 };

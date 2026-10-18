@@ -264,8 +264,8 @@ describe('Каркасный метод v2.0 (framework)', () => {
       p.sections = [Section.create('S1')];
       p.sections[0].resources = [Resource.create({ type: 'labor', qty: 10, price: 100 })];
       const t = calculateFrameworkTotals(p);
-      // labor = 10 × 100 × 1.20 = 1200; СП = 10% × 1200 + 25000 = 26200
-      expect(t.sp).toBeCloseTo(26200);
+      // labor = 10 × 100 × 1.20 = 1200; СП = (10/100) × 1200 + 25000 = 120 + 25000 = 25120
+      expect(t.sp).toBeCloseTo(25120);
     });
 
     test('старый проект без framework декодируется без поля (миграция добавит дефолты)', () => {

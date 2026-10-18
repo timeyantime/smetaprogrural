@@ -563,17 +563,8 @@
             </div>
             <div class="at-side-row indent"><span></span><b x-money="sums.sp"></b></div>
 
-            <div class="at-side-row" x-show="!sums.framework">
-              <span>НДС</span>
-              <span class="at-rate">
-                <input class="at-pct" type="number" step="0.1" x-model.number="data.rates.vatPct" />%
-              </span>
-            </div>
-            <div class="at-side-row indent" x-show="!sums.framework"><span></span><b x-money="sums.vat"></b></div>
-
-            <!-- Каркасный метод v2.0: ЛЗ, Налог, Возвратные -->
-            <template x-if="sums.framework">
-              <div>
+            <!-- Каркасный метод v2.0: ЛЗ, Налог, Возвратные (НДС удалён) -->
+            <div>
                 <div class="at-side-row"><span>Лимитированные затраты (ЛЗ)</span><b x-money="sums.lz"></b></div>
                 <div class="at-side-row indent"><span title="Временные здания и сооружения">ВЗ</span><b x-money="sums.lzParts.vz"></b></div>
                 <div class="at-side-row indent"><span title="Зимнее удорожание">ЗУ</span><b x-money="sums.lzParts.zu"></b></div>
@@ -591,10 +582,9 @@
                 </div>
                 <div class="at-side-row indent"><span></span><b x-money="sums.tax"></b></div>
                 <div class="at-side-row"><span title="Металлолом + ликвидация ВЗ">− Возвратные суммы</span><b x-money="-sums.returnable.total"></b></div>
-              </div>
-            </template>
+            </div>
 
-            <div class="at-side-row grand"><span x-text="sums.framework ? 'ИТОГО S = ПЗ+НР+СП+ЛЗ+Нал−Возвр' : 'ИТОГО ПО СМЕТЕ'"></span><b x-money="sums.grand"></b></div>
+            <div class="at-side-row grand"><span>ИТОГО S = ПЗ+НР+СП+ЛЗ+Нал−Возвр</span><b x-money="sums.grand"></b></div>
           </div>
 
           <div class="at-side-section" x-show="selectedIds.size > 0">
@@ -966,11 +956,12 @@
           <p>Та же логика базы, что и для НР:</p>
           <p class="formula">СП = База × Приб%/100</p>
 
-          <h4>7. НДС</h4>
-          <p class="formula">НДС = (ПЗ + НР + СП) × НДС%/100</p>
+          <h4>7. Лимитированные затраты (ЛЗ) и налог</h4>
+          <p class="formula">ЛЗ = ВЗ + ЗУ + Дож + ПП + Т_раб + Гарант + НП (НП = 3% × (ПЗ + НР))</p>
+          <p class="formula">Налог (УСН) = S без налога × 6% (без НДС)</p>
 
-          <h4>8. Итого по смете</h4>
-          <p class="formula grand">ИТОГО = ПЗ + НР + СП + НДС</p>
+          <h4>8. Итого по смете (каркасный метод v2.0)</h4>
+          <p class="formula grand">S = ПЗ + НР + СП + ЛЗ + Нал − Возвр</p>
 
           <h4>9. Диаграмма Ганта</h4>
           <p>Для каждой записи задайте длительность в днях (столбец «Длит., дн.»).

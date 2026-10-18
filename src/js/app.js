@@ -22,7 +22,7 @@ import * as storage from './services/storage.js';
 import * as calculation from './services/calculation.js';
 import * as exportService from './services/export.js';
 import * as validation from './services/validation.js';
-import { roundMoney, roundGrandTotal, ROUND_MODES, ROUND_METHODS } from './rounding.js';
+import { roundMoney, ROUND_MODES, ROUND_METHODS } from './rounding.js';
 import { xmlEsc, svgToPng } from './office.js';
 import { encodeValue as toonEncode, decodeValue as toonDecode } from './toon.js';
 import { formatMoney } from './utils/formatters.js';
@@ -1051,42 +1051,18 @@ window.smeta = function smeta() {
     /**
      * Итоги сметы с применением округления по Методике № 421/пр (п. 58).
      * Расчёты идут с полной точностью; округляются только итоговые статьи.
-     * Если включён каркасный метод (data.framework.enabled) — используется
-     * формула v2.0: S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС).
+     * Каркасный метод v2.0 — единственный расчёт в программе (старый путь с НДС удалён):
+     * S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС).
      */
     get sums() {
-      if (this.data.framework && this.data.framework.enabled) {
-        const fw = calculation.calculateFrameworkTotals(this.data);
-        if (fw) {
-          return {
-            labor: fw.labor, machine: fw.machine, operator: 0, material: fw.material,
-            pz: fw.pz, nr: fw.nr, sp: fw.sp, vat: 0,
-            lz: fw.lz, lzParts: fw.lzParts, tax: fw.tax, vehicleTax: fw.vehicleTax,
-            returnable: fw.returnable, sNoTax: fw.sNoTax,
-            grand: fw.grand, framework: true,
-          };
-        }
-      }
-      const sums = { labor: 0, machine: 0, operator: 0, material: 0 };
-      for (const sec of this.data.sections) {
-        for (const r of sec.resources) {
-          const t = (Number(r.qty) || 0) * (Number(r.price) || 0);
-          if (r.type === 'labor') sums.labor += t;
-          else if (r.type === 'machine') {
-            sums.machine += t;
-            if (r.operator) sums.operator += t;
-          } else sums.material += t;
-        }
-      }
-      sums.pz = sums.labor + sums.machine + sums.material;
-
-      const rate = this.data.rates || {};
-      const baseFor = (base) => (base === 'pz' ? sums.pz : sums.labor + (sums.operator || 0));
-      sums.nr = this.rnd((baseFor(rate.overheadBase) * (Number(rate.overheadPct) || 0)) / 100);
-      sums.sp = this.rnd((baseFor(rate.profitBase) * (Number(rate.profitPct) || 0)) / 100);
-      sums.vat = this.rnd(((sums.pz + sums.nr + sums.sp) * (Number(rate.vatPct) || 0)) / 100);
-      sums.grand = roundGrandTotal(sums.pz + sums.nr + sums.sp + sums.vat);
-      return sums;
+      const fw = calculation.calculateFrameworkTotals(this.data);
+      return {
+        labor: fw.labor, machine: fw.machine, operator: 0, material: fw.material,
+        pz: fw.pz, nr: fw.nr, sp: fw.sp,
+        lz: fw.lz, lzParts: fw.lzParts, tax: fw.tax, vehicleTax: fw.vehicleTax,
+        returnable: fw.returnable, sNoTax: fw.sNoTax,
+        grand: fw.grand, framework: true,
+      };
     },
 
     /**

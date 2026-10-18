@@ -13,8 +13,8 @@
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
        (единый источник округления — src/js/rounding.js). -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-CNB28t4p.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-DK8qJwOZ.css">
+  <script type="module" crossorigin src="/assets/main-BQjGnSCX.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-BZi_9Jcf.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -170,7 +170,7 @@
           <tbody>
             <!-- Плоский список строк текущей области просмотра (виртуализация: 50 строк на страницу, #38) -->
             <template x-for="(item, vi) in pagedRows" :key="item.row.id">
-              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi, dragging: dragRow && dragRow.id === item.row.id, 'drop-above': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'above', 'drop-below': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'below', 'is-section-start': showSectionStarts && item.isSectionStart }"
+              <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi, dragging: dragRow && dragRow.id === item.row.id, 'row-dropped': droppedRowId === item.row.id, 'drop-above': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'above', 'drop-below': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'below', 'is-section-start': showSectionStarts && item.isSectionStart }"
                   :draggable="!!(dragRow && dragRow.id === item.row.id)" @dragend="rowDragEnd(item, $event)"
                   @dragover.prevent="rowDragOver($event, item)" @drop.prevent="rowDrop(item)">
                 <td class="at-cell-num" @dblclick="openRowModal(item)" @contextmenu="openCtxMenu($event, item)">
@@ -327,8 +327,7 @@
           <button class="at-btn at-btn-sm" :class="{ active: ganttCritical }" @click="ganttCritical = !ganttCritical"
                   title="Подсветка критического пути (#49)">⚑ Крит. путь</button>
           <button class="at-btn at-btn-sm" @click="resetAllGanttShifts()" x-show="ganttHasShifts()" title="Вернуть все работы в автоплан">↺ Автоплан</button>
-          <button class="at-btn at-btn-sm" @click="exportGanttPng()" title="Сохранить PNG (#26)">🖼 PNG</button>
-          <button class="at-btn at-btn-sm" @click="exportGanttSvg()" title="Сохранить SVG">⤒ SVG</button>
+          <button class="gh-btn" @click="exportGantt()" title="Экспорт диаграммы Ганта: OK — PNG, Отмена — SVG">⤓ Экспорт…</button>
           <span class="at-gantt-skipped" x-show="ganttData.skipped.length" x-cloak
                 :title="'Записей без длительности: ' + ganttData.skipped.map(s => s.name || '(без названия)').join(', ')">
             ⊘ <b x-text="ganttData.skipped.length"></b> скрыто
@@ -426,6 +425,7 @@
               <th class="at-th"><span class="at-col-type">T</span> Наименование ресурса</th>
               <th class="at-th" style="width:120px"><span class="at-col-type">⬡</span> Тип</th>
               <th class="at-th" style="width:80px"><span class="at-col-type">T</span> Ед. изм.</th>
+              <th class="at-th" style="width:200px"><span class="at-col-type">T</span> Раздел</th>
               <th class="at-th at-th-right" style="width:110px"><span class="at-col-type">#</span> Кол-во всего</th>
               <th class="at-th at-th-right" style="width:130px"><span class="at-col-type">$</span> Средняя цена</th>
               <th class="at-th at-th-right" style="width:140px"><span class="at-col-type">∑</span> Стоимость, ₽</th>
@@ -441,6 +441,7 @@
                     <span class="at-chip" :class="'chip-' + item.e.type" x-text="groupTypeLabel(item.e.type)"></span>
                   </td>
                   <td class="at-cell" x-text="item.e.unit"></td>
+                  <td class="at-cell muted" x-text="[...item.e.sections].join(', ') || '—'"></td>
                   <td class="at-cell at-right num" x-text="fmtNum(item.e.qty)"></td>
                   <td class="at-cell at-right num" x-money="item.avgPrice"></td>
                   <td class="at-cell at-right at-formula"><b x-money="item.e.cost"></b></td>
@@ -448,11 +449,11 @@
                 </tr>
             </template>
             <tr class="at-group-total">
-              <td colspan="6" class="at-right"><b>Итого по всем ресурсам:</b></td>
+              <td colspan="7" class="at-right"><b>Итого по всем ресурсам:</b></td>
               <td class="at-right at-formula"><b x-money="summaryTotalCost()"></b></td>
               <td></td>
             </tr>
-            <tr x-show="!summaryRows.length"><td colspan="8" class="nsb-empty muted">Ничего не найдено.</td></tr>
+            <tr x-show="!summaryRows.length"><td colspan="9" class="nsb-empty muted">Ничего не найдено.</td></tr>
           </tbody>
         </table>
       </div>
@@ -512,11 +513,14 @@
       </nav>
       </div><!-- /.at-content -->
 
+      <!-- Плавающая кнопка возврата панели (видна только когда aside схлопнут) -->
+      <button class="at-sidebar-restore" x-show="sidebarCollapsed" x-cloak
+              @click="sidebarCollapsed = false" title="Развернуть сводную панель">◀ Сводка</button>
+
       <!-- ===== Боковая панель сводки (GitHub-style): полностью прячется влево, тег-ручка остаётся ===== -->
       <aside class="at-sidebar" :class="{ collapsed: sidebarCollapsed }">
-        <button class="at-sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed"
-                :title="sidebarCollapsed ? 'Развернуть сводку' : 'Свернуть сводку'"
-                x-text="sidebarCollapsed ? '◀' : '▶'"></button>
+        <button class="at-sidebar-toggle" x-show="!sidebarCollapsed" @click="sidebarCollapsed = true"
+                title="Свернуть сводку">▶</button>
         <div class="at-sidebar-inner" x-show="!sidebarCollapsed"
              x-transition:enter="sb-enter-active" x-transition:enter-start="sb-enter-start" x-transition:enter-end="sb-enter-end"
              x-transition:leave="sb-leave-active" x-transition:leave-start="sb-leave-start" x-transition:leave-end="sb-leave-end">

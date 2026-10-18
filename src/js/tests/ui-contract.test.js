@@ -137,4 +137,20 @@ describe('UI-контракт: index.html ↔ smeta()', () => {
     expect(rt).not.toBeNull();
     expect(rt[0]).toMatch(/frameworkRowCost/);
   });
+
+  it('раунд 7: единая кнопка экспорта Ганта, анимация drop и столбец «Раздел» в сводке', () => {
+    // PNG/SVG слиты в одну кнопку exportGantt() — из HTML нельзя звать старые методы
+    expect(html).toMatch(/@click="exportGantt\(\)"/);
+    expect(html).not.toMatch(/@click="exportGanttPng\(\)"|@click="exportGanttSvg\(\)"/);
+    // обе реализации остаются только внутренними (вызываются из exportGantt)
+    expect(defined.has('exportGantt')).toBe(true);
+    // вспышка переставленной строки: состояние объявлено, класс привязан, CSS есть
+    expect(appSrc).toMatch(/^\s*droppedRowId:\s*null,/m);
+    expect(html).toMatch(/'row-dropped':\s*droppedRowId === item\.row\.id/);
+    const css = fs.readFileSync(path.join(ROOT, 'src/css/style.css'), 'utf8');
+    expect(css).toMatch(/\.at-row\.row-dropped/);
+    // сводная ведомость: колонка «Раздел» + данные sections
+    expect(html).toMatch(/<th[^>]*>[^<]*<\/?span[^>]*>T<\/span>\s*Раздел<\/th>/);
+    expect(html).toMatch(/\[\.\.\.item\.e\.sections\]\.join\(', '\)/);
+  });
 });

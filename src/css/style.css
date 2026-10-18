@@ -223,10 +223,17 @@ body {
 .at-menu button:hover { background: var(--accent-soft); color: var(--accent); }
 
 /* ============ Область таблицы + сайдбар ============ */
-.at-main { display: flex; flex: 1; min-height: 0; }
+.at-main { display: flex; flex: 1; min-height: 0; overflow: visible; }
 
 /* Колонка контента: виды сверху, панель разделов прижата снизу */
-.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+/* Плавающая кнопка возврата сводной панели (когда aside схлопнут в 0 и ручка не видна) */
+.at-sidebar-restore {
+  position: absolute; right: 8px; top: 8px; z-index: 30;
+  border: 1px solid var(--line-strong); background: #f6f8fa; color: #59636e;
+  border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+}
+.at-sidebar-restore:hover { background: #eef1f4; color: #0969da; }
 
 .at-table-wrap { flex: 1; overflow: auto; min-height: 0; }
 

@@ -207,22 +207,26 @@ body {
 .at-mini-x { border: none; background: none; cursor: pointer; color: inherit; padding: 0 2px; font-size: 11px; }
 .at-count { margin-left: auto; color: var(--muted); font-size: 12px; }
 
+/* Меню колонки — GitHub dropdown style. Прижат к <th> (position:relative),
+   иначе у узких/правых колонок уезжал за пределы экрана («раскрывается, но не видно»). */
 .at-menu {
-  position: absolute; top: calc(100% - 4px); left: 240px; z-index: 30;
-  background: #fff; border: 1px solid var(--line); border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(23,43,77,.18); padding: 4px; min-width: 210px;
+  position: absolute; top: calc(100% + 4px); left: 8px; z-index: 60;
+  background: #fff; border: 1px solid var(--line-strong); border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(140,149,159,.2); padding: 4px; min-width: 210px;
 }
 .at-menu button {
   display: block; width: 100%; text-align: left; border: none; background: none;
   padding: 7px 10px; border-radius: 5px; font-size: 13px; cursor: pointer; color: var(--text);
 }
+/* Правые числовые колонки (Кол-во, Цена, Итого, Дни): меню не должно вылезать за правый край */
+.at-table thead th .at-menu-right { left: auto; right: 2px; }
 .at-menu button:hover { background: var(--accent-soft); color: var(--accent); }
 
 /* ============ Область таблицы + сайдбар ============ */
 .at-main { display: flex; flex: 1; min-height: 0; }
 
 /* Колонка контента: виды сверху, панель разделов прижата снизу */
-.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: visible; }
+.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 .at-table-wrap { flex: 1; overflow: auto; min-height: 0; }
 
@@ -271,6 +275,12 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 }
 .at-row.dragging td { cursor: grabbing; color: var(--muted); }
 /* «Призрачная» строка при drag + плавный сдвиг соседей к линии вставки */
+/* Перенос строки на новое место: подсветка цели + FLIP-анимация «прилёта» (указатель №7) */
+@keyframes row-drop-flash {
+  0%   { background: #ddfbe8; box-shadow: inset 0 0 0 2px #1f883d; }
+  100% { background: transparent; box-shadow: none; }
+}
+.at-row.row-dropped td { animation: row-drop-flash .6s ease-out; }
 .at-row.drop-above td { box-shadow: inset 0 3px 0 -1px #fd8c73; background: #fff8f5; transition: box-shadow .12s ease, background .12s ease; }
 .at-row.drop-below td { box-shadow: inset 0 -3px 0 -1px #fd8c73; background: #fff8f5; transition: box-shadow .12s ease, background .12s ease; }
 .at-add-row td { transition: background .12s ease; }
@@ -365,28 +375,31 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   background: #f6f8fa; position: relative; overflow-y: auto;
   transition: width .25s cubic-bezier(.4, 0, .2, 1);
 }
-/* Полностью прячется: панель схлопывается в 0, наружу торчит только тег-ручка.
-   visibility:hidden нужен, чтобы min-width внутреннего блока не мешал схлопыванию
-   и скрытая панель не перехватывала клики. */
-.at-sidebar.collapsed { width: 0; border-left: none; visibility: hidden; transition-delay: .25s; }
-.at-sidebar:not(.collapsed) { visibility: visible; }
+/* Полностью прячется: панель схлопывается в 0, наружу торчит только тег-ручка */
+.at-sidebar.collapsed { width: 0; border-left: none; }
 .at-sidebar-toggle {
   position: absolute; top: 10px; left: -1px; z-index: 20;
   transform: translateX(-100%);
   border: 1px solid var(--line-strong); border-right: none;
   background: #f6f8fa; color: #59636e;
   border-radius: 6px 0 0 6px;
-  cursor: pointer; padding: 7px 5px; font-size: 11px; line-height: 1;
-  box-shadow: 0 1px 2px rgba(31,35,40,.08); transition: background .12s, color .12s;
+  cursor: pointer; padding: 6px 4px; font-size: 10px; line-height: 1;
+  box-shadow: none; transition: background .12s, color .12s;
 }
+/* Открытая панель: ручка должна оставаться видимой (у aside стоит overflow-y:auto,
+   без этого правила кнопка обрезалась и «сайдбар не прятался/не открывался») */
+.at-sidebar:not(.collapsed) { overflow: visible; }
+.at-sidebar:not(.collapsed)::-webkit-scrollbar { width: 0; }
 .at-sidebar-toggle:hover { background: #eef1f4; color: #0969da; }
-.at-sidebar.collapsed { overflow: visible; }
 .at-sidebar.collapsed .at-sidebar-toggle {
-  left: -26px; transform: none;
+  left: 0; transform: none;
   border-right: 1px solid var(--line-strong);
   border-radius: 6px 0 0 6px;
 }
 .at-sidebar-inner { padding: 16px; min-width: 300px; }
+/* Схлопнутая панель не должна оставлять полосу прокрутки/контент */
+.at-sidebar.collapsed .at-sidebar-inner { visibility: hidden; }
+.at-sidebar.collapsed { overflow: hidden; }
 /* Анимация выезда содержимого сводки */
 .sb-enter-active { transition: opacity .25s ease, transform .25s cubic-bezier(.4, 0, .2, 1); }
 .sb-enter-start { opacity: 0; transform: translateX(24px); }
@@ -483,14 +496,8 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-view-tab:hover { background: var(--hover); color: var(--text); }
 .at-view-tab.active { background: var(--accent-soft); color: var(--accent); border-color: #c4d9fb; font-weight: 600; }
 
-/* Компактный поиск в линии переключателя видов: спейсеры слева и справа
-   центрируют поле по горизонтали относительно строки табов */
-.at-views-spacer { flex: 1 1 0; min-width: 8px; }
-.at-search-inline {
-  flex: 0 0 auto; min-width: 0; width: 230px; background: #f6f8fa;
-  align-self: center; height: 28px; box-sizing: border-box;
-}
-.at-search-inline svg { flex-shrink: 0; }
+/* Компактный поиск в линии переключателя видов (перенесён из отдельного тулбара) */
+.at-search-inline { min-width: 0; width: 230px; margin-left: auto; background: #f6f8fa; }
 .at-search-inline input { min-width: 0; }
 
 /* Плашка «что запрещено» рядом с действиями шапки (GitHub note-style) */
@@ -585,6 +592,26 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-gantt-bar.gb-machine { background: var(--chip-machine-dot); }
 .at-gantt-bar.gb-material { background: var(--chip-material-dot); }
 .at-gantt-bar-label { font-size: 10.5px; color: #fff; font-weight: 600; white-space: nowrap; }
+/* Подсветка критического пути (#49 / указатель №4): красный контур + заливка полосы */
+.at-gantt-bar.critical {
+  outline: 2px solid #cf222e; outline-offset: -1px;
+  box-shadow: 0 0 0 3px rgba(207, 34, 46, .18), 0 1px 2px rgba(23,43,77,.2);
+  filter: saturate(1.4) brightness(.92);
+}
+/* Обработник связи на краю полосы (указатель №3): заметная круглая ручка справа */
+.at-gantt-link-handle {
+  position: absolute; right: -6px; top: 50%; transform: translateY(-50%);
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 2px solid #0969da; color: transparent;
+  font-size: 8px; line-height: 1; display: grid; place-items: center;
+  cursor: crosshair; opacity: 0; transition: opacity .12s ease, transform .12s ease;
+  z-index: 2;
+}
+.at-gantt-bar:hover .at-gantt-link-handle { opacity: 1; }
+.at-gantt-link-handle:hover { transform: translateY(-50%) scale(1.25); background: #ddf4ff; }
+.at-gantt-bar.link-source .at-gantt-link-handle { opacity: 1; background: #0969da; }
+/* Живая связь при рисовании — пунктир */
+.gantt-link-draft { stroke-dasharray: 4 3; }
 .at-gantt-empty { padding: 24px; color: var(--muted); text-align: center; }
 
 /* ============ Модалки: Справочник и НСБ ============ */

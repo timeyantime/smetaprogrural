@@ -13,8 +13,8 @@
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
        (единый источник округления — src/js/rounding.js). -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-B3K0hADm.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-Cn84aQWi.css">
+  <script type="module" crossorigin src="/assets/main-CIOFo9FY.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-CStxu4G7.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -28,55 +28,80 @@
         <input class="at-title-input" x-model="data.title" placeholder="Наименование сметы" />
       </div>
       <div class="at-actions">
-        <button class="at-btn at-btn-primary" :class="{ 'is-saved': savedFlash }" @click="manualSave()"
-                :title="savedTimeText()">
+        <!-- Быстрые действия (GitHub-style): только самое частое -->
+        <button class="gh-btn gh-btn-primary" @click="openAddRecordModal()">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2z"/></svg>
+          Добавить запись
+        </button>
+        <button class="gh-btn" @click="manualSave()" :title="savedTimeText()">
           <template x-if="!savedFlash"><span>💾 Сохранить</span></template>
           <template x-if="savedFlash"><span>✓ Сохранено</span></template>
         </button>
-        <button class="at-btn" @click="$refs.fileImport.click()">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1l3.5 3.5H9v6H7v-6H4.5L8 1zM2 12h12v2H2z"/></svg>
-          Импорт JSON
-        </button>
-        <button class="at-btn" @click="exportJson()">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 15L4.5 11.5H7v-6h2v6h2.5L8 15zM2 3h12V1H2z"/></svg>
-          Экспорт JSON
-        </button>
-        <button class="at-btn" @click="exportCsv()">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
-          Экспорт CSV
-        </button>
-        <button class="at-btn" @click="helpModalOpen = true" title="Как считаются затраты — справочник по методике">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.9 10.6H7.1v-1.4h1.8v1.4zm0-2.6H7.1V4.6h1.8v4.4z"/></svg>
-          Справочник
-        </button>
-        <button class="at-btn" @click="openNsb()" title="Нормативно-справочная база расценок">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M2 2h5v2H2zM9 2h5v2H9zM2 7h5v2H2zM9 7h5v2H9zM2 12h12v2H2z"/></svg>
-          НСБ
-        </button>
-        <button class="at-btn" @click="openResHub()" title="Единый справочник ресурсов: одна цена меняет все строки сметы">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1L15 4.5 8 8 1 4.5zM1 8l7 3.5L15 8M1 11.5l7 3.5 7-3.5"/></svg>
-          Ресурсы
-        </button>
-        <button class="at-btn" @click="openCalc()" title="Калькулятор трудозатрат и машинного времени">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 1h8a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm1 2v2h6V3H5zM5 7v1.5h1.5V7H5zm2.75 0v1.5h1.5V7h-1.5zM5 10v1.5h1.5V10H5zm2.75 0v1.5h1.5V10h-1.5zM5 12.5V14h4.25v-1.5H5z"/></svg>
-          Калькулятор
-        </button>
-        <span class="at-top-sep"></span>
-        <button class="at-btn at-icon-btn" :class="{ 'has-problems': problemCount() > 0 }"
-                @click="historyOpen = !historyOpen" title="Журнал изменений и проверка сметы">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 7 7h-2a5 5 0 1 1-5-5V3.5L10.5 6 8 8V1z"/></svg>
-          Журнал<span class="at-badge" x-show="problemCount() > 0" x-text="problemCount()"></span>
-        </button>
-        <button class="at-btn at-icon-btn" @click="undoAction()" :disabled="!undoStack.length" title="Отменить (Ctrl+Z)">↩</button>
-        <button class="at-btn at-icon-btn" @click="redoAction()" :disabled="!redoStack.length" title="Повторить (Ctrl+Shift+Z)">↪</button>
-        <button class="at-btn" @click="openProjectModal()" title="Реквизиты объекта — для титульного листа печати">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 14V3h6v3h4v8H3zM5 5v1h2V5H5zM5 8v1h4V8H5zM5 11v1h4v-1H5z"/></svg>
-          Объект
-        </button>
-        <button class="at-btn" @click="openPrintModal()">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 5V1h8v4M4 12H2V6h12v6h-2M4 9h8v6H4z"/></svg>
-          Печать ▾
-        </button>
+        <button class="gh-btn" @click="undoAction()" :disabled="!undoStack.length" title="Отменить (Ctrl+Z)">↩</button>
+        <button class="gh-btn" @click="redoAction()" :disabled="!redoStack.length" title="Повторить (Ctrl+Shift+Z)">↪</button>
+
+        <!-- Меню «Ещё»: всё остальное вынесено из шапки, чтобы визуально разгрузить интерфейс -->
+        <div class="gh-menu-wrap" @click.outside="topMenuOpen = false">
+          <button class="gh-btn gh-btn-menu" :class="{ active: topMenuOpen }" @click="topMenuOpen = !topMenuOpen"
+                  title="Меню: разделы, справочники, файл, печать">
+            <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M1 3.75A.75.75 0 0 1 1.75 3h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 3.75zm0 4.25A.75.75 0 0 1 1.75 7h12.5a.75.75 0 0 1 0 1.5H1.75A.75.75 0 0 1 1 8zm1.75 3.25a.75.75 0 0 0 0 1.5h12.5a.75.75 0 0 0 0-1.5H2.75z"/></svg>
+            Меню
+          </button>
+          <div class="gh-menu" x-show="topMenuOpen" x-cloak x-transition.opacity.duration.120ms>
+            <div class="gh-menu-group-title">Разделы</div>
+            <button @click="topMenuOpen = false; openAddSectionModal()">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2z"/></svg>
+              Новый раздел
+            </button>
+            <div class="gh-menu-group-title">Справочники</div>
+            <button @click="topMenuOpen = false; openNsb()" title="Нормативно-справочная база расценок">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M2 2h5v2H2zM9 2h5v2H9zM2 7h5v2H2zM9 7h5v2H9zM2 12h12v2H2z"/></svg>
+              НСБ — расценки
+            </button>
+            <button @click="topMenuOpen = false; openResHub()" title="Единый справочник ресурсов: одна цена меняет все строки сметы">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1L15 4.5 8 8 1 4.5zM1 8l7 3.5L15 8M1 11.5l7 3.5 7-3.5"/></svg>
+              Ресурсы
+            </button>
+            <button @click="topMenuOpen = false; openCalc()" title="Калькулятор трудозатрат и машинного времени">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 1h8a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1zm1 2v2h6V3H5zM5 7v1.5h1.5V7H5zm2.75 0v1.5h1.5V7h-1.5zM5 10v1.5h1.5V10H5zm2.75 0v1.5h1.5V10h-1.5zM5 12.5V14h4.25v-1.5H5z"/></svg>
+              Калькулятор
+            </button>
+            <button @click="topMenuOpen = false; helpModalOpen = true" title="Как считаются затраты — справочник по методике">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.9 10.6H7.1v-1.4h1.8v1.4zm0-2.6H7.1V4.6h1.8v4.4z"/></svg>
+              Справочник методики
+            </button>
+            <div class="gh-menu-sep"></div>
+            <div class="gh-menu-group-title">Файл</div>
+            <button @click="topMenuOpen = false; $nextTick(() => $refs.fileImport.click())">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1l3.5 3.5H9v6H7v-6H4.5L8 1zM2 12h12v2H2z"/></svg>
+              Импорт JSON
+            </button>
+            <button @click="topMenuOpen = false; exportJson()">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 15L4.5 11.5H7v-6h2v6h2.5L8 15zM2 3h12V1H2z"/></svg>
+              Экспорт JSON
+            </button>
+            <button @click="topMenuOpen = false; exportCsv()">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
+              Экспорт CSV
+            </button>
+            <div class="gh-menu-sep"></div>
+            <div class="gh-menu-group-title">Проект</div>
+            <button @click="topMenuOpen = false; openProjectModal()" title="Реквизиты объекта — для титульного листа печати">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 14V3h6v3h4v8H3zM5 5v1h2V5H5zM5 8v1h4V8H5zM5 11v1h4v-1H5z"/></svg>
+              Реквизиты объекта
+            </button>
+            <button @click="topMenuOpen = false; openPrintModal()">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M4 5V1h8v4M4 12H2V6h12v6h-2M4 9h8v6H4z"/></svg>
+              Печать…
+            </button>
+            <button @click="topMenuOpen = false; historyOpen = !historyOpen" :class="{ 'has-problems': problemCount() > 0 }"
+                    title="Журнал изменений и проверка сметы">
+              <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1a7 7 0 1 0 7 7h-2a5 5 0 1 1-5-5V3.5L10.5 6 8 8V1z"/></svg>
+              Журнал и проверка сметы
+              <span class="gh-menu-badge" x-show="problemCount() > 0" x-text="problemCount()"></span>
+            </button>
+          </div>
+        </div>
         <input type="file" x-ref="fileImport" accept=".json" hidden @change="importJson($event)" />
         <input type="file" x-ref="fileNsbImport" accept=".json" hidden @change="importNsb($event)" />
       </div>
@@ -108,12 +133,10 @@
         <button class="at-tab at-tab-add" @click="openAddSectionModal()" title="Добавить раздел">＋</button>
       </div>
       <div class="at-toolbar">
-        <button class="at-btn at-btn-primary at-btn-sm" @click="openAddRecordModal()">
-          <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2"/></svg>
+        <!-- Кнопки «Добавить запись» и «＋ Раздел» вынесены в шапку/меню «Меню» — тулбар разгружен -->
+        <button class="gh-btn gh-btn-primary gh-btn-sm" @click="openAddRecordModal()">
+          <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2z"/></svg>
           Добавить запись
-        </button>
-        <button class="at-btn at-btn-ghost at-btn-sm" @click="openAddSectionModal()">
-          ＋ Раздел
         </button>
         <div class="at-search">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
@@ -122,8 +145,8 @@
         <span class="at-count" x-text="visibleCount() + ' записей'"></span>
       </div>
 
-      <!-- ===== Переключатель видов: Таблица / Диаграмма Ганта (как вью Airtable) ===== -->
-      <div class="at-views">
+      <!-- ===== Переключатель видов (GitHub underline-style) ===== -->
+      <div class="at-views gh-undernav">
         <button class="at-view-tab" :class="{ active: viewTab === 'table' }" @click="viewTab = 'table'">
           <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M1 2h14v3H1zM1 7h14v3H1zM1 12h14v3H1z"/></svg>
           Таблица

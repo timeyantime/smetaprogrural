@@ -367,7 +367,6 @@ window.smeta = function smeta() {
 
     // UI состояние
     filter: '',
-    groupBy: 'none',
     activeTab: null,
     renamingSection: null,
     tabDragFrom: null,
@@ -381,15 +380,12 @@ window.smeta = function smeta() {
     sectionDraft: { name: '', index: null },
     recordModalOpen: false,
     recordDraft: null,
-    sortState: { field: null, dir: 1 },
-    multiSort: [],
     fieldMenuFor: null,
     savedFlash: false,
     lastSavedAt: null,
 
     // UI v4
     viewTab: 'table',
-    groupCollapsed: {},
     page: 0,
     historyOpen: false,
     dragRow: null, // drag&drop строк между разделами (#26)
@@ -402,7 +398,6 @@ window.smeta = function smeta() {
     batchPrice: '',
     batchQty: '',
     batchUnit: '',
-    darkTheme: false,
     cursor: -1,
     calcTab: 'labor',
     calc: {
@@ -493,24 +488,10 @@ window.smeta = function smeta() {
     },
 
     /**
-     * Отсортированные ресурсы
+     * Ресурсы текущей области просмотра (без сортировки — порядок ручной/разделами)
      */
     get sortedRows() {
-      const rows = this.filteredRows;
-      const sort = this.sortState;
-
-      if (!sort.field) return rows;
-
-      return [...rows].sort((a, b) => {
-        const aVal = a.row[sort.field];
-        const bVal = b.row[sort.field];
-        if (aVal === null || aVal === undefined) return 1;
-        if (bVal === null || bVal === undefined) return -1;
-        if (typeof aVal === 'number' && typeof bVal === 'number') {
-          return (aVal - bVal) * sort.dir;
-        }
-        return String(aVal).localeCompare(String(bVal), 'ru') * sort.dir;
-      });
+      return this.filteredRows;
     },
 
     /**
@@ -548,20 +529,6 @@ window.smeta = function smeta() {
     colLabel(key) {
       const col = this.columns.find((c) => c.key === key);
       return col ? col.label : key;
-    },
-
-    /**
-     * Проверяет, отсортирована ли колонка
-     */
-    colSorted(key) {
-      return this.sortState.field === key;
-    },
-
-    /**
-     * Получает направление сортировки
-     */
-    sortDir() {
-      return this.sortState.dir === 1 ? '↑' : '↓';
     },
 
     /**
@@ -728,15 +695,7 @@ window.smeta = function smeta() {
       );
 
       this.$watch('columns', () => this.saveColWidths(), { deep: true });
-      this.$watch('multiSort', () => this.saveUI());
       this.$watch('hiddenCols', () => this.saveUI());
-      this.$watch('darkTheme', () => {
-        document.body.classList.toggle('theme-dark', this.darkTheme);
-        this.saveUI();
-      });
-      this.$watch('viewTab', () => this.saveUI());
-
-      document.body.classList.toggle('theme-dark', this.darkTheme);
 
       // Обработчики клавиш
       window.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -887,11 +846,8 @@ window.smeta = function smeta() {
      */
     loadUI() {
       const ui = storage.loadUISettings();
-      if (ui.darkTheme) this.darkTheme = true;
-      if (Array.isArray(ui.multiSort)) this.multiSort = ui.multiSort;
       if (Array.isArray(ui.hiddenCols)) this.hiddenCols = ui.hiddenCols;
       if (['table', 'gantt', 'summary'].includes(ui.viewTab)) this.viewTab = ui.viewTab;
-      if (ui.groupBy) this.groupBy = ui.groupBy;
     },
 
     /**
@@ -899,11 +855,8 @@ window.smeta = function smeta() {
      */
     saveUI() {
       storage.saveUISettings({
-        darkTheme: this.darkTheme,
-        multiSort: this.multiSort,
         hiddenCols: this.hiddenCols,
         viewTab: this.viewTab,
-        groupBy: this.groupBy,
       });
     },
 
@@ -1053,15 +1006,6 @@ window.smeta = function smeta() {
       this.logActivity('Экспорт в CSV');
     },
 
-    /**
-     * Экспорт в Excel
-     */
-    exportXls() {
-      const blob = exportService.exportToExcel(this.data);
-      exportService.downloadFile(blob, `${this.data.title || 'смета'}.xls`);
-      this.logActivity('Экспорт в Excel');
-    },
-
     // ==========================================
     // История и Undo/Redo
     // ==========================================
@@ -1176,13 +1120,6 @@ window.smeta = function smeta() {
     // ==========================================
     // Утилиты
     // ==========================================
-
-    /**
-     * Переключение темной темы
-     */
-    toggleDarkTheme() {
-      this.darkTheme = !this.darkTheme;
-    },
 
     /**
      * Открытие модального окна помощи
@@ -1905,72 +1842,17 @@ window.smeta = function smeta() {
     },
 
     get visibleGroups() {
-      const groups = [];
-      if (this.groupBy !== 'none') {
-        const map = new Map();
-        for (const item of this.flatRows) {
-          const key = this.groupBy === 'type' ? item.row.type : item.row.unit || '—';
-          if (!map.has(key)) map.set(key, { key, label: this.groupLabel(key), total: 0, count: 0 });
-          map.get(key).total += this.rowTotal(item.row);
-          map.get(key).count++;
-        }
-        groups.push(...map.values());
-      } else if (this.activeTab !== null) {
-        const sec = this.data.sections[this.activeTab];
-        if (sec)
-          groups.push({
-            key: sec.id,
-            label: sec.name,
-            total: this.sectionTotal(sec),
-            count: sec.resources.length,
-          });
-      }
-      return groups;
-    },
-
-    get groupedFlatRows() {
-      if (this.groupBy === 'none') return this.pagedRows;
-      const buckets = new Map();
-      for (const item of this.flatRows) {
-        const key = this.groupBy === 'type' ? item.row.type : item.row.unit || '—';
-        if (!buckets.has(key)) buckets.set(key, []);
-        buckets.get(key).push(item);
-      }
-      const out = [];
-      for (const [key, rows] of buckets) {
-        if (this.groupCollapsed[key]) continue;
-        out.push(...rows);
-      }
-      return out;
-    },
-
-    toggleGroupCollapse(key) {
-      this.groupCollapsed = { ...this.groupCollapsed, [key]: !this.groupCollapsed[key] };
-    },
-
-    groupCollapsedFn(key) {
-      return !!this.groupCollapsed[key];
-    },
-
-    groupLabel(key) {
-      if (this.groupBy === 'unit') return key;
-      return (
+      if (this.activeTab === null) return [];
+      const sec = this.data.sections[this.activeTab];
+      if (!sec) return [];
+      return [
         {
-          labor: 'ЗТ — затраты труда',
-          machine: 'ОМ — эксплуатация машин',
-          material: 'М — материалы',
-        }[key] || key
-      );
-    },
-
-    groupByLabel() {
-      return { type: 'По типу ресурса', unit: 'По единице измерения' }[this.groupBy] || '';
-    },
-
-    setGroupBy(v) {
-      this.groupBy = v;
-      this.toggleGroupMenu = false;
-      this.saveUI();
+          key: sec.id,
+          label: sec.name,
+          total: this.sectionTotal(sec),
+          count: sec.resources.length,
+        },
+      ];
     },
 
     get summaryResources() {
@@ -2108,97 +1990,6 @@ window.smeta = function smeta() {
 
     toggleFieldMenu(col) {
       this.fieldMenuFor = this.fieldMenuFor === col ? null : col;
-    },
-
-    sortDescOrAsc(field) {
-      const order = this.sortState.field === field ? -this.sortState.dir : 1;
-      this.sortState = { field, dir: order };
-      // однократная сортировка сбрасывает многоуровневую (#15)
-      this.multiSort = [{ field, dir: order }];
-      this.applySortToSections();
-      this.fieldMenuFor = null;
-    },
-
-    addSortLevel(field, dir) {
-      const exists = this.multiSort.find((s) => s.field === field);
-      if (exists) exists.dir = dir;
-      else this.multiSort = [...this.multiSort, { field, dir }];
-      this.sortState = { field, dir };
-      this.applySortToSections();
-      this.fieldMenuFor = null;
-    },
-
-    removeSortLevel(field) {
-      const hadLevels = this.multiSort.length > 0;
-      this.multiSort = this.multiSort.filter((s) => s.field !== field);
-      if (!this.multiSort.length) {
-        // все уровни сняты — возвращаем исходный (ручной drag&drop) порядок
-        this.sortState = { field: null, dir: 1 };
-        this.restoreManualOrder();
-      } else if (hadLevels) {
-        // пересортировка по оставшимся уровням поверх текущего порядка
-        this.applySortToSections();
-      }
-      this.fieldMenuFor = null;
-    },
-
-    /**
-     * Восстановить исходный (ручной drag&drop) порядок записей во всех разделах.
-     */
-    restoreManualOrder() {
-      const snap = this.manualOrderSnapshot;
-      if (!snap) return;
-      this.data.sections.forEach((sec, i) => {
-        if (!Array.isArray(snap[i])) return;
-        const byId = new Map(sec.resources.map((r) => [r.id, r]));
-        const ordered = [];
-        for (const id of snap[i]) if (byId.delete(id)) ordered.push(byId.get(id));
-        // новые записи (после снимка) — в конец
-        for (const r of byId.values()) ordered.push(r);
-        sec.resources = ordered;
-      });
-    },
-
-    sortLevelIndex(field) {
-      const i = this.multiSort.findIndex((s) => s.field === field);
-      return i >= 0 ? i + 1 : null;
-    },
-
-    applySortToSections() {
-      const levels = this.multiSort.length
-        ? this.multiSort
-        : this.sortState.field
-          ? [this.sortState]
-          : [];
-      if (!levels.length) {
-        // сортировка снята — восстановить ручной порядок (drag&drop, #15)
-        this.restoreManualOrder();
-        return;
-      }
-      // снимок ручного порядка ДО первой сортировки — для восстановления после отмены
-      if (!this.manualOrderSnapshot) {
-        this.manualOrderSnapshot = this.data.sections.map((sec) => sec.resources.map((r) => r.id));
-      }
-      const val = (r, field) => {
-        if (field === 'type') return this.typeLabel(r);
-        if (field === 'total') return this.rowTotal(r);
-        const v = r[field];
-        return typeof v === 'number' ? v : String(v ?? '').toLowerCase();
-      };
-      for (const sec of this.data.sections) {
-        sec.resources.sort((a, b) => {
-          for (const { field, dir } of levels) {
-            const va = val(a, field),
-              vb = val(b, field);
-            if (va < vb) return -dir;
-            if (va > vb) return dir;
-          }
-          return 0;
-        });
-      }
-      this.logActivity(
-        'Сортировка: ' + levels.map((l) => l.field + (l.dir > 0 ? '↑' : '↓')).join(', ')
-      );
     },
 
     currentTargetSection() {

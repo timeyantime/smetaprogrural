@@ -252,12 +252,14 @@ describe('Каркасный метод v2.0 (framework)', () => {
     test('d_рын и k_ночн сериализуются в схеме toon (не теряются при сохранении)', () => {
       // Регрессия на TODO п.3: поля были вне FRAMEWORK_FIELDS и пропадали в JSON.
       const p = Project.default();
-      p.framework = { ...defaultFrameworkSettings(), dRyn: 25000, kNight: 1.45 };
+      p.framework = { ...p.framework, dRyn: 25000, kNight: 1.45 };
       const encoded = encodeProject(p);
       const decoded = decodeProject(encoded.slice('TOONP1:'.length));
       expect(decoded.framework.dRyn).toBe(25000);
       expect(decoded.framework.kNight).toBe(1.45);
-      // СП = Н_сп * Б_сп + d_рын — надбавка участвует в расчёте после восстановления
+      // СП = Н_сп * Б_сп + d_рын — надбавка участвует в расчёте после восстановления.
+      // Лимитированные обнулены, чтобы sp был изолирован (дождь по дефолту даёт 120 ₽ на ФОТ 1200).
+      p.framework = { ...p.framework, npPct: 0, vzPct: 0, zuPct: 0, ppPct: 0, garantPct: 0, rainDays: 0, workDays: 0 };
       p.rates = { overheadPct: 0, overheadBase: 'labor', profitPct: 10, profitBase: 'labor' };
       p.sections = [Section.create('S1')];
       p.sections[0].resources = [Resource.create({ type: 'labor', qty: 10, price: 100 })];

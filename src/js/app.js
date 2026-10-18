@@ -20,6 +20,7 @@ import { Section } from './models/Section.js';
 import { Resource } from './models/Resource.js';
 import * as storage from './services/storage.js';
 import * as calculation from './services/calculation.js';
+import * as framework from './framework.js';
 import * as exportService from './services/export.js';
 import * as validation from './services/validation.js';
 import { roundMoney, ROUND_MODES, ROUND_METHODS } from './rounding.js';
@@ -1360,8 +1361,36 @@ window.smeta = function smeta() {
     /* ---------- вычисления (#11) — каркасный метод v2.0 ---------- */
 
     rowTotal(row) {
+      if (!row) return 0;
+      try {
+        const fw = this.data && this.data.framework ? this.data.framework : null;
+        return framework.frameworkRowCost(row, fw).total;
+      } catch (e) {
+        // fallback для строк без каркасовых метаданных
+        return (Number(row.qty) || 0) * (Number(row.price) || 0);
+      }
+    },
+
+    /** Детализация стоимости строки: q_факт, p_полн и состав (для проверки расчётов). */
+    rowBreakdown(row) {
       const fw = this.data && this.data.framework ? this.data.framework : null;
-      return calculation.frameworkRowCost(row, fw).total;
+      return framework.frameworkRowCost(row, fw);
+    },
+
+    /** Название группы норм отходов + k для отображения в проверке расчёта. */
+    wasteLabel(groupId) {
+      const g = framework.WASTE_NORMS.find((w) => w.id === groupId);
+      return g ? `${g.material_group} · +${g.pct}` : 'без запаса';
+    },
+
+    /** Контрольная сверка: Σ стоимостей строк грида == ПЗ из свода (расхождение, ₽). */
+    checkPzConvergence() {
+      let gridSum = 0;
+      for (const sec of this.data.sections || []) {
+        for (const r of sec.resources || []) gridSum += this.rowTotal(r);
+      }
+      const pz = Number(this.sums && this.sums.pz) || 0;
+      return { gridSum, pz, diff: gridSum - pz };
     },
 
     sectionTotal(section) {
@@ -1607,21 +1636,6 @@ window.smeta = function smeta() {
     },
 
     /* ---------- Каркасный метод v2.0: строки считаются по frameworkRowCost ---------- */
-
-    rowTotal(row) {
-      const fw = this.data && this.data.framework ? this.data.framework : null;
-      return calculation.frameworkRowCost(row, fw).total;
-    },
-
-    /** Детализация стоимости строки: q_факт, p_полн и состав (для проверки расчётов). */
-    rowBreakdown(row) {
-      const fw = this.data && this.data.framework ? this.data.framework : null;
-      return calculation.frameworkRowCost(row, fw);
-    },
-
-    sectionTotal(section) {
-      return section.resources.reduce((s, r) => s + this.rowTotal(r), 0);
-    },
 
     selectionTotal() {
       let s = 0;

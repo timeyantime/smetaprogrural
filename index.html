@@ -379,19 +379,19 @@
                        @mousedown="startGanttDrag($event, g)"
                        @contextmenu.prevent="onBarContext(g)">
                     <span class="at-gantt-bar-label" x-text="g.days + ' дн.'"></span>
-                    <span class="at-gantt-link-handle" @mousedown.stop @click.stop="ganttLinkClick($event, g)"
-                          title="Клик — начать/закончить связь">#</span>
+                    <span class="at-gantt-link-handle" @mousedown.stop.prevent="startLinkDrag($event, g)"
+                          title="Потяните к другой работе или кликните по ручкам двух работ — связь">⤳</span>
                   </div>
                 </div>
               </div>
             </template>
-            <!-- SVG-слой связей -->
+            <!-- SVG-слой связей: абсолютно поверх всей сетки .at-gantt (координаты 0,0 = левый верхний угол сетки) -->
             <svg class="at-gantt-links" :width="ganttLinksSize.w" :height="ganttLinksSize.h" aria-hidden="true">
               <!-- Vite/parse5 не может сериализовать <template> внутри SVG-контекста
                    (сломанная сборка: "Cannot read properties of undefined (reading 'nodeName')").
                    Эквивалент исходному x-for/x-if: Alpine-компонент ganttLinks() в src/js/app.js
                    перерисовывает этот <g> при изменениях ganttLinkLines / ganttLinkPath. -->
-              <g :data-link-count="ganttLinkLines.length" x-data="ganttLinks()" x-effect="render($el, ganttLinkLines, ganttLinkPath)"></g>
+              <g x-data="ganttLinks()" x-init="init($el)" @cleanup="destroy()" x-effect="render($el, ganttLinkLines, ganttLinkPath)"></g>
               <defs>
                 <marker id="arrowhead" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
                   <polygon points="0 0, 7 3.5, 0 7" fill="#666" />

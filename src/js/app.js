@@ -2490,7 +2490,9 @@ window.smeta = function smeta() {
       }
       /* связи предшественник → преемник и перемещённые полосы (#49):
          сдвиг относительно автоплана, затем каскад по зависимостям */
-      const byNum = new Map(rows.map((g, i) => [i + 1, g]));
+      // Ключ карты — номер строки в ТАБЛИЦЕ (flatRows), т.к. row.pred хранится в этой нумерации.
+      const numByRowId = new Map(this.flatRows.map((it, i) => [it.row.id, i + 1]));
+      const byNum = new Map(rows.map((g) => [numByRowId.get(g.row.id), g]).filter(([n]) => n != null));
       const origLeft = rows.map((g) => g.leftDays);
       const moved = rows.some((g) => Number(g.row.startAt) >= 0);
       if (moved) {
@@ -2502,7 +2504,7 @@ window.smeta = function smeta() {
       const links = [];
       rows.forEach((g, i) => {
         const n = parseInt(String(g.row.pred || '').trim());
-        if (!isFinite(n) || n <= 0 || n === i + 1) return;
+        if (!isFinite(n) || n <= 0 || n === numByRowId.get(g.row.id)) return;
         const pred = byNum.get(n);
         if (!pred) return;
         links.push({ from: pred, to: g });
@@ -2558,20 +2560,41 @@ window.smeta = function smeta() {
 
     get ganttLinkLines() {
       const w = this.ganttDayWidth();
+      // Фолбэк-геометрия (используется только вне браузера / до первой отрисовки):
+      // должна совпадать с CSS: TOP=34 (шкала), SECH=38 (.at-gantt-secrow), ROWH=34 (.at-gantt-row).
       const ROWH = 34,
         SECH = 38,
         TOP = 34;
       const rows = this.ganttData.rows;
       const secCount = this.ganttData.sections.length;
+      // Инкремент при изменении раскладки (ResizeObserver в ganttLinks): заставляет
+      // Alpine пересчитать линии связей после того, как DOM уже отрисован.
+      void this.layoutTick;
+      const tracks = document.querySelectorAll('.at-gantt .at-gantt-track');
       return this.ganttData.links
         .map((l) => {
           const fi = rows.indexOf(l.from);
           const ti = rows.indexOf(l.to);
           if (fi < 0 || ti < 0) return null;
-          const x1 = l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
-          const y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
-          const x2 = l.to.leftDays * w;
-          const y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
+          // Координаты: из DOM (точно), фолбэк — формульная геометрия (вне браузера).
+          let x1, y1, x2, y2;
+          const trackT = tracks[ti];
+          const barF = trackT && tracks[fi] ? tracks[fi].querySelector('.at-gantt-bar') : null;
+          const barT = trackT ? trackT.querySelector('.at-gantt-bar') : null;
+          if (barF && barT) {
+            const rf = barF.getBoundingClientRect();
+            const rt = barT.getBoundingClientRect();
+            const rc = trackT.getBoundingClientRect();
+            x1 = rf.right - rc.left;
+            y1 = rf.top + rf.height / 2 - rc.top;
+            x2 = rt.left - rc.left;
+            y2 = rt.top + rt.height / 2 - rc.top;
+          } else {
+            x1 = l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
+            y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
+            x2 = l.to.leftDays * w;
+            y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
+          }
           // drawio-style: ортогональный маршрутер со скруглёнными углами
           // (правая точка предшественника → вправо → вертикаль → влево → стрелка в цель).
           const r = 6;
@@ -2601,12 +2624,25 @@ window.smeta = function smeta() {
 
     trackGanttLink(e) {
       if (!this.ganttLinkFrom) return;
-      const rect = e.currentTarget.getBoundingClientRect();
+      const grid = e.currentTarget.closest('.at-gantt');
+      if (!grid) return;
+      const rectG = grid.getBoundingClientRect();
       const w = this.ganttDayWidth();
-      const x1 = this.ganttLinkFrom.leftDays * w + Math.max(6, this.ganttLinkFrom.spanDays * w - 4);
-      const y1 = 20;
-      const x2 = e.clientX - rect.left;
-      const y2 = e.clientY - rect.top;
+      // Стартовая точка — правый край полосы источника (координаты слоя связей = координаты .at-gantt)
+      const fi = this.ganttData.rows.indexOf(this.ganttLinkFrom);
+      const tracks = grid.querySelectorAll('.at-gantt-track');
+      let x1, y1;
+      const barF = fi >= 0 && tracks[fi] ? tracks[fi].querySelector('.at-gantt-bar') : null;
+      if (barF) {
+        const rf = barF.getBoundingClientRect();
+        x1 = rf.right - rectG.left;
+        y1 = rf.top + rf.height / 2 - rectG.top;
+      } else {
+        x1 = this.ganttLinkFrom.leftDays * w + Math.max(6, this.ganttLinkFrom.spanDays * w - 4);
+        y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
+      }
+      const x2 = e.clientX - rectG.left;
+      const y2 = e.clientY - rectG.top;
       // превью связи тоже рисоваем кривой drawio-style
       const mx = (x1 + x2) / 2;
       this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
@@ -2666,13 +2702,59 @@ window.smeta = function smeta() {
       } else {
         if (this.ganttLinkFrom !== g) {
           this.pushHistory('Создана связь Ганта');
-          g.row.pred = String(this.rowNumber(this.ganttLinkFrom.row.id));
-          this.logActivity(
-            `Связь: №${this.rowNumber(this.ganttLinkFrom.row.id)} → №${this.rowNumber(g.row.id)}`
-          );
+          // Номер предшественника — в нумерации ТАБЛИЦЫ (rowNumber), т.к. именно так
+          // связи разбираются в геттере ganttData (byNum строится по индексам flatRows).
+          // Раньше здесь использовался индекс строки Ганта (в другой раскладке и с другим
+          // счётом) → связь указывала не на ту работу или терялась («связи не отображаются»).
+          const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
+          if (fromNum == null) {
+            this.logActivity('Не удалось определить номер предшественника — связь не создана');
+          } else {
+            g.row.pred = String(fromNum);
+            this.logActivity(
+              `Связь: №${fromNum} → №${this.rowNumber(g.row.id) ?? '—'}`
+            );
+          }
         }
         this.ganttLinkFrom = null;
+        this.ganttLinkPath = null;
       }
+    },
+
+    /** Начало рисования связи перетаскиванием (drawio-style): зажать ручку и тянуть к цели */
+    startLinkDrag(e, g) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.ganttLinkFrom && this.ganttLinkFrom !== g) {
+        // уже рисуем другую связь — завершаем её на источнике нового mousedown
+        this.ganttLinkClick(e, g);
+        return;
+      }
+      if (!this.ganttLinkFrom) this.ganttLinkFrom = g;
+      const onUp = (ev) => {
+        window.removeEventListener('mouseup', onUp);
+        // Если отпустили над полосой другой работы — создать связь; иначе оставить режим ожидания клика
+        const target = ev.target && ev.target.closest ? ev.target.closest('.at-gantt-bar') : null;
+        if (target && this.ganttLinkFrom) {
+          const rows = this.ganttData.rows;
+          const idx = Array.prototype.findIndex.call(
+            document.querySelectorAll('.at-gantt .at-gantt-track'),
+            (t) => t.contains(target)
+          );
+          const gTo = idx >= 0 ? rows[idx] : null;
+          if (gTo && gTo !== this.ganttLinkFrom) {
+            this.pushHistory('Создана связь Ганта');
+            const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
+            if (fromNum != null) {
+              gTo.row.pred = String(fromNum);
+              this.logActivity(`Связь: №${fromNum} → №${this.rowNumber(gTo.row.id) ?? '—'}`);
+            }
+          }
+        }
+        this.ganttLinkFrom = null;
+        this.ganttLinkPath = null;
+      };
+      window.addEventListener('mouseup', onUp);
     },
 
     removePred(row) {
@@ -2699,9 +2781,19 @@ window.smeta = function smeta() {
     /** Размер SVG-слоя связей (ширина/высота сетки диаграммы) */
     get ganttLinksSize() {
       const g = this.ganttData;
+      void this.layoutTick; // пересчитать после изменения раскладки (ResizeObserver в ganttLinks)
+      // Ширина: правый край самой правой полосы + отступ. Иначе SVG-слой не дотягивается
+      // до дальних полос и связи там обрезаются (выглядит как «связи не отображаются»).
+      const w = this.ganttDayWidth();
+      const maxRight = g.rows.reduce((m, r) => Math.max(m, (r.leftDays + r.spanDays) * w), 0);
+      let h = 34 + g.sections.length * 38 + g.rows.length * 34;
+      if (g.rows.length) {
+        const grid = document.querySelector('.at-gantt');
+        if (grid) h = Math.max(h, grid.getBoundingClientRect().height);
+      }
       return {
-        w: g.totalDays * this.ganttDayWidth(),
-        h: 34 + g.sections.length * 38 + g.rows.length * 34,
+        w: Math.max(g.totalDays * w, maxRight + 24),
+        h,
       };
     },
 
@@ -3007,12 +3099,40 @@ window.smeta = function smeta() {
 // вместо этого связи перерисовываются императивно через x-effect (см. index.html).
 window.ganttLinks = function ganttLinks() {
   const NS = 'http://www.w3.org/2000/svg';
-  let lastCount = -1;
+  let lastKey = '';
   return {
+    layoutTick: 0,
+    _ro: null,
+    init(el) {
+      // После первой отрисовки DOM пересчитываем связи по фактическим координатам полос.
+      requestAnimationFrame(() => {
+        this.layoutTick++;
+      });
+      if (typeof ResizeObserver === 'undefined') return;
+      const grid = el.closest('.at-gantt');
+      if (!grid) return;
+      let raf = 0;
+      this._ro = new ResizeObserver(() => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          this.layoutTick++;
+        });
+      });
+      this._ro.observe(grid);
+    },
+    destroy() {
+      if (this._ro) this._ro.disconnect();
+    },
     render(el, lines, preview) {
-      // Связи: перерисовываем только при изменении набора (без ре-анимации на каждое движение мыши).
-      if (lines.length !== lastCount) {
-        lastCount = lines.length;
+      // Инкремент при изменении раскладки: ResizeObserver в init() подписывает
+      // компонент на пересчёт ganttLinkLines после полной отрисовки DOM.
+      this.layoutTick++;
+      // Связи: перерисовываем только при изменении набора путей (без ре-анимации
+      // на каждое движение мыши). Ключ — содержимое, а не количество: при удалении
+      // одной из нескольких связей тоже нужна перерисовка.
+      const key = lines.join('|');
+      if (key !== lastKey) {
+        lastKey = key;
         el.replaceChildren(
           ...lines.map((d) => {
             const p = document.createElementNS(NS, 'path');

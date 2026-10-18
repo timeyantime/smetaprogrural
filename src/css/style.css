@@ -565,13 +565,17 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .gb-section { background: #4f5b7a; opacity: 0.92; }
 
 /* сводная строка раздела в диаграмме Ганта */
-.at-gantt-secrow { background: #f2f5fa; min-height: 26px; }
+/* Высота 38px = константа SECH в ganttLinkLines() — синхронно с геометрией связей. */
+.at-gantt-secrow { background: #f2f5fa; height: 38px; }
 .at-gantt-secrow .at-gantt-name b { font-size: 12px; }
 .at-gantt-secrow .at-gantt-bar { height: 8px; align-self: center; border-radius: 4px; }
 .at-gantt-secrow .at-gantt-bar-label { display: none; }
 
 .at-gantt-scroll { flex: 1; overflow: auto; }
-.at-gantt { min-width: 100%; width: max-content; }
+/* Абсолютный overlay поверх всей сетки .at-gantt: координаты путей считаются от
+   левого верхнего угла сетки (getBoundingClientRect полос) — связи всегда попадают в полосы. */
+.at-gantt { position: relative; min-width: 100%; width: max-content; }
+.at-gantt-links { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 4; overflow: visible; }
 .at-gantt-scale {
   display: flex; position: sticky; top: 0; z-index: 5; background: #fff;
   border-bottom: 1px solid var(--line-strong); height: 28px;
@@ -586,7 +590,9 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   position: absolute; top: 6px; font-size: 11px; color: var(--muted);
   padding-left: 4px; border-left: 1px solid var(--line);
 }
-.at-gantt-row { display: flex; align-items: stretch; min-height: 30px; border-bottom: 1px solid var(--line); }
+/* Строки диаграммы: фиксированная высота 34px = константа ROWH в ganttLinkLines().
+   Иначе SVG-слой связей разъезжается по вертикали со строками (связи «не отображаются»). */
+.at-gantt-row { display: flex; align-items: stretch; height: 34px; box-sizing: border-box; border-bottom: 1px solid var(--line); }
 .at-gantt-row.is-section-start { border-top: 2px solid var(--line-strong); }
 .at-gantt-name { display: flex; gap: 6px; align-items: center; color: var(--text); font-size: 12.5px; }
 .at-gantt-sec { color: var(--muted); font-weight: 600; }

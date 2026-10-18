@@ -281,7 +281,7 @@ function defaultData() {
 // Фабрики записей (используются методами smeta())
 // ============================================
 
-/** Ключ ресурса для группировки/дедупликации (тонкая обёртка над Resource.getKey) */
+/** Ключ ресурса для дедупликации в справочнике ресурсов (тонкая обёртка над Resource.getKey) */
 function resKey(r) {
   return Resource.getKey(r);
 }
@@ -356,7 +356,7 @@ window.smeta = function smeta() {
     data: loadLocal() || defaultData(),
 
     // Сводная ведомость ресурсов (вид «Сводка»)
-    summaryGroup: 'none', // none | type | unit
+    // Группировки и сортировки запрещены — сводка всегда плоская.
     summarySearch: '',
 
     // Гант: подсветка критического пути (#49)
@@ -419,7 +419,6 @@ window.smeta = function smeta() {
     ganttLinkFrom: null,
     ganttLinkPath: null,
     rowDropTarget: null, // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
-    toggleGroupMenu: false,
 
     // Настройки печати
     printOrientation: 'landscape',
@@ -434,20 +433,20 @@ window.smeta = function smeta() {
     nsbEditId: null,
     nsbDraft: null,
 
-    // Колонки таблицы
+    // Колонки таблицы (сортировка запрещена — порядок ручной / разделами)
     columns: [
-      { key: 'num', label: '#', width: 44, min: 34, sortable: false },
-      { key: 'basis', label: 'Обоснование', width: 120, min: 70, sortable: true },
-      { key: 'name', label: 'Наименование работы и затрат', width: 300, min: 140, sortable: true },
-      { key: 'type', label: 'Тип затрат', width: 150, min: 110, sortable: true },
-      { key: 'unit', label: 'Ед. изм.', width: 90, min: 60, sortable: true },
-      { key: 'qty', label: 'Кол-во', width: 100, min: 70, sortable: true },
-      { key: 'price', label: 'Текущая цена, руб.', width: 120, min: 80, sortable: true },
-      { key: 'total', label: 'Стоимость, руб.', width: 130, min: 90, sortable: true },
-      { key: 'note', label: 'Примечание', width: 190, min: 90, sortable: true },
-      { key: 'days', label: 'Длит., дни', width: 90, min: 60, sortable: true },
-      { key: 'pred', label: 'Преемств.', width: 90, min: 60, sortable: true },
-      { key: 'actions', label: '', width: 118, min: 118, sortable: false },
+      { key: 'num', label: '#', width: 44, min: 34 },
+      { key: 'basis', label: 'Обоснование', width: 120, min: 70 },
+      { key: 'name', label: 'Наименование работы и затрат', width: 300, min: 140 },
+      { key: 'type', label: 'Тип затрат', width: 150, min: 110 },
+      { key: 'unit', label: 'Ед. изм.', width: 90, min: 60 },
+      { key: 'qty', label: 'Кол-во', width: 100, min: 70 },
+      { key: 'price', label: 'Текущая цена, руб.', width: 120, min: 80 },
+      { key: 'total', label: 'Стоимость, руб.', width: 130, min: 90 },
+      { key: 'note', label: 'Примечание', width: 190, min: 90 },
+      { key: 'days', label: 'Длит., дни', width: 90, min: 60 },
+      { key: 'pred', label: 'Преемств.', width: 90, min: 60 },
+      { key: 'actions', label: '', width: 118, min: 118 },
     ],
 
     // ==========================================
@@ -1841,19 +1840,8 @@ window.smeta = function smeta() {
       return Math.max(1, Math.ceil(this.flatRows.length / PAGE_SIZE));
     },
 
-    get visibleGroups() {
-      if (this.activeTab === null) return [];
-      const sec = this.data.sections[this.activeTab];
-      if (!sec) return [];
-      return [
-        {
-          key: sec.id,
-          label: sec.name,
-          total: this.sectionTotal(sec),
-          count: sec.resources.length,
-        },
-      ];
-    },
+    // Групповые итоги удалены: группировки запрещены (см. README «⛔ Запрещено»).
+    // Итог раздела остаётся доступным через sectionTotal(sec).
 
     get summaryResources() {
       const map = new Map();
@@ -2578,40 +2566,19 @@ window.smeta = function smeta() {
       return this.typeLabel({ type });
     },
 
-    /** Строки сводной ведомости с группировкой (#none/type/unit), поиском и нумерацией */
+    /** Строки сводной ведомости (плоские: группировки и сортировки запрещены) */
     get summaryRows() {
       const f = this.summarySearch.trim().toLowerCase();
       const all = this.summaryResources.filter(
         (e) =>
           !f || String(e.name).toLowerCase().includes(f) || String(e.unit).toLowerCase().includes(f)
       );
-      const withAvg = all.map((e) => ({
-        ...e,
+      return all.map((e, i) => ({
+        key: 'r' + i,
+        num: i + 1,
+        e,
         avgPrice: e.qty > 0 ? e.cost / e.qty : e.price || 0,
       }));
-      if (this.summaryGroup === 'none') {
-        return withAvg.map((e, i) => ({ key: 'r' + i, num: i + 1, e, avgPrice: e.avgPrice }));
-      }
-      const groups = new Map();
-      for (const e of withAvg) {
-        const k = this.summaryGroup === 'type' ? e.type : e.unit || '—';
-        if (!groups.has(k)) groups.set(k, []);
-        groups.get(k).push(e);
-      }
-      const out = [];
-      let num = 0;
-      for (const [k, list] of groups) {
-        out.push({
-          key: 'g-' + k,
-          header: true,
-          label: this.summaryGroup === 'type' ? this.groupTypeLabel(k) : k,
-          groupTotal: list.reduce((s, e) => s + e.cost, 0),
-          groupCount: list.reduce((s, e) => s + e.qty, 0),
-        });
-        for (const e of list)
-          out.push({ key: 'g-' + k + '-' + ++num, num, e, avgPrice: e.avgPrice });
-      }
-      return out;
     },
 
     exportSummaryCsv() {
@@ -2635,13 +2602,6 @@ window.smeta = function smeta() {
         );
       }
       this.download('svod-resursy.csv', '\ufeff' + lines.join('\r\n'), 'text/csv;charset=utf-8');
-    },
-
-    sortDescOrAsc2(field) {
-      this.sortState = { field, dir: -1 };
-      this.multiSort = [{ field, dir: -1 }];
-      this.applySortToSections();
-      this.fieldMenuFor = null;
     },
 
     get nsbFiltered() {
@@ -2859,36 +2819,7 @@ window.smeta = function smeta() {
       if (field === 'price') this.syncResourcePrice(item.row);
     },
 
-    mergeSameResources(groupKey) {
-      const items = this.groupedFlatRows.filter((i) => {
-        const k = this.groupBy === 'type' ? i.row.type : i.row.unit || '—';
-        return k === groupKey;
-      });
-      const byName = new Map();
-      for (const i of items) {
-        const k = resKey(i.row);
-        if (!k) continue;
-        if (!byName.has(k)) byName.set(k, []);
-        byName.get(k).push(i);
-      }
-      let merged = 0;
-      for (const [k, list] of byName) {
-        if (list.length < 2) continue;
-        const first = list[0];
-        for (const dup of list.slice(1)) {
-          first.row.qty = Number(
-            ((Number(first.row.qty) || 0) + (Number(dup.row.qty) || 0)).toFixed(6)
-          );
-          if (!first.row.basis && dup.row.basis) first.row.basis = dup.row.basis;
-          if (!first.row.note && dup.row.note) first.row.note = dup.row.note;
-          const sec = this.data.sections[dup.si];
-          sec.resources.splice(sec.resources.indexOf(dup.row), 1);
-          merged++;
-        }
-      }
-      if (merged) this.pushHistory(`Объединено дублей ресурсов: ${merged}`);
-      else alert('В этой группе нет повторяющихся ресурсов с одинаковым наименованием и ценой.');
-    },
+    // mergeSameResources(groupKey) удалён: группировки запрещены (см. README «⛔ Запрещено»).
   };
 };
 

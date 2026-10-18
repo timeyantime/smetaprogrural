@@ -123,7 +123,10 @@ describe('UI-контракт: index.html ↔ smeta()', () => {
   it('удалённый функционал отсутствует в UI: тема, Excel, сортировка/группировка строк', () => {
     expect(html).not.toMatch(/toggleTheme|darkMode|lightMode/i);
     // «Excel» допускается только в баннере-запрете (gh-notice), но не как код/кнопка экспорта
-    const htmlWithoutNotice = html.replace(/<!-- Быстрые действия[\s\S]*?Без тем · Excel · сортировок\s*<\/span>/g, '');
+    const htmlWithoutNotice = html.replace(
+      /<!-- Быстрые действия[\s\S]*?Без тем · Excel · сортировок\s*<\/span>/g,
+      ''
+    );
     expect(htmlWithoutNotice).not.toMatch(/exportExcel|Экспорт Excel|\.xlsx/i);
     expect(htmlWithoutNotice).not.toMatch(/sortBy|toggleGroupMenu|summaryGroup/);
     expect(appSrc).not.toMatch(/toggleTheme|exportExcel|sortBy\s*[:(]|toggleGroupMenu/);

@@ -126,8 +126,35 @@ body {
 .at-btn-sm { padding: 4px 10px; font-size: 12.5px; }
 .at-btn-primary.is-saved { background: #2a5838; border-color: #2a5838; }
 
-/* ============ Вкладки разделов (GitHub underline-nav style) + тулбар ============ */
-.at-tabs-bar { flex-shrink: 0; border-bottom: 1px solid var(--line); }
+/* ============ Вкладки разделов (GitHub underline-nav style) — ВНИЗУ таблицы, как листы AutoCAD ============ */
+.at-tabs-bar { flex-shrink: 0; border-top: 1px solid var(--line); background: #f6f8fa; }
+.at-views-bar { flex-shrink: 0; border-bottom: 1px solid var(--line); background: #fff; }
+/* Нижняя панель прижата к низу области контента */
+.at-tabs-bottom { display: flex; align-items: center; gap: 4px; position: sticky; bottom: 0; z-index: 25; }
+
+/* Кнопка «раскрыть список разделов вверх» (AutoCAD-листы), слева от вкладок */
+.at-section-select-wrap { position: relative; flex-shrink: 0; padding-left: 8px; }
+.at-section-select { white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.at-caret { color: #59636e; font-size: 10px; margin-left: 2px; }
+.at-section-dropdown {
+  position: absolute; bottom: calc(100% + 6px); left: 8px; z-index: 40;
+  min-width: 260px; max-height: 320px; overflow-y: auto;
+  background: #fff; border: 1px solid var(--line-strong); border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(31, 35, 40, .16); padding: 4px;
+}
+.sd-enter-active { transition: opacity .15s ease, transform .15s ease; }
+.sd-hidden { opacity: 0; transform: translateY(6px); }
+.sd-shown { opacity: 1; transform: translateY(0); }
+.at-section-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  border: none; background: none; padding: 7px 10px; border-radius: 6px;
+  font-size: 13px; cursor: pointer; color: #1f2328;
+}
+.at-section-item:hover { background: #f6f8fa; }
+.at-section-item.active { background: #ddf4ff; color: #0969da; font-weight: 600; }
+.at-section-count { margin-left: auto; font-size: 11px; color: #59636e; background: #eaeef2; border-radius: 10px; padding: 1px 7px; }
+.at-section-dd-sep { height: 1px; background: var(--line); margin: 4px 6px; }
+.at-section-add { color: #1a7f37; font-weight: 500; }
 
 .at-tabs {
   display: flex; align-items: flex-end; gap: 0; padding: 0 16px;
@@ -194,7 +221,10 @@ body {
 /* ============ Область таблицы + сайдбар ============ */
 .at-main { display: flex; flex: 1; min-height: 0; }
 
-.at-table-wrap { flex: 1; overflow: auto; }
+/* Колонка контента: виды сверху, панель разделов прижата снизу */
+.at-content { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+.at-table-wrap { flex: 1; overflow: auto; min-height: 0; }
 
 table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
 
@@ -602,7 +632,7 @@ button.danger:hover { background: #fdecec; }
 @media print {
   html, body { height: auto; }
   .app { display: block; height: auto; overflow: visible; }
-  .at-actions, .at-toolbar, .at-views, .at-sidebar-toggle, .at-row-tools, .at-add-row,
+  .at-actions, .at-toolbar, .at-views, .at-views-bar, .at-tabs-bar, .at-sidebar-toggle, .at-row-tools, .at-add-row,
   .at-th-caret, .at-resizer, .at-statusbar .spacer, .at-modal-backdrop,
   .at-gantt-toolbar .at-gantt-info, .at-gantt-skipped { display: none !important; }
   .at-main { display: block; }

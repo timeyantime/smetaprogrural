@@ -552,7 +552,7 @@ export function encodeValue(key, value) {
  * @returns {any}
  */
 export function decodeValue(key, raw) {
-  if (raw == null) return null;
+  if (raw === null || raw === undefined) return null;
   const sc = TOON_SCHEMAS[key];
   if (sc && typeof raw === 'string' && raw.startsWith('TOON1:')) {
     return decodeTable(raw.slice('TOON1:'.length), sc);

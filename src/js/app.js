@@ -900,7 +900,10 @@ window.smeta = function smeta() {
      * Выбор раздела
      */
     selectTab(si) {
+      // Клик по активной вкладке — возврат к списку «Все разделы» (Airtable-поведение).
+      // Смена раздела = мгновенная смена области просмотра таблицы + сброс пагинации.
       this.activeTab = this.activeTab === si ? null : si;
+      this.page = 0;
     },
 
     // ==========================================
@@ -1590,6 +1593,12 @@ window.smeta = function smeta() {
       e.dataTransfer.effectAllowed = 'move';
       try {
         e.dataTransfer.setData('text/plain', item.row.id);
+        // Аккуратный «призрак» строки вместо снимка всей таблицы со скроллом
+        const tr = e.target && e.target.closest ? e.target.closest('tr') : null;
+        if (tr) {
+          const r = tr.getBoundingClientRect();
+          e.dataTransfer.setDragImage(tr, 12, r.height / 2);
+        }
       } catch (err) {
         /* ignore */
       }

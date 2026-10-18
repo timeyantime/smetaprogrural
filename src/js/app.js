@@ -427,6 +427,7 @@ window.smeta = function smeta() {
 
     // Модальные окна
     helpModalOpen: false,
+    topMenuOpen: false, // выпадающее меню «Меню» в шапке (GitHub-style)
     nsbModalOpen: false,
     nsbSearch: '',
     nsbItems: loadNsb(),

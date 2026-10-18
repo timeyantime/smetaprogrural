@@ -459,10 +459,11 @@ window.smeta = function smeta() {
      */
     get flatRows() {
       const result = [];
-      for (let si = 0; si < this.data.sections.length; si++) {
-        const section = this.data.sections[si];
-        for (let ri = 0; ri < section.resources.length; ri++) {
-          result.push({ si, row: section.resources[ri], section });
+      // Область просмотра: активный раздел (или все разделы при activeTab === null)
+      const scope = this.scopedSections;
+      for (const { sec, si } of scope) {
+        for (let ri = 0; ri < sec.resources.length; ri++) {
+          result.push({ si, row: sec.resources[ri], section: sec });
         }
       }
       return result;
@@ -1993,17 +1994,42 @@ window.smeta = function smeta() {
 
     /** Завершение перетаскивания строки — сброс состояния drag/drop-подсветки. */
     rowDragEnd(item, e) {
+      // Если drop произошёл на строку того же раздела — reorder внутри раздела.
+      const target = this.rowDropTarget;
+      if (
+        this.dragRow &&
+        target &&
+        this.dragRow.si === item.si &&
+        this.dragRow.id !== item.row.id
+      ) {
+        this._reorderInSection(this.dragRow.si, this.dragRow.id, item.row.id, target.pos);
+      }
       this.dragRow = null;
       this.rowDropTarget = null;
+    },
+
+    /** Перемещение строки внутри одного раздела относительно целевой (up/down). */
+    _reorderInSection(si, movedId, targetId, pos) {
+      const arr = this.data.sections[si].resources;
+      const from = arr.findIndex((r) => r.id === movedId);
+      if (from < 0) return;
+      let to = arr.findIndex((r) => r.id === targetId);
+      if (to < 0) return;
+      if (pos === 'below') to += 1;
+      if (from < to) to -= 1; // учёт удаления элемента из начала
+      if (to === from) return;
+      this.pushHistory('Перемещение записи');
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
     },
 
     /**
      * Наведение на строку во время drag&drop: определяем половину цели
      * (вставить перед строкой или после неё) и подсвечиваем drop-зону.
-     * Перенос возможен только между разными разделами (как в исходном приложении).
+     * Работает и перенос между разделами, и reorder внутри раздела.
      */
     rowDragOver(e, item) {
-      if (!this.dragRow || this.dragRow.si === item.si) {
+      if (!this.dragRow || this.dragRow.id === item.row.id) {
         if (this.rowDropTarget) this.rowDropTarget = null;
         return;
       }
@@ -2025,7 +2051,7 @@ window.smeta = function smeta() {
     /** Drop строки на другую строку: перенос в раздел цели перед/после целевой записи. */
     rowDrop(item) {
       const target = this.rowDropTarget;
-      this.rowDropTarget = null;
+      // Перенос между разделами (reorder внутри раздела обрабатывается в rowDragEnd).
       if (!this.dragRow || this.dragRow.si === item.si) return;
       const fromSi = this.dragRow.si;
       const movedId = this.dragRow.id;

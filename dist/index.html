@@ -13,8 +13,8 @@
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
        (единый источник округления — src/js/rounding.js). -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-CIOFo9FY.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-CStxu4G7.css">
+  <script type="module" crossorigin src="/assets/main-D_8Sz00M.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-YwOxoXES.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -28,11 +28,8 @@
         <input class="at-title-input" x-model="data.title" placeholder="Наименование сметы" />
       </div>
       <div class="at-actions">
-        <!-- Быстрые действия (GitHub-style): только самое частое -->
-        <button class="gh-btn gh-btn-primary" @click="openAddRecordModal()">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2z"/></svg>
-          Добавить запись
-        </button>
+        <!-- Быстрые действия (GitHub-style): только самое частое.
+             «Добавить запись» — внизу таблицы и в табе раздела; здесь не дублируется. -->
         <button class="gh-btn" @click="manualSave()" :title="savedTimeText()">
           <template x-if="!savedFlash"><span>💾 Сохранить</span></template>
           <template x-if="savedFlash"><span>✓ Сохранено</span></template>
@@ -134,10 +131,6 @@
       </div>
       <div class="at-toolbar">
         <!-- Кнопки «Добавить запись» и «＋ Раздел» вынесены в шапку/меню «Меню» — тулбар разгружен -->
-        <button class="gh-btn gh-btn-primary gh-btn-sm" @click="openAddRecordModal()">
-          <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2z"/></svg>
-          Добавить запись
-        </button>
         <div class="at-search">
           <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
           <input x-model="filter" placeholder="Поиск записей…" />
@@ -201,10 +194,13 @@
             <!-- Плоский список строк текущей области просмотра (виртуализация: 50 строк на страницу, #38) -->
             <template x-for="(item, vi) in pagedRows" :key="item.row.id">
               <tr class="at-row" :class="{ selected: selectedIds.has(item.row.id), cursor: cursor === vi, dragging: dragRow && dragRow.id === item.row.id, 'drop-above': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'above', 'drop-below': rowDropTarget && rowDropTarget.key === item.si + '|' + item.row.id && rowDropTarget.pos === 'below', 'is-section-start': showSectionStarts && item.isSectionStart }"
-                  draggable="true" @dragstart="startRowDrag($event, item)" @dragend="rowDragEnd(item, $event)"
+                  :draggable="!!(dragRow && dragRow.id === item.row.id)" @dragend="rowDragEnd(item, $event)"
                   @dragover.prevent="rowDragOver($event, item)" @drop.prevent="rowDrop(item)">
-                <td class="at-cell-num" @dblclick="openRowModal(item)" @click="toggleSelect(item.row.id)"
-                    @contextmenu="openCtxMenu($event, item)" x-text="item.index"></td>
+                <td class="at-cell-num" @dblclick="openRowModal(item)" @contextmenu="openCtxMenu($event, item)">
+                  <span class="at-drag-handle" title="Перетащите, чтобы переместить строку"
+                        draggable="true" @dragstart="startRowDrag($event, item)">⠿</span>
+                  <span x-text="item.index"></span>
+                </td>
 
                 <td class="at-cell" :class="{ 'print-off': !printColOn('basis') }" @dblclick="openCell('basis', item)" @click="selectOnly(item.row.id)">
                   <template x-if="editing && editing.key === item.row.id + '|basis'">

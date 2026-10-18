@@ -580,3 +580,16 @@ body.printing-gantt {
   .at-tabs-bar { display: none !important; }
   .at-gantt-wrap { display: flex !important; }
 }
+
+/* Ручка перетаскивания строки (первый столбец) */
+.at-drag-handle {
+  display: inline-block;
+  cursor: grab;
+  color: var(--text-3, #8b949e);
+  margin-right: 4px;
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+}
+.at-drag-handle:hover { color: var(--accent); }
+.at-drag-handle:active { cursor: grabbing; }

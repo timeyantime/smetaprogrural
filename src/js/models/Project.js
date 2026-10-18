@@ -19,13 +19,13 @@ export { Resource } from './Resource.js';
 let uidCounter = 0;
 
 /**
- * Ставки для расчетов (накладные, прибыль, НДС)
+ * Ставки для расчетов каркасного метода (НР, СП)
  * @typedef {Object} Rates
- * @property {number} overheadPct - Процент накладных расходов
- * @property {string} overheadBase - База для накладных: 'labor' или 'pz'
- * @property {number} profitPct - Процент прибыли
- * @property {string} profitBase - База для прибыли: 'labor' или 'pz'
- * @property {number} vatPct - Процент НДС
+ * @property {number} overheadPct - Норма Н_нр накладных расходов, % от базы Б_нр
+ * @property {string} overheadBase - База НР: 'labor' (ФОТ) или 'pz'
+ * @property {number} profitPct - Норма Н_сп сметной прибыли, % от базы Б_сп
+ * @property {string} profitBase - База СП: 'labor' (ФОТ) или 'pz'
+ * (НДС удалён: метод «Без НДС», налог — УСН в project.framework.usnPct)
  */
 
 /**
@@ -54,9 +54,10 @@ let uidCounter = 0;
  */
 function frameworkDefaults() {
   return {
-    enabled: false,
+    enabled: true, // каркасный метод v2.0 — единственный расчёт (старый с НДС удалён)
     npPct: 3,
     usnPct: 6,
+    dRyn: 0,
     vzPct: 3,
     zuPct: 0,
     ppPct: 0,
@@ -111,14 +112,13 @@ export class Project {
         overheadBase: 'labor',
         profitPct: 10,
         profitBase: 'labor',
-        vatPct: 20,
       },
       rounding: {
         mode: 'kopecks',
         method: 'math',
       },
-      // Каркасный метод ценообразования v2.0 (см. src/js/framework.js).
-      // enabled=false → классическая цепочка ПЗ→НР→СП→НДС (обратная совместимость).
+      // Каркасный метод ценообразования v2.0 (см. src/js/framework.js) —
+      // единственный расчёт в программе (старая цепочка ПЗ→НР→СП→НДС удалена).
       framework: frameworkDefaults(),
     };
   }

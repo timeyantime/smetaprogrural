@@ -1,12 +1,22 @@
 /**
- * Сервис для расчетов сметы
- * Отвечает за расчет стоимости, накладных, прибыли, НДС
+ * Сервис расчёта сметы — Каркасный метод v2.0 (единственный метод расчёта).
+ *
+ * Источник методологии: TOON-спецификация «Сметная стоимость строительства
+ * (Каркасный метод)» v2.0 / Полный комплект с нормами отходов и логистикой
+ * (анализ от 2026-10-15). Реализация формул — в ../framework.js.
+ *
+ * Старый классический расчёт (ПЗ → НР → СП → НДС) УДАЛЁН и заменён на:
+ *   S = ПЗ + НР + СП + ЛЗ + Нал − Возвр   (без НДС, без дисконтирования)
+ *   • ПЗ = Σ(q_факт × p_полн), q_факт = q_нетто × (1 + k_отх)
+ *   • НР = Σ(q_j × p_j) или Н_нр × Б_нр;  СП = Н_сп × Б_сп + d_рын
+ *   • ЛЗ = ВЗ + ЗУ + Дож + ПП + Т_раб + Гарант + НП;  НП = (ПЗ + НР) × 3%
+ *   • Налог — УСН 6% от S без НДС; транспортный налог/страховка — по сроку
+ *   • Возвр — металлолом + ликвидационная стоимость ВЗ (вычитается из S)
  *
  * ВАЖНО: округление — единый источник истины в ../rounding.js (Методика 421/пр).
- * Здесь roundValue/roundGrandTotal только реэкспортируются, чтобы не дублировать логику.
+ * Здесь roundMoney/roundGrandTotal только реэкспортируются, чтобы не дублировать логику.
  */
 
-import { Resource } from '../models/Resource.js';
 import { Section } from '../models/Section.js';
 import { roundMoney, roundGrandTotal } from '../rounding.js';
 import { frameworkRowCost, calcFrameworkTotals } from '../framework.js';
@@ -25,91 +35,30 @@ export function roundValue(value, mode, method) {
 }
 
 /**
- * Рассчитывает итоги по проекту
- * @param {Object} project - Проект
- * @returns {Object} Итоги проекта
+ * Главная формула каркасного метода v2.0:
+ *   S = ПЗ + НР + СП + ЛЗ + Нал − Возвр
+ * (старый расчёт с НДС удалён — этот метод единственный для всей программы).
+ * @param {Object} project - Проект (данные приложения)
+ * @returns {Object} Итоги проекта по каркасному методу
  */
 export function calculateProjectTotals(project) {
-  if (!project || !project.sections) {
-    return {
-      laborTotal: 0,
-      machineTotal: 0,
-      materialTotal: 0,
-      grandTotal: 0,
-      overhead: 0,
-      profit: 0,
-      vat: 0,
-      totalWithVat: 0,
-    };
-  }
+  const totals = calculateFrameworkTotals(project);
+  if (totals) return totals;
 
-  let laborTotal = 0;
-  let machineTotal = 0;
-  let materialTotal = 0;
-
-  // Рассчитываем итоги по разделам
-  for (const section of project.sections) {
-    const sectionTotals = Section.calculateTotals(section, project.rates);
-    laborTotal += sectionTotals.laborTotal;
-    machineTotal += sectionTotals.machineTotal;
-    materialTotal += sectionTotals.materialTotal;
-  }
-
-  const grandTotal = laborTotal + machineTotal + materialTotal;
-
-  // Рассчитываем накладные расходы
-  const overheadBase = project.rates?.overheadBase || 'labor';
-  const overheadPct = project.rates?.overheadPct || 0;
-  const overheadBaseAmount = getBaseAmount(overheadBase, laborTotal, machineTotal, materialTotal);
-  const overhead = (overheadBaseAmount * overheadPct) / 100;
-
-  // Рассчитываем прибыль
-  const profitBase = project.rates?.profitBase || 'labor';
-  const profitPct = project.rates?.profitPct || 0;
-  const profitBaseAmount = getBaseAmount(profitBase, laborTotal, machineTotal, materialTotal);
-  const profit = (profitBaseAmount * profitPct) / 100;
-
-  // Рассчитываем НДС
-  const vatPct = project.rates?.vatPct || 0;
-  const vatBase = grandTotal + overhead + profit;
-  const vat = (vatBase * vatPct) / 100;
-
-  const totalWithVat = vatBase + vat;
-
+  // Пустой/некорректный проект — нулевая смета той же структуры.
   return {
-    laborTotal,
-    machineTotal,
-    materialTotal,
-    grandTotal,
-    overhead,
-    profit,
-    vat,
-    totalWithVat,
+    labor: 0, machine: 0, material: 0, laborRaw: 0,
+    pz: 0, nr: 0, sp: 0, vat: 0,
+    lz: 0, lzParts: null, tax: 0, vehicleTax: 0,
+    returnable: { scrap: 0, liquidation: 0, total: 0 },
+    sNoTax: 0, grand: 0, framework: true,
   };
 }
 
 /**
- * Получает базовую сумму для расчета накладных/прибыли
- * @param {string} base - База ('labor' или 'pz')
- * @param {number} laborTotal - Итог по работам
- * @param {number} machineTotal - Итог по машинам
- * @param {number} materialTotal - Итог по материалам
- * @returns {number} Базовая сумма
- */
-function getBaseAmount(base, laborTotal, machineTotal, materialTotal) {
-  switch (base) {
-    case 'pz':
-      return laborTotal + machineTotal + materialTotal;
-    case 'labor':
-    default:
-      return laborTotal;
-  }
-}
-
-/**
- * Рассчитывает итоги по разделу
+ * Рассчитывает итоги по разделу (строки × цены, без надбавок метода).
  * @param {Object} section - Раздел
- * @param {Object} rates - Ставки
+ * @param {Object} rates - Ставки (не используются; оставлено для совместимости сигнатуры)
  * @returns {Object} Итоги раздела
  */
 export function calculateSectionTotals(section, rates) {
@@ -117,34 +66,34 @@ export function calculateSectionTotals(section, rates) {
 }
 
 /**
- * Рассчитывает стоимость ресурса.
- * Включает ли каркасный метод (project.framework.enabled) — передавайте вторым
- * аргументом объект проекта; иначе считается классическая формула qty × price.
+ * Стоимость строки ресурса по каркасному методу v2.0:
+ *   труд:      q × (ЗП_база × 1.20 [× k_ночн при ночь/праздник]);
+ *   машины:    q × mach.-ч (без наценки чел-ч, ночь/праздник — множитель);
+ *   материалы: q_факт × p_полн (норма отходов + перевозка + разгрузка + П + Х;
+ *              тара и погрузка исключены — обязанность поставщика).
  * @param {Object} resource - Ресурс
- * @param {Object|null} project - Проект (для режима framework)
+ * @param {Object|null} project - Проект (settings берутся из project.framework)
  * @returns {number} Стоимость ресурса
  */
 export function calculateResourceTotal(resource, project = null) {
-  if (project && project.framework && project.framework.enabled) {
-    return frameworkRowCost(resource, project.framework).total;
-  }
-  return Resource.calculateTotal(resource);
+  const settings = project && project.framework ? project.framework : null;
+  return frameworkRowCost(resource, settings).total;
 }
 
 /**
  * Каркасный метод v2.0: полный расчёт итогов сметы
  *   S = ПЗ + НР + СП + ЛЗ + Нал − Возвр (без НДС)
- * @param {Object} project - Проект (project.framework.enabled должен быть true)
- * @returns {Object|null} Итоги каркасного метода или null, если метод выключен
+ * @param {Object} project - Проект
+ * @returns {Object} Итоги каркасного метода
  */
 export function calculateFrameworkTotals(project) {
-  if (!project || !project.framework || !project.framework.enabled) return null;
+  if (!project || !Array.isArray(project.sections)) return null;
 
   // ПЗ по фактическим объёмам и полным ценам (q_факт, p_полн, наценка труда)
   let laborRaw = 0; // «голый» ФОТ без наценки — не используется, но полезен для отчётов
   let labor = 0, machine = 0, material = 0;
-  const fwSettings = project.framework;
-  for (const sec of project.sections || []) {
+  const fwSettings = project.framework || {};
+  for (const sec of project.sections) {
     const walk = (s) => {
       for (const r of s.resources || []) {
         const c = frameworkRowCost(r, fwSettings);
@@ -161,29 +110,18 @@ export function calculateFrameworkTotals(project) {
   const method = project.rounding?.method || 'math';
   const pz = labor + machine + material;
 
-  // НР и СП — как и в классике (% от базы ФОТ или ПЗ), но округляем по 421/пр
+  // НР и СП: % от базы (ФОТ или ПЗ); к нормативной СП добавляется
+  // рыночная надбавка d_рын (framework.dRyn, ₽): СП = Н_сп * Б_сп + d_рын.
   const baseFor = (base) => (base === 'pz' ? pz : labor);
   const nr = roundMoney((baseFor(project.rates?.overheadBase) * (Number(project.rates?.overheadPct) || 0)) / 100, mode, method);
-  const sp = roundMoney((baseFor(project.rates?.profitBase) * (Number(project.rates?.profitPct) || 0)) / 100, mode, method);
+  const sp = roundMoney(
+    (baseFor(project.rates?.profitBase) * (Number(project.rates?.profitPct) || 0)) / 100
+      + (Number(fwSettings.dRyn) || 0),
+    mode, method,
+  );
 
   const totals = calcFrameworkTotals(project, { pz, nr, sp, laborTotal: labor, mode, method });
-  return { ...totals, labor, machine, material, laborRaw };
-}
-
-/**
- * Рассчитывает стоимость с учетом оператора для машин
- * @param {Object} resource - Ресурс (машина)
- * @returns {number} Стоимость с оператором
- */
-export function calculateMachineTotalWithOperator(resource) {
-  if (!Resource.validate(resource) || resource.type !== 'machine') {
-    return Resource.calculateTotal(resource);
-  }
-
-  // Если есть оператор, добавляем его стоимость
-  // Пока просто возвращаем базовую стоимость
-  // В будущем можно добавить логику для расчета оператора
-  return Resource.calculateTotal(resource);
+  return { ...totals, labor, machine, material, laborRaw, vat: 0, framework: true };
 }
 
 /**
@@ -239,7 +177,6 @@ export default {
   calculateFrameworkTotals,
   roundValue,
   roundGrandTotal,
-  calculateMachineTotalWithOperator,
   calculateSectionDuration,
   calculateProjectDuration,
 };

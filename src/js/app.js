@@ -1876,7 +1876,7 @@ window.smeta = function smeta() {
 
     get summaryResources() {
       const map = new Map();
-      for (const sec of this.data.sections) {
+      this.data.sections.forEach((sec, si) => {
         const secs = this.isChapter(sec) ? sec.children : [sec];
         for (const s of secs) {
           for (const r of s.resources) {
@@ -1891,15 +1891,17 @@ window.smeta = function smeta() {
                 cost: 0,
                 bases: new Set(),
                 uses: 0,
+                sections: new Set(), // имя раздела(ов), где встречается ресурс (указатель №6)
               });
             const e = map.get(k);
             e.qty += Number(r.qty) || 0;
             e.cost += this.rowTotal(r);
             e.uses++;
             if (String(r.basis).trim()) e.bases.add(String(r.basis).trim());
+            e.sections.add(`${si + 1}. ${s.name || '(без названия)'}`);
           }
         }
-      }
+      });
       return [...map.values()].sort((a, b) => b.cost - a.cost);
     },
 
@@ -2048,6 +2050,15 @@ window.smeta = function smeta() {
       this.pushHistory('Перемещение записи');
       const [moved] = arr.splice(from, 1);
       arr.splice(to, 0, moved);
+      this._flashDroppedRow(movedId);
+    },
+
+    /** Подсветка строки после переноса — визуальное подтверждение нового места (указатель №7). */
+    _flashDroppedRow(rowId) {
+      this.droppedRowId = rowId;
+      setTimeout(() => {
+        if (this.droppedRowId === rowId) this.droppedRowId = null;
+      }, 650);
     },
 
     /**
@@ -2093,6 +2104,7 @@ window.smeta = function smeta() {
       else if (target && target.pos === 'below') to += 1;
       toArr.splice(to, 0, moved);
       this.dragRow = null;
+      this._flashDroppedRow(movedId);
     },
 
     openCtxMenu(e, item) {
@@ -2229,8 +2241,8 @@ window.smeta = function smeta() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     },
 
-    exportGanttPng() {
-      const svg = this.buildGanttSVG();
+    exportGanttPng(svgIn) {
+      const svg = svgIn || this.buildGanttSVG();
       if (!svg) {
         alert('Нет работ для экспорта: задайте длительность хотя бы одной записи.');
         return;
@@ -2245,8 +2257,8 @@ window.smeta = function smeta() {
       });
     },
 
-    exportGanttSvg() {
-      const svg = this.buildGanttSVG();
+    exportGanttSvg(svgIn) {
+      const svg = svgIn || this.buildGanttSVG();
       if (!svg) {
         alert('Нет работ для экспорта.');
         return;
@@ -2609,6 +2621,16 @@ window.smeta = function smeta() {
       }
     },
 
+    /** Экспорт Ганта в PNG (указатель №5: PNG/SVG слиты в одну кнопку — выбор формата в диалоге) */
+    exportGantt() {
+      const svg = this.buildGanttSVG();
+      const choice = confirm(
+        'Экспорт диаграммы Ганта.\n\nOK — сохранить как PNG (растровое изображение)\nОтмена — сохранить как SVG (векторный файл)'
+      );
+      if (choice) this.exportGanttPng(svg);
+      else this.exportGanttSvg(svg);
+    },
+
     ganttHasShifts() {
       return this.ganttData.rows.some((g) => Number(g.row.startAt) >= 0);
     },
@@ -2643,13 +2665,14 @@ window.smeta = function smeta() {
 
     exportSummaryCsv() {
       const esc = (v) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-      const lines = ['№;Наименование;Тип;Ед.;Кол-во;Средняя цена;Стоимость;Расценки'];
+      const lines = ['№;Наименование;Раздел;Тип;Ед.;Кол-во;Средняя цена;Стоимость;Расценки'];
       let n = 0;
       for (const e of this.summaryResources) {
         lines.push(
           [
             ++n,
             e.name,
+            [...e.sections].join(', '),
             this.groupTypeLabel(e.type),
             e.unit,
             e.qty,

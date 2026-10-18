@@ -110,37 +110,8 @@
       </div>
     </header>
 
-    <!-- ===== Панель вкладок разделов (как вкладки таблиц Airtable) ===== -->
-    <nav class="at-tabs-bar">
-      <div class="at-tabs">
-        <button class="at-tab" :class="{ active: activeTab === null }" @click="activeTab = null">
-          <span class="at-tab-icon">📋</span> Все разделы
-        </button>
-        <template x-for="(section, si) in data.sections" :key="section.id">
-          <div class="at-tab-wrap" :class="{ 'tab-drop-target': tabDragOver === si }" draggable="true" @dragstart="tabDragFrom = si" @dragend="tabDragFrom = null; tabDragOver = null"
-               @dragover.prevent="tabDragOver = (tabDragFrom !== null && tabDragFrom !== si) ? si : tabDragOver"
-               @dragleave="tabDragOver === si && (tabDragOver = null)"
-               @drop="moveSectionByDrag(si); tabDragOver = null; tabDragFrom = null">
-            <button class="at-tab" :class="{ active: activeTab === si }"
-                    @click="selectTab(si)" @dblclick="startRenameSection(si)">
-              <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
-              <span x-show="renamingSection !== si" x-text="section.name"></span>
-              <input x-show="renamingSection === si" class="at-tab-rename"
-                     x-model="section.name" @blur="renamingSection = null"
-                     @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
-            </button>
-            <button class="at-tab-x" title="Настройки раздела"
-                    @click.stop="openEditSectionModal(si)">⚙</button>
-          </div>
-        </template>
-        <button class="at-tab at-tab-add" @click="openAddSectionModal()" title="Добавить раздел">＋</button>
-      </div>
-      <div class="at-toolbar">
-        <!-- Поиск перенесён в линию видов; счётчик записей — здесь -->
-        <span class="at-count" x-text="visibleCount() + ' записей'"></span>
-      </div>
-
-      <!-- ===== Переключатель видов (GitHub underline-style) ===== -->
+    <!-- ===== Верхняя линия: переключатель видов (GitHub underline-style) ===== -->
+    <nav class="at-views-bar">
       <div class="at-views gh-undernav">
         <button class="at-view-tab" :class="{ active: viewTab === 'table' }" @click="viewTab = 'table'">
           <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M1 2h14v3H1zM1 7h14v3H1zM1 12h14v3H1z"/></svg>
@@ -486,6 +457,60 @@
           </tbody>
         </table>
       </div>
+
+      <!-- ===== Панель вкладок разделов — внизу таблицы (как листы в AutoCAD) ===== -->
+      <nav class="at-tabs-bar at-tabs-bottom" x-show="viewTab === 'table'" x-cloak @click.outside="sectionDropdownOpen = false">
+        <!-- Кнопка раскрытия списка разделов (вверх), слева от вкладок -->
+        <div class="at-section-select-wrap">
+          <button class="gh-btn gh-btn-sm at-section-select" @click="sectionDropdownOpen = !sectionDropdownOpen"
+                  :title="'Текущий: ' + (activeTab === null ? 'Все разделы' : data.sections[activeTab]?.name)">
+            <span class="at-tab-icon">📋</span>
+            <span x-text="activeTab === null ? 'Все разделы' : ((activeTab + 1) + '. ' + (data.sections[activeTab]?.name || ''))"></span>
+            <span class="at-caret">▴</span>
+          </button>
+          <!-- Выпадающий список вверх: любой раздел из перечня -->
+          <div class="at-section-dropdown" x-show="sectionDropdownOpen" x-cloak
+               x-transition:enter="sd-enter-active" x-transition:enter-start="sd-hidden" x-transition:enter-end="sd-shown">
+            <button class="at-section-item" :class="{ active: activeTab === null }" @click="selectSection(null)">
+              <span class="at-tab-icon">📋</span> Все разделы
+              <span class="at-section-count" x-text="visibleCount()"></span>
+            </button>
+            <template x-for="(section, si) in data.sections" :key="section.id">
+              <button class="at-section-item" :class="{ active: activeTab === si }" @click="selectSection(si)">
+                <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
+                <span x-text="section.name"></span>
+                <span class="at-section-count" x-text="sectionRecordCount(si)"></span>
+              </button>
+            </template>
+            <div class="at-section-dd-sep"></div>
+            <button class="at-section-item at-section-add" @click="sectionDropdownOpen = false; openAddSectionModal()">＋ Новый раздел</button>
+          </div>
+        </div>
+        <!-- Вкладки разделов (двойной клик — переименование, ⚙ — настройки, drag — порядок) -->
+        <div class="at-tabs">
+          <template x-for="(section, si) in data.sections" :key="section.id">
+            <div class="at-tab-wrap" :class="{ 'tab-drop-target': tabDragOver === si }" draggable="true" @dragstart="tabDragFrom = si" @dragend="tabDragFrom = null; tabDragOver = null"
+                 @dragover.prevent="tabDragOver = (tabDragFrom !== null && tabDragFrom !== si) ? si : tabDragOver"
+                 @dragleave="tabDragOver === si && (tabDragOver = null)"
+                 @drop="moveSectionByDrag(si); tabDragOver = null; tabDragFrom = null">
+              <button class="at-tab" :class="{ active: activeTab === si }"
+                      @click="selectTab(si)" @dblclick="startRenameSection(si)">
+                <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
+                <span x-show="renamingSection !== si" x-text="section.name"></span>
+                <input x-show="renamingSection === si" class="at-tab-rename"
+                       x-model="section.name" @blur="renamingSection = null"
+                       @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
+              </button>
+              <button class="at-tab-x" title="Настройки раздела"
+                      @click.stop="openEditSectionModal(si)">⚙</button>
+            </div>
+          </template>
+          <button class="at-tab at-tab-add" @click="openAddSectionModal()" title="Добавить раздел">＋</button>
+        </div>
+        <div class="at-toolbar at-toolbar-compact">
+          <span class="at-count" x-text="visibleCount() + ' записей'"></span>
+        </div>
+      </nav>
       </div><!-- /.at-content -->
 
       <!-- ===== Боковая панель сводки (GitHub-style): полностью прячется влево, тег-ручка остаётся ===== -->

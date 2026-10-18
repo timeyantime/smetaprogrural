@@ -13,8 +13,8 @@
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
        (единый источник округления — src/js/rounding.js). -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-D_8Sz00M.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-YwOxoXES.css">
+  <script type="module" crossorigin src="/assets/main-CNB28t4p.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-DK8qJwOZ.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -29,7 +29,12 @@
       </div>
       <div class="at-actions">
         <!-- Быстрые действия (GitHub-style): только самое частое.
-             «Добавить запись» — внизу таблицы и в табе раздела; здесь не дублируется. -->
+             «Добавить запись» — внизу таблицы и в табе раздела; здесь не дублируется.
+             ⛔ Темы (светлая/тёмная), экспорт Excel, сортировки и группировки запрещены (README). -->
+        <span class="gh-notice" title="В этом интерфейсе запрещено: переключение светлой/тёмной темы, экспорт Excel, сортировки и группировки строк. Порядок записей меняется только перетаскиванием.">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM7.25 5a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0V5zM8 12a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>
+          Без тем · Excel · сортировок
+        </span>
         <button class="gh-btn" @click="manualSave()" :title="savedTimeText()">
           <template x-if="!savedFlash"><span>💾 Сохранить</span></template>
           <template x-if="savedFlash"><span>✓ Сохранено</span></template>
@@ -104,41 +109,8 @@
       </div>
     </header>
 
-    <!-- ===== Панель вкладок разделов (как вкладки таблиц Airtable) ===== -->
-    <nav class="at-tabs-bar">
-      <div class="at-tabs">
-        <button class="at-tab" :class="{ active: activeTab === null }" @click="activeTab = null">
-          <span class="at-tab-icon">📋</span> Все разделы
-        </button>
-        <template x-for="(section, si) in data.sections" :key="section.id">
-          <div class="at-tab-wrap" :class="{ 'tab-drop-target': tabDragOver === si }" draggable="true" @dragstart="tabDragFrom = si" @dragend="tabDragFrom = null; tabDragOver = null"
-               @dragover.prevent="tabDragOver = (tabDragFrom !== null && tabDragFrom !== si) ? si : tabDragOver"
-               @dragleave="tabDragOver === si && (tabDragOver = null)"
-               @drop="moveSectionByDrag(si); tabDragOver = null; tabDragFrom = null">
-            <button class="at-tab" :class="{ active: activeTab === si }"
-                    @click="selectTab(si)" @dblclick="startRenameSection(si)">
-              <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
-              <span x-show="renamingSection !== si" x-text="section.name"></span>
-              <input x-show="renamingSection === si" class="at-tab-rename"
-                     x-model="section.name" @blur="renamingSection = null"
-                     @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
-            </button>
-            <button class="at-tab-x" title="Настройки раздела"
-                    @click.stop="openEditSectionModal(si)">⚙</button>
-          </div>
-        </template>
-        <button class="at-tab at-tab-add" @click="openAddSectionModal()" title="Добавить раздел">＋</button>
-      </div>
-      <div class="at-toolbar">
-        <!-- Кнопки «Добавить запись» и «＋ Раздел» вынесены в шапку/меню «Меню» — тулбар разгружен -->
-        <div class="at-search">
-          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
-          <input x-model="filter" placeholder="Поиск записей…" />
-        </div>
-        <span class="at-count" x-text="visibleCount() + ' записей'"></span>
-      </div>
-
-      <!-- ===== Переключатель видов (GitHub underline-style) ===== -->
+    <!-- ===== Верхняя линия: переключатель видов (GitHub underline-style) ===== -->
+    <nav class="at-views-bar">
       <div class="at-views gh-undernav">
         <button class="at-view-tab" :class="{ active: viewTab === 'table' }" @click="viewTab = 'table'">
           <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M1 2h14v3H1zM1 7h14v3H1zM1 12h14v3H1z"/></svg>
@@ -152,6 +124,11 @@
           <svg viewBox="0 0 16 16" width="13" height="13"><path fill="currentColor" d="M2 2h12v3H2zM2 7h8v3H2zM2 12h10v3H2z"/></svg>
           Сводная ведомость ресурсов
         </button>
+        <!-- Поиск записей — компактно в линии переключателя видов (вместо отдельного тулбара) -->
+        <div class="at-search at-search-inline" x-show="viewTab === 'table'" title="Поиск по наименованию, основе, единице, примечанию">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M11.7 10.3a6 6 0 1 0-1.4 1.4l2.5 2.5a1 1 0 0 0 1.4-1.4l-2.5-2.5zM7 10a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+          <input x-model="filter" placeholder="Поиск записей…" />
+        </div>
       </div>
     </nav>
 
@@ -318,16 +295,14 @@
               </tr>
             </template>
 
-            <!-- Строка добавления записей -->
+            <!-- Строка добавления записей (единственное место быстрой вставки — в шапке/тулбаре не дублируется) -->
             <tr class="at-add-row">
               <td class="at-cell-num add" @click="addRow(currentTargetSection())">＋</td>
               <td :colspan="Math.max(1, colSpanFor('total') - 2)" @click="addRow(currentTargetSection())">
-                <span class="at-add-hint">Нажмите, чтобы добавить запись…</span>
+                <span class="at-add-hint"><b>Добавить запись</b><span class="at-add-hint-sub"> · пустая строка в текущем разделе</span></span>
               </td>
               <td :colspan="tailCols() + 1" class="at-add-inline">
-                <button class="at-btn at-btn-sm at-btn-ghost" @click.stop="openAddRecordModal()">
-                  ⤢ Добавить через форму
-                </button>
+                <button class="gh-btn gh-btn-sm" @click.stop="openAddRecordModal()">⤢ Через форму</button>
               </td>
             </tr>
           </tbody>
@@ -481,14 +456,70 @@
           </tbody>
         </table>
       </div>
+
+      <!-- ===== Панель вкладок разделов — внизу таблицы (как листы в AutoCAD) ===== -->
+      <nav class="at-tabs-bar at-tabs-bottom" x-show="viewTab === 'table'" x-cloak @click.outside="sectionDropdownOpen = false">
+        <!-- Кнопка раскрытия списка разделов (вверх), слева от вкладок -->
+        <div class="at-section-select-wrap">
+          <button class="gh-btn gh-btn-sm at-section-select" @click="sectionDropdownOpen = !sectionDropdownOpen"
+                  :title="'Текущий: ' + (activeTab === null ? 'Все разделы' : data.sections[activeTab]?.name)">
+            <span class="at-tab-icon">📋</span>
+            <span x-text="activeTab === null ? 'Все разделы' : ((activeTab + 1) + '. ' + (data.sections[activeTab]?.name || ''))"></span>
+            <span class="at-caret">▴</span>
+          </button>
+          <!-- Выпадающий список вверх: любой раздел из перечня -->
+          <div class="at-section-dropdown" x-show="sectionDropdownOpen" x-cloak
+               x-transition:enter="sd-enter-active" x-transition:enter-start="sd-hidden" x-transition:enter-end="sd-shown">
+            <button class="at-section-item" :class="{ active: activeTab === null }" @click="selectSection(null)">
+              <span class="at-tab-icon">📋</span> Все разделы
+              <span class="at-section-count" x-text="visibleCount()"></span>
+            </button>
+            <template x-for="(section, si) in data.sections" :key="section.id">
+              <button class="at-section-item" :class="{ active: activeTab === si }" @click="selectSection(si)">
+                <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
+                <span x-text="section.name"></span>
+                <span class="at-section-count" x-text="sectionRecordCount(si)"></span>
+              </button>
+            </template>
+            <div class="at-section-dd-sep"></div>
+            <button class="at-section-item at-section-add" @click="sectionDropdownOpen = false; openAddSectionModal()">＋ Новый раздел</button>
+          </div>
+        </div>
+        <!-- Вкладки разделов (двойной клик — переименование, ⚙ — настройки, drag — порядок) -->
+        <div class="at-tabs">
+          <template x-for="(section, si) in data.sections" :key="section.id">
+            <div class="at-tab-wrap" :class="{ 'tab-drop-target': tabDragOver === si }" draggable="true" @dragstart="tabDragFrom = si" @dragend="tabDragFrom = null; tabDragOver = null"
+                 @dragover.prevent="tabDragOver = (tabDragFrom !== null && tabDragFrom !== si) ? si : tabDragOver"
+                 @dragleave="tabDragOver === si && (tabDragOver = null)"
+                 @drop="moveSectionByDrag(si); tabDragOver = null; tabDragFrom = null">
+              <button class="at-tab" :class="{ active: activeTab === si }"
+                      @click="selectTab(si)" @dblclick="startRenameSection(si)">
+                <span class="at-tab-icon" x-text="si + 1 + '.'"></span>
+                <span x-show="renamingSection !== si" x-text="section.name"></span>
+                <input x-show="renamingSection === si" class="at-tab-rename"
+                       x-model="section.name" @blur="renamingSection = null"
+                       @keydown.enter="renamingSection = null" @keydown.esc="renamingSection = null" />
+              </button>
+              <button class="at-tab-x" title="Настройки раздела"
+                      @click.stop="openEditSectionModal(si)">⚙</button>
+            </div>
+          </template>
+          <button class="at-tab at-tab-add" @click="openAddSectionModal()" title="Добавить раздел">＋</button>
+        </div>
+        <div class="at-toolbar at-toolbar-compact">
+          <span class="at-count" x-text="visibleCount() + ' записей'"></span>
+        </div>
+      </nav>
       </div><!-- /.at-content -->
 
-      <!-- ===== Боковая панель сводки ===== -->
+      <!-- ===== Боковая панель сводки (GitHub-style): полностью прячется влево, тег-ручка остаётся ===== -->
       <aside class="at-sidebar" :class="{ collapsed: sidebarCollapsed }">
         <button class="at-sidebar-toggle" @click="sidebarCollapsed = !sidebarCollapsed"
                 :title="sidebarCollapsed ? 'Развернуть сводку' : 'Свернуть сводку'"
                 x-text="sidebarCollapsed ? '◀' : '▶'"></button>
-        <div class="at-sidebar-inner" x-show="!sidebarCollapsed">
+        <div class="at-sidebar-inner" x-show="!sidebarCollapsed"
+             x-transition:enter="sb-enter-active" x-transition:enter-start="sb-enter-start" x-transition:enter-end="sb-enter-end"
+             x-transition:leave="sb-leave-active" x-transition:leave-start="sb-leave-start" x-transition:leave-end="sb-leave-end">
           <h3 class="at-side-title">Сводная стоимость</h3>
 
           <div class="at-stat-grid">

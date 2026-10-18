@@ -428,6 +428,7 @@ window.smeta = function smeta() {
     // Модальные окна
     helpModalOpen: false,
     topMenuOpen: false, // выпадающее меню «Меню» в шапке (GitHub-style)
+    sectionDropdownOpen: false, // список разделов «раскрыть вверх» (AutoCAD-листы, внизу таблицы)
     nsbModalOpen: false,
     nsbSearch: '',
     nsbItems: loadNsb(),
@@ -904,6 +905,23 @@ window.smeta = function smeta() {
       // Смена раздела = мгновенная смена области просмотра таблицы + сброс пагинации.
       this.activeTab = this.activeTab === si ? null : si;
       this.page = 0;
+    },
+
+    /**
+     * Выбор раздела из выпадающего списка (как листы в AutoCAD):
+     * всегда переключает на выбранный, без «тоггла» при повторном клике.
+     */
+    selectSection(si) {
+      this.activeTab = si;
+      this.page = 0;
+      this.sectionDropdownOpen = false;
+    },
+
+    /** Количество записей в разделе (для бейджей в списке разделов). */
+    sectionRecordCount(si) {
+      const sec = this.data.sections[si];
+      if (!sec) return 0;
+      return sec.resources.length;
     },
 
     // ==========================================

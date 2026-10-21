@@ -419,6 +419,15 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .sb-leave-end { opacity: 0; transform: translateX(24px); }
 .at-side-title { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
 
+/* Карточка стоимости выделения (SPEC «UI v2»: стоимость выделения в сайдбаре) */
+.at-selection-card {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 8px 10px; margin-bottom: 12px; font-size: 12.5px;
+}
+.at-selection-label { color: var(--text); }
+.at-selection-value { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+
 .at-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
 .at-stat {
   background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;

@@ -521,6 +521,12 @@
              x-transition:leave="sb-leave-active" x-transition:leave-start="sb-leave-start" x-transition:leave-end="sb-leave-end">
           <h3 class="at-side-title">Сводная стоимость</h3>
 
+          <!-- Стоимость выделения (Airtable-style): появляется при выделении записей -->
+          <div class="at-selection-card" x-show="selectedIds.size" x-cloak>
+            <span class="at-selection-label">Выделено записей: <b x-text="selectedIds.size"></b></span>
+            <span class="at-selection-value" x-money="selectedCost()"></span>
+          </div>
+
           <div class="at-stat-grid">
             <div class="at-stat"><span class="at-stat-label">ЗТ — труд</span>
               <span class="at-stat-value chip-text-labor" x-money="sums.labor"></span></div>

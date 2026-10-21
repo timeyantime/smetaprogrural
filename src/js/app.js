@@ -1266,6 +1266,15 @@ window.smeta = function smeta() {
       this.editing = { key: item.row.id + '|' + field };
     },
 
+    /** Стоимость всех выделенных записей (показывается в сайдбаре, SPEC «UI v2») */
+    selectedCost() {
+      let s = 0;
+      if (!this.selectedIds.size) return 0;
+      for (const sec of this.data.sections)
+        for (const r of sec.resources) if (this.selectedIds.has(r.id)) s += this.rowTotal(r);
+      return s;
+    },
+
     /** Удаление выделенных записей */
     removeSelected() {
       if (!this.selectedIds.size) return;

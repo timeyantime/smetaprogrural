@@ -2492,7 +2492,11 @@ window.smeta = function smeta() {
          сдвиг относительно автоплана, затем каскад по зависимостям */
       // Ключ карты — номер строки в ТАБЛИЦЕ (flatRows), т.к. row.pred хранится в этой нумерации.
       const numByRowId = new Map(this.flatRows.map((it, i) => [it.row.id, i + 1]));
-      const byNum = new Map(rows.map((g) => [numByRowId.get(g.row.id), g]).filter(([n]) => n != null));
+      const byNum = new Map(
+        rows
+          .map((g) => [numByRowId.get(g.row.id), g])
+          .filter(([n]) => n !== undefined && n !== null)
+      );
       const origLeft = rows.map((g) => g.leftDays);
       const moved = rows.some((g) => Number(g.row.startAt) >= 0);
       if (moved) {
@@ -2608,7 +2612,12 @@ window.smeta = function smeta() {
             d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2 - 7},${y2}`;
           } else {
             // классический Гант: «ступенька» со скруглениями
-            const rr = Math.min(r, ady / 2, Math.max(0, (midX - x1) / 2), Math.max(0, (x2 - 7 - midX) / 2));
+            const rr = Math.min(
+              r,
+              ady / 2,
+              Math.max(0, (midX - x1) / 2),
+              Math.max(0, (x2 - 7 - midX) / 2)
+            );
             const sgn = dy >= 0 ? 1 : -1;
             d =
               `M${x1},${y1} H${midX - rr}` +
@@ -2707,13 +2716,11 @@ window.smeta = function smeta() {
           // Раньше здесь использовался индекс строки Ганта (в другой раскладке и с другим
           // счётом) → связь указывала не на ту работу или терялась («связи не отображаются»).
           const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
-          if (fromNum == null) {
+          if (fromNum === null || fromNum === undefined) {
             this.logActivity('Не удалось определить номер предшественника — связь не создана');
           } else {
             g.row.pred = String(fromNum);
-            this.logActivity(
-              `Связь: №${fromNum} → №${this.rowNumber(g.row.id) ?? '—'}`
-            );
+            this.logActivity(`Связь: №${fromNum} → №${this.rowNumber(g.row.id) ?? '—'}`);
           }
         }
         this.ganttLinkFrom = null;
@@ -2745,7 +2752,7 @@ window.smeta = function smeta() {
           if (gTo && gTo !== this.ganttLinkFrom) {
             this.pushHistory('Создана связь Ганта');
             const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
-            if (fromNum != null) {
+            if (fromNum !== null && fromNum !== undefined) {
               gTo.row.pred = String(fromNum);
               this.logActivity(`Связь: №${fromNum} → №${this.rowNumber(gTo.row.id) ?? '—'}`);
             }

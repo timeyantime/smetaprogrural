@@ -31,7 +31,7 @@
 - `npm run build` — успешно.
 
 ## Проверка
-- [x] npx vitest run → 187/187 (включая новый контрактный тест UI index.html ↔ smeta())
+- [x] npx vitest run → 188/188 (включая новый контрактный тест UI index.html ↔ smeta())
 - [x] dev-сервер: http://localhost:8080 отдаёт страницу, app.js — 200 OK
 - [x] npx eslint src → 0 errors
 - [x] npm run build → OK

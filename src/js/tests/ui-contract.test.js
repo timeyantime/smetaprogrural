@@ -8,7 +8,20 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const appSrc = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
+const appSrcFull = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
+// Тело только smeta(): до window.ganttLinks — иначе ключи второго Alpine-компонента
+// (init и т.п.) ложно считаются дублями.
+const ganttStart = appSrcFull.indexOf('window.ganttLinks');
+const appSrc = ganttStart === -1 ? appSrcFull : appSrcFull.slice(0, ganttStart);
+// Ключи вспомогательного компонента ganttLinks() (init/destroy/render…) — не часть smeta().
+const ganttKeys = new Set();
+if (ganttStart !== -1) {
+  for (const m of appSrcFull
+    .slice(ganttStart)
+    .matchAll(/^ {4}(?:get |set )?([A-Za-z_][\w]*)\s*[:(]/gm)) {
+    ganttKeys.add(m[1]);
+  }
+}
 
 // имена методов/геттеров, объявленных в smeta() (отступ 4 пробела)
 const defined = new Set();
@@ -102,7 +115,7 @@ describe('UI-контракт: index.html ↔ smeta()', () => {
     for (const attr of html.matchAll(/(?:@[\w.-]+|x-show|x-text|x-if|:href)="([^"]+)"/g)) {
       for (const call of attr[1].matchAll(/(?:^|[^.\w$])([A-Za-z_][\w]*)\s*\(/g)) {
         const name = call[1];
-        if (!defined.has(name) && !BUILTINS.has(name)) missing.add(name);
+        if (!defined.has(name) && !ganttKeys.has(name) && !BUILTINS.has(name)) missing.add(name);
       }
     }
     expect([...missing]).toEqual([]);

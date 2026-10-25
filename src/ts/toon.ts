@@ -287,7 +287,12 @@ export function decodeTable(src, fields) {
  * Блок: @name[field1,field2,...] + строки значений.
  * opts.childField — поле-массив дочерних объектов, сериализуется JSON-ячейкой.
  */
-function encodeBlock(name, fields, rows, opts = {}) {
+function encodeBlock(
+  name: string,
+  fields: string[],
+  rows: any[],
+  opts: { childField?: string; jsonFields?: string[] } = {}
+) {
   const cf = opts.childField;
   // поле-массив (дочерние разделы) сериализуем JSON-ячейкой прямо в схеме
   const jsonFields = new Set(opts.jsonFields || (cf ? [cf] : []));
@@ -329,7 +334,7 @@ function defaultFor(f) {
   return null; // days, startAt, parentId, id...
 }
 
-function decodeBlockRows(lines, fields, jsonCols) {
+function decodeBlockRows(lines, fields, jsonCols = []) {
   const jc = jsonCols || [];
   const out = [];
   for (const line of lines) {
@@ -452,7 +457,7 @@ export function decodeProject(payload) {
       const nm = b.header.slice(0, b.header.indexOf('['));
       return nm === name;
     });
-  const project = {};
+  const project: Record<string, any> = {};
   const metaB = find('meta');
   if (metaB) {
     const m = /^\[(.+)\]$/.exec(metaB.header.slice(4));

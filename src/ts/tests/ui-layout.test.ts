@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { JSDOM } from 'jsdom';
-import smetaModule from '../app.js';
+import smetaModule from '../app.ts';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const htmlSrc = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');

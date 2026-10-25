@@ -1221,7 +1221,7 @@ window.smeta = function smeta() {
     startRenameSection(si) {
       this.renamingSection = si;
       this.$nextTick(() => {
-        const el = document.querySelector('.at-tab-wrap .at-tab-rename');
+        const el = document.querySelector<HTMLInputElement>('.at-tab-wrap .at-tab-rename');
         if (el) {
           el.focus();
           el.select();
@@ -2070,7 +2070,7 @@ window.smeta = function smeta() {
       const prev = this._rowRects || new Map();
       requestAnimationFrame(() => {
         const anims = [];
-        document.querySelectorAll(sel).forEach((tr) => {
+        document.querySelectorAll<HTMLTableRowElement>(sel).forEach((tr) => {
           const id = tr.dataset.rowId;
           const now = tr.getBoundingClientRect();
           const before = prev.get(id);
@@ -2116,7 +2116,7 @@ window.smeta = function smeta() {
     /** Снимок вертикальных позиций строк таблицы (для FLIP-анимации). */
     _captureRowRects() {
       const map = new Map();
-      document.querySelectorAll('tr.at-row[data-row-id]').forEach((tr) => {
+      document.querySelectorAll<HTMLTableRowElement>('tr.at-row[data-row-id]').forEach((tr) => {
         map.set(tr.dataset.rowId, tr.getBoundingClientRect());
       });
       return map;
@@ -2506,11 +2506,14 @@ window.smeta = function smeta() {
       /* связи предшественник → преемник и перемещённые полосы (#49):
          сдвиг относительно автоплана, затем каскад по зависимостям */
       // Ключ карты — номер строки в ТАБЛИЦЕ (flatRows), т.к. row.pred хранится в этой нумерации.
-      const numByRowId = new Map(this.flatRows.map((it, i) => [it.row.id, i + 1]));
-      const byNum = new Map(
+      const numByRowId = new Map<string, number>(this.flatRows.map((it, i) => [it.row.id, i + 1]));
+      const byNum = new Map<number, any>(
         rows
-          .map((g) => [numByRowId.get(g.row.id), g])
-          .filter(([n]) => n !== undefined && n !== null)
+          .map((g): [number, any] | null => {
+            const n = numByRowId.get(g.row.id);
+            return n === undefined || n === null ? null : [n, g];
+          })
+          .filter((e): e is [number, any] => e !== null)
       );
       const origLeft = rows.map((g) => g.leftDays);
       const moved = rows.some((g) => Number(g.row.startAt) >= 0);
@@ -3091,14 +3094,14 @@ window.smeta = function smeta() {
     },
 
     suggestionsFor(field, item) {
-      const vals = new Set();
+      const vals = new Set<string>();
       for (const sec of this.data.sections) {
         for (const r of sec.resources) {
           const v = field === 'total' ? null : r[field];
           if (v !== '' && v !== null && !(Number(v) === 0)) vals.add(String(v));
         }
       }
-      let arr = [...vals].sort((a, b) => a.localeCompare(b, 'ru'));
+      let arr: string[] = [...vals].sort((a, b) => a.localeCompare(b, 'ru'));
       // для предшественника — номера существующих записей
       if (field === 'pred') {
         arr = this.flatRows.filter((i) => i.row.id !== item.row.id).map((i) => String(i.index));
@@ -3180,7 +3183,7 @@ window.ganttLinks = function ganttLinks() {
         });
       }
       // Превью рисования связи — отдельный слой поверх (обновляется каждый mousemove).
-      let pv = document.getElementById('gantt-link-preview-layer');
+      let pv = document.getElementById('gantt-link-preview-layer') as unknown as SVGGElement | null;
       if (!preview && !pv) return;
       if (!pv) {
         pv = document.createElementNS(NS, 'g');

@@ -251,7 +251,7 @@ export const RESOURCE_DEFAULT_META = Object.freeze({
 
 /** Объединяет метаданные ресурса со значениями по умолчанию. */
 export function normalizeResMeta(resource) {
-  const out = {};
+  const out: Record<string, any> = {};
   for (const k of Object.keys(RESOURCE_DEFAULT_META)) {
     out[k] =
       resource && resource[k] !== undefined && resource[k] !== null
@@ -303,7 +303,7 @@ export function calcLimitedCosts(pz, nr, spres, laborTotal, settings, mode, meth
 
 // Строки прямых лимитированных затрат передаются отдельно (см. collect в app.js)
 let _limitedRows = [];
-function resOf() {
+function resOf(_settings?: unknown) {
   return _limitedRows;
 }
 function directSum(kind, rows) {

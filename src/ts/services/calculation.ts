@@ -3,7 +3,7 @@
  *
  * Источник методологии: TOON-спецификация «Сметная стоимость строительства
  * (Каркасный метод)» v2.0 / Полный комплект с нормами отходов и логистикой
- * (анализ от 2026-10-15). Реализация формул — в ../framework.js.
+ * (анализ от 2026-10-15). Реализация формул — в ../framework.ts.
  *
  * Старый классический расчёт (ПЗ → НР → СП → НДС) УДАЛЁН и заменён на:
  *   S = ПЗ + НР + СП + ЛЗ + Нал − Возвр   (без НДС, без дисконтирования)
@@ -13,18 +13,18 @@
  *   • Налог — УСН 6% от S без НДС; транспортный налог/страховка — по сроку
  *   • Возвр — металлолом + ликвидационная стоимость ВЗ (вычитается из S)
  *
- * ВАЖНО: округление — единый источник истины в ../rounding.js (Методика 421/пр).
+ * ВАЖНО: округление — единый источник истины в ../rounding.ts (Методика 421/пр).
  * Здесь roundMoney/roundGrandTotal только реэкспортируются, чтобы не дублировать логику.
  */
 
-import { Section } from '../models/Section.js';
-import { roundMoney, roundGrandTotal } from '../rounding.js';
-import { frameworkRowCost, calcFrameworkTotals, defaultFrameworkSettings } from '../framework.js';
+import { Section } from '../models/Section.ts';
+import { roundMoney, roundGrandTotal } from '../rounding.ts';
+import { frameworkRowCost, calcFrameworkTotals, defaultFrameworkSettings } from '../framework.ts';
 
 export { roundMoney, roundGrandTotal };
 
 /**
- * Совместимое имя: roundValue(value, mode, method) === roundMoney из rounding.js
+ * Совместимое имя: roundValue(value, mode, method) === roundMoney из rounding.ts
  * @param {number} value - Значение для округления
  * @param {string} mode - Режим округления ('kopecks' или 'rubles')
  * @param {string} method - Метод округления ('math', 'bank', 'truncate')

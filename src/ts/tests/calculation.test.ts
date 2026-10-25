@@ -11,8 +11,8 @@ import {
   roundGrandTotal,
   calculateSectionDuration,
   calculateProjectDuration,
-} from '../services/calculation.js';
-import { Project, Section, Resource } from '../models/Project.js';
+} from '../services/calculation.ts';
+import { Project, Section, Resource } from '../models/Project.ts';
 
 describe('Calculation Service', () => {
   describe('calculateResourceTotal', () => {

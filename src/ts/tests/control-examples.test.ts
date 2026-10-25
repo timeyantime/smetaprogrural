@@ -20,8 +20,8 @@ import {
   calcReturnable,
   frameworkRowCost,
   defaultFrameworkSettings,
-} from '../framework.js';
-import { calculateFrameworkTotals } from '../services/calculation.js';
+} from '../framework.ts';
+import { calculateFrameworkTotals } from '../services/calculation.ts';
 
 describe('Контрольные примеры (справочник → раздел 13)', () => {
   // ── Строка 1. Труд: наценка 20% и ночь ────────────────────────────────

@@ -526,7 +526,31 @@ export function decodeProject(payload) {
   return project;
 }
 
-// ---- ключ-ориентированный API (для storage.js / app.js) --------------------
+// ---- файлы .toon (экспорт/импорт) ------------------------------------------
+
+/**
+ * Сериализует проект в формат файла .toon (префикс 'TOONP1:').
+ * @param {Object} project
+ * @returns {string}
+ */
+export function toFile(project) {
+  return encodeProject(project);
+}
+
+/**
+ * Разбирает содержимое файла .toon в объект проекта.
+ * Принимает как 'TOONP1:'-строку, так и классический JSON (обратная совместимость).
+ * @param {string} text - содержимое файла
+ * @returns {Object} проект
+ */
+export function fromFile(text) {
+  const s = String(text).replace(/^\ufeff/, '').trim();
+  if (s.startsWith('TOONP1:')) return decodeProject(s.slice('TOONP1:'.length));
+  if (s.startsWith('{')) return JSON.parse(s); // legacy: импорт .json всё ещё работает
+  throw new Error('TOON: неизвестный формат файла (ожидался .toon с префиксом TOONP1:)');
+}
+
+// ---- ключ-ориентированный API (для storage.ts / app.ts) --------------------
 
 /** Возвращает схему для ключа хранилища или null. */
 export function schemaFor(key) {

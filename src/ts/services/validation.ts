@@ -3,9 +3,9 @@
  * Отвечает за проверку корректности входных данных
  */
 
-import { Project } from '../models/Project.js';
-import { Section } from '../models/Section.js';
-import { Resource } from '../models/Resource.js';
+import { Project } from '../models/Project.ts';
+import { Section } from '../models/Section.ts';
+import { Resource } from '../models/Resource.ts';
 
 /**
  * Ошибки валидации

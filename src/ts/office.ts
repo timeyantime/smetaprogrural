@@ -34,9 +34,9 @@ function svgToPng(svgMarkup, scale, callback) {
 }
 
 /* Функции объявлены как function declarations — они автоматически становятся
-   глобальными при загрузке файла классическим <script> (так подключен office.js). */
+   глобальными при загрузке файла классическим <script> (так подключен office.ts). */
 
 /* ES-модульный экспорт: единый источник SpreadsheetML-логики.
-   Сервис services/export.js импортирует отсюда xmlEsc,
+   Сервис services/export.ts импортирует отсюда xmlEsc,
    а не дублирует их. */
 export { xmlEsc, svgToPng };

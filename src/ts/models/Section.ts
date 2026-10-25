@@ -3,8 +3,8 @@
  * Содержит список ресурсов и настройки раздела
  */
 
-import { Resource } from './Resource.js';
-import { Project } from './Project.js';
+import { Resource } from './Resource.ts';
+import { Project } from './Project.ts';
 
 /**
  * Модель раздела

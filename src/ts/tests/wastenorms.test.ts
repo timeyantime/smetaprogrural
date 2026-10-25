@@ -2,7 +2,7 @@
  * Юнит-тесты норм отходов (блок waste_norms ТЗ, 12 групп) и q_факт.
  */
 
-import { WASTE_NORMS, wasteK, factQty } from '../framework.js';
+import { WASTE_NORMS, wasteK, factQty } from '../framework.ts';
 
 describe('НОРМЫ ОТХОДОВ И ЗАПАСОВ (waste_norms, 12 групп)', () => {
   const EXPECTED = [

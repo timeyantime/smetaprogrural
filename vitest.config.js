@@ -12,8 +12,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/js/**/*.js'],
-      exclude: ['**/*.test.js', '**/*.spec.js', '**/node_modules/**'],
+      include: ['src/ts/**/*.ts'],
+      exclude: ['**/*.test.ts', '**/*.spec.ts', '**/node_modules/**'],
     },
     // Для работы с ES modules в тестах
     transformMode: {

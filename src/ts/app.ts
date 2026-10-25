@@ -15,18 +15,23 @@
 // Импорт модулей
 // ============================================
 
-import { Project, migrateV3toV4 } from './models/Project.js';
-import { Section } from './models/Section.js';
-import { Resource } from './models/Resource.js';
-import * as storage from './services/storage.js';
-import * as calculation from './services/calculation.js';
-import * as framework from './framework.js';
-import * as exportService from './services/export.js';
-import * as validation from './services/validation.js';
-import { roundMoney, ROUND_MODES, ROUND_METHODS } from './rounding.js';
-import { xmlEsc, svgToPng } from './office.js';
-import { encodeValue as toonEncode, decodeValue as toonDecode } from './toon.js';
-import { formatMoney } from './utils/formatters.js';
+import { Project, migrateV3toV4 } from './models/Project.ts';
+import { Section } from './models/Section.ts';
+import { Resource } from './models/Resource.ts';
+import * as storage from './services/storage.ts';
+import * as calculation from './services/calculation.ts';
+import * as framework from './framework.ts';
+import * as exportService from './services/export.ts';
+import * as validation from './services/validation.ts';
+import { roundMoney, ROUND_MODES, ROUND_METHODS } from './rounding.ts';
+import { xmlEsc, svgToPng } from './office.ts';
+import {
+  encodeValue as toonEncode,
+  decodeValue as toonDecode,
+  toFile as toonToFile,
+  fromFile as toonFromFile,
+} from './toon.ts';
+import { formatMoney } from './utils/formatters.ts';
 
 // ============================================
 // Константы
@@ -992,19 +997,19 @@ window.smeta = function smeta() {
     // ==========================================
 
     /**
-     * Экспорт в JSON
+     * Экспорт в TOON (.toon — компактный табличный формат вместо JSON)
      */
     exportJson() {
-      const json = exportService.exportToJson(this.data);
+      const toon = toonToFile(this.data);
       exportService.downloadFile(
-        new Blob([json], { type: 'application/json' }),
-        `${this.data.title || 'смета'}.json`
+        new Blob([toon], { type: 'text/plain;charset=utf-8;' }),
+        `${this.data.title || 'смета'}.toon`
       );
-      this.logActivity('Экспорт в JSON');
+      this.logActivity('Экспорт в TOON');
     },
 
     /**
-     * Импорт из JSON
+     * Импорт из TOON (.toon; legacy .json с объектом внутри тоже принимается)
      */
     importJson(event) {
       const file = event.target.files[0];
@@ -1013,10 +1018,11 @@ window.smeta = function smeta() {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const project = exportService.importFromJson(e.target.result);
+          const project = toonFromFile(e.target.result);
+          if (!Project.validate(project)) throw new Error('некорректные данные проекта');
           this.data = project;
-          this.pushHistory('Импорт из JSON');
-          this.logActivity('Импорт из JSON');
+          this.pushHistory('Импорт из TOON');
+          this.logActivity('Импорт из TOON');
         } catch (error) {
           alert('Ошибка импорта: ' + error.message);
         }
@@ -3023,7 +3029,9 @@ window.smeta = function smeta() {
     },
 
     exportNsb() {
-      this.download('nsb.json', JSON.stringify(this.nsbItems, null, 2), 'application/json');
+      // TOON-таблица (схема smetapro.nsb.v1) вместо JSON — компактнее в ~2 раза
+      const toon = toonEncode(storage.STORAGE_KEYS.NSB, this.nsbItems); // 'TOON1:' + таблица
+      this.download('nsb.toon', toon, 'text/plain;charset=utf-8');
     },
 
     importNsb(ev) {
@@ -3032,7 +3040,8 @@ window.smeta = function smeta() {
       const reader = new FileReader();
       reader.onload = () => {
         try {
-          const arr = JSON.parse(reader.result);
+          // автоопределение: TOON1:-таблица или legacy JSON-массив
+          const arr = toonDecode(storage.STORAGE_KEYS.NSB, String(reader.result));
           if (!Array.isArray(arr)) throw new Error('ожидается массив записей');
           const FW_KEYS = [
             'wasteGroup',

@@ -351,11 +351,28 @@ function defaultStartDate() {
  * Основной компонент приложения
  * @returns {Object} Состояние компонента
  */
+// Реестр инструментов главного экрана («Home»).
+// Пока здесь только «Смета»; будущие инструменты добавляются в конец массива.
+export const TOOLS = [
+  {
+    id: 'smeta',
+    icon: '📋',
+    name: 'Смета',
+    description:
+      'Таблица разделов и записей, сводная ведомость ресурсов, диаграмма Ганта. Данные хранятся локально в браузере.',
+    meta: 'Основной инструмент',
+  },
+];
+
 window.smeta = function smeta() {
   return {
     // ==========================================
     // Состояние
     // ==========================================
+
+    // Главный экран: 'home' (карточки инструментов) | 'app' (смета)
+    screen: 'home',
+    tools: TOOLS,
 
     // Данные проекта
     data: loadLocal() || defaultData(),
@@ -857,6 +874,8 @@ window.smeta = function smeta() {
      */
     loadUI() {
       const ui = storage.loadUISettings();
+      // Запоминаем, в каком экране находился пользователь (home | app)
+      if (ui.screen === 'home' || ui.screen === 'app') this.screen = ui.screen;
       if (Array.isArray(ui.hiddenCols)) this.hiddenCols = ui.hiddenCols;
       if (['table', 'gantt', 'summary'].includes(ui.viewTab)) this.viewTab = ui.viewTab;
       // Состояние сводной панели: запоминаем; на первый запуск — открыта на широких экранах
@@ -869,10 +888,27 @@ window.smeta = function smeta() {
      */
     saveUI() {
       storage.saveUISettings({
+        screen: this.screen,
         hiddenCols: this.hiddenCols,
         viewTab: this.viewTab,
         sidebarCollapsed: this.sidebarCollapsed,
       });
+    },
+
+    // ==========================================
+    // Главный экран (карточки инструментов)
+    // ==========================================
+
+    openTool(id) {
+      if (!this.tools.some((t) => t.id === id)) return;
+      this.screen = 'app';
+      this.saveUI();
+    },
+
+    goHome() {
+      this.manualSave();
+      this.screen = 'home';
+      this.saveUI();
     },
 
     // ==========================================

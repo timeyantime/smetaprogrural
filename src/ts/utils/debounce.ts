@@ -12,9 +12,18 @@
  * @param {number} options.maxWait - Максимальное время ожидания
  * @returns {Function} Debounced функция
  */
-export function debounce(func, wait, options = {}) {
-  let lastArgs = null;
-  let lastThis = null;
+interface DebounceOptions {
+  leading?: boolean;
+  maxWait?: number;
+}
+
+export function debounce(
+  func: (...args: any[]) => any,
+  wait: number,
+  options: DebounceOptions = {}
+) {
+  let lastArgs: any[] | null = null;
+  let lastThis: unknown = null;
   const maxWait = options.maxWait || 0;
   let timerId = null;
   let lastInvokeTime = 0;
@@ -36,7 +45,7 @@ export function debounce(func, wait, options = {}) {
   function invokeFunc(time) {
     const args = lastArgs;
     const thisArg = lastThis;
-    lastArgs = lastThis = null;
+    lastArgs = null; lastThis = null;
     lastInvokeTime = time;
     return func.apply(thisArg, args);
   }
@@ -52,7 +61,7 @@ export function debounce(func, wait, options = {}) {
     if (trailing && lastArgs) {
       return invokeFunc(time);
     }
-    lastArgs = lastThis = null;
+    lastArgs = null; lastThis = null;
     return null;
   }
 

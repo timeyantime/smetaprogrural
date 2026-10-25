@@ -3,14 +3,14 @@
  * Содержит все данные сметы: разделы, ресурсы, настройки
  */
 
-import { Resource } from './Resource.js';
-import { Section } from './Section.js';
+import { Resource } from './Resource.ts';
+import { Section } from './Section.ts';
 
 // Реэкспорт смежных моделей: тесты и внешний код могут импортировать
 // Section/Resource из Project.js (модели связаны и живут в одной папке).
 // Это единая точка входа для моделей данных.
-export { Section } from './Section.js';
-export { Resource } from './Resource.js';
+export { Section } from './Section.ts';
+export { Resource } from './Resource.ts';
 
 /**
  * Счётчик для генерации уникальных ID (модульная переменная,
@@ -50,7 +50,7 @@ let uidCounter = 0;
 
 /**
  * Дефолтные настройки каркасного метода v2.0 — копия формулировки из
- * src/js/framework.js без import (чтобы модели не зависели от расчётного слоя).
+ * src/ts/framework.ts без import (чтобы модели не зависели от расчётного слоя).
  */
 function frameworkDefaults() {
   return {
@@ -118,7 +118,7 @@ export class Project {
         mode: 'kopecks',
         method: 'math',
       },
-      // Каркасный метод ценообразования v2.0 (см. src/js/framework.js) —
+      // Каркасный метод ценообразования v2.0 (см. src/ts/framework.ts) —
       // единственный расчёт в программе (старая цепочка ПЗ→НР→СП→НДС удалена).
       framework: frameworkDefaults(),
     };

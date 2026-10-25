@@ -3,8 +3,8 @@
  * Отвечает за экспорт в JSON и CSV (Excel удалён по требованию)
  */
 
-import { Project } from '../models/Project.js';
-import { Resource } from '../models/Resource.js';
+import { Project } from '../models/Project.ts';
+import { Resource } from '../models/Resource.ts';
 /**
  * Экспортирует проект в JSON
  * @param {Object} project - Проект

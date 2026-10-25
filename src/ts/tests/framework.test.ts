@@ -21,10 +21,10 @@ import {
   frameworkRowCost,
   calcFrameworkTotals,
   FRAMEWORK_META,
-} from '../framework.js';
-import { calculateFrameworkTotals } from '../services/calculation.js';
-import { encodeProject, decodeProject } from '../toon.js';
-import { Project, Section, Resource } from '../models/Project.js';
+} from '../framework.ts';
+import { calculateFrameworkTotals } from '../services/calculation.ts';
+import { encodeProject, decodeProject } from '../toon.ts';
+import { Project, Section, Resource } from '../models/Project.ts';
 
 describe('Каркасный метод v2.0 (framework)', () => {
   test('meta соответствует спецификации', () => {

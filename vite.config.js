@@ -38,8 +38,8 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{js,ts}'],
     coverage: {
       reporter: ['text', 'json', 'html'],
-      include: ['src/js/**/*.js'],
-      exclude: ['**/*.test.js', '**/*.spec.js'],
+      include: ['src/ts/**/*.ts'],
+      exclude: ['**/*.test.ts', '**/*.spec.ts'],
     },
   },
   

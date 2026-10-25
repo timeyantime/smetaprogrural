@@ -3,9 +3,9 @@
  * Отвечает за проверку корректности входных данных
  */
 
-import { Project } from '../models/Project.js';
-import { Section } from '../models/Section.js';
-import { Resource } from '../models/Resource.js';
+import { Project } from '../models/Project.ts';
+import { Section } from '../models/Section.ts';
+import { Resource } from '../models/Resource.ts';
 
 /**
  * Ошибки валидации
@@ -410,7 +410,7 @@ export function validateRounding(rounding) {
  * @param {boolean} options.required - Обязательное поле
  * @returns {boolean} true если число валидно
  */
-export function validateNumber(value, options = {}) {
+export function validateNumber(value: unknown, options: { min?: number; max?: number; required?: boolean } = {}) {
   const { min = -Infinity, max = Infinity, required = true } = options;
 
   if (value === null || value === undefined) {
@@ -433,7 +433,7 @@ export function validateNumber(value, options = {}) {
  * @param {boolean} options.required - Обязательное поле
  * @returns {boolean} true если строка валидна
  */
-export function validateString(value, options = {}) {
+export function validateString(value: unknown, options: { minLength?: number; maxLength?: number; required?: boolean } = {}) {
   const { minLength = 0, maxLength = Infinity, required = true } = options;
 
   if (value === null || value === undefined) {

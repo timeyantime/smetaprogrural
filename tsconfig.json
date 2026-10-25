@@ -14,12 +14,19 @@
     "noEmit": true,
     
     /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "strict": false, // плавный переход после миграции с JS: строгость включается по мере типизации
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noImplicitAny": false, // Временно отключено для плавного перехода
+    "noImplicitReturns": false,
+    "noImplicitAny": false,
+
+    /* Allow JS-style code migrated to TS (checkJs off — tsc не проверяет тела) */
+    "checkJs": false,
+
+    /* Module output for Vite dev server (import './x.ts' -> './x.js') */
+    "verbatimModuleSyntax": false,
+    "rewriteRelativeImportExtensions": true,
     "esModuleInterop": true,
     
     /* Path aliases */
@@ -32,6 +39,6 @@
       "@/components/*": ["src/js/components/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.js"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }

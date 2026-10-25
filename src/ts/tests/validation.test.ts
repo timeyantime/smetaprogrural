@@ -12,8 +12,8 @@ import {
   validateNumber,
   validateString,
   formatValidationErrors,
-} from '../services/validation.js';
-import { Project, Section, Resource } from '../models/Project.js';
+} from '../services/validation.ts';
+import { Project, Section, Resource } from '../models/Project.ts';
 
 describe('Validation Service', () => {
   describe('validateNumber', () => {

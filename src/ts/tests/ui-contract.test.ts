@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '../../..');
 const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-const appSrcFull = fs.readFileSync(path.join(ROOT, 'src/js/app.js'), 'utf8');
+const appSrcFull = fs.readFileSync(path.join(ROOT, 'src/ts/app.ts'), 'utf8');
 // Тело только smeta(): до window.ganttLinks — иначе ключи второго Alpine-компонента
 // (init и т.п.) ложно считаются дублями.
 const ganttStart = appSrcFull.indexOf('window.ganttLinks');

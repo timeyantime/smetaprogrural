@@ -15,18 +15,23 @@
 // Импорт модулей
 // ============================================
 
-import { Project, migrateV3toV4 } from './models/Project.js';
-import { Section } from './models/Section.js';
-import { Resource } from './models/Resource.js';
-import * as storage from './services/storage.js';
-import * as calculation from './services/calculation.js';
-import * as framework from './framework.js';
-import * as exportService from './services/export.js';
-import * as validation from './services/validation.js';
-import { roundMoney, ROUND_MODES, ROUND_METHODS } from './rounding.js';
-import { xmlEsc, svgToPng } from './office.js';
-import { encodeValue as toonEncode, decodeValue as toonDecode } from './toon.js';
-import { formatMoney } from './utils/formatters.js';
+import { Project, migrateV3toV4 } from './models/Project.ts';
+import { Section } from './models/Section.ts';
+import { Resource } from './models/Resource.ts';
+import * as storage from './services/storage.ts';
+import * as calculation from './services/calculation.ts';
+import * as framework from './framework.ts';
+import * as exportService from './services/export.ts';
+import * as validation from './services/validation.ts';
+import { roundMoney, ROUND_MODES, ROUND_METHODS } from './rounding.ts';
+import { xmlEsc, svgToPng } from './office.ts';
+import {
+  encodeValue as toonEncode,
+  decodeValue as toonDecode,
+  toFile as toonToFile,
+  fromFile as toonFromFile,
+} from './toon.ts';
+import { formatMoney } from './utils/formatters.ts';
 
 // ============================================
 // Константы
@@ -992,19 +997,19 @@ window.smeta = function smeta() {
     // ==========================================
 
     /**
-     * Экспорт в JSON
+     * Экспорт в TOON (.toon — компактный табличный формат вместо JSON)
      */
     exportJson() {
-      const json = exportService.exportToJson(this.data);
+      const toon = toonToFile(this.data);
       exportService.downloadFile(
-        new Blob([json], { type: 'application/json' }),
-        `${this.data.title || 'смета'}.json`
+        new Blob([toon], { type: 'text/plain;charset=utf-8;' }),
+        `${this.data.title || 'смета'}.toon`
       );
-      this.logActivity('Экспорт в JSON');
+      this.logActivity('Экспорт в TOON');
     },
 
     /**
-     * Импорт из JSON
+     * Импорт из TOON (.toon; legacy .json с объектом внутри тоже принимается)
      */
     importJson(event) {
       const file = event.target.files[0];
@@ -1013,10 +1018,11 @@ window.smeta = function smeta() {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const project = exportService.importFromJson(e.target.result);
+          const project = toonFromFile(e.target.result);
+          if (!Project.validate(project)) throw new Error('некорректные данные проекта');
           this.data = project;
-          this.pushHistory('Импорт из JSON');
-          this.logActivity('Импорт из JSON');
+          this.pushHistory('Импорт из TOON');
+          this.logActivity('Импорт из TOON');
         } catch (error) {
           alert('Ошибка импорта: ' + error.message);
         }
@@ -1215,7 +1221,7 @@ window.smeta = function smeta() {
     startRenameSection(si) {
       this.renamingSection = si;
       this.$nextTick(() => {
-        const el = document.querySelector('.at-tab-wrap .at-tab-rename');
+        const el = document.querySelector<HTMLInputElement>('.at-tab-wrap .at-tab-rename');
         if (el) {
           el.focus();
           el.select();
@@ -1264,6 +1270,15 @@ window.smeta = function smeta() {
     /** Открытие ячейки на редактирование */
     openCell(field, item) {
       this.editing = { key: item.row.id + '|' + field };
+    },
+
+    /** Стоимость всех выделенных записей (показывается в сайдбаре, SPEC «UI v2») */
+    selectedCost() {
+      let s = 0;
+      if (!this.selectedIds.size) return 0;
+      for (const sec of this.data.sections)
+        for (const r of sec.resources) if (this.selectedIds.has(r.id)) s += this.rowTotal(r);
+      return s;
     },
 
     /** Удаление выделенных записей */
@@ -2055,7 +2070,7 @@ window.smeta = function smeta() {
       const prev = this._rowRects || new Map();
       requestAnimationFrame(() => {
         const anims = [];
-        document.querySelectorAll(sel).forEach((tr) => {
+        document.querySelectorAll<HTMLTableRowElement>(sel).forEach((tr) => {
           const id = tr.dataset.rowId;
           const now = tr.getBoundingClientRect();
           const before = prev.get(id);
@@ -2101,7 +2116,7 @@ window.smeta = function smeta() {
     /** Снимок вертикальных позиций строк таблицы (для FLIP-анимации). */
     _captureRowRects() {
       const map = new Map();
-      document.querySelectorAll('tr.at-row[data-row-id]').forEach((tr) => {
+      document.querySelectorAll<HTMLTableRowElement>('tr.at-row[data-row-id]').forEach((tr) => {
         map.set(tr.dataset.rowId, tr.getBoundingClientRect());
       });
       return map;
@@ -2491,11 +2506,14 @@ window.smeta = function smeta() {
       /* связи предшественник → преемник и перемещённые полосы (#49):
          сдвиг относительно автоплана, затем каскад по зависимостям */
       // Ключ карты — номер строки в ТАБЛИЦЕ (flatRows), т.к. row.pred хранится в этой нумерации.
-      const numByRowId = new Map(this.flatRows.map((it, i) => [it.row.id, i + 1]));
-      const byNum = new Map(
+      const numByRowId = new Map<string, number>(this.flatRows.map((it, i) => [it.row.id, i + 1]));
+      const byNum = new Map<number, any>(
         rows
-          .map((g) => [numByRowId.get(g.row.id), g])
-          .filter(([n]) => n !== undefined && n !== null)
+          .map((g): [number, any] | null => {
+            const n = numByRowId.get(g.row.id);
+            return n === undefined || n === null ? null : [n, g];
+          })
+          .filter((e): e is [number, any] => e !== null)
       );
       const origLeft = rows.map((g) => g.leftDays);
       const moved = rows.some((g) => Number(g.row.startAt) >= 0);
@@ -3014,7 +3032,9 @@ window.smeta = function smeta() {
     },
 
     exportNsb() {
-      this.download('nsb.json', JSON.stringify(this.nsbItems, null, 2), 'application/json');
+      // TOON-таблица (схема smetapro.nsb.v1) вместо JSON — компактнее в ~2 раза
+      const toon = toonEncode(storage.STORAGE_KEYS.NSB, this.nsbItems); // 'TOON1:' + таблица
+      this.download('nsb.toon', toon, 'text/plain;charset=utf-8');
     },
 
     importNsb(ev) {
@@ -3023,7 +3043,8 @@ window.smeta = function smeta() {
       const reader = new FileReader();
       reader.onload = () => {
         try {
-          const arr = JSON.parse(reader.result);
+          // автоопределение: TOON1:-таблица или legacy JSON-массив
+          const arr = toonDecode(storage.STORAGE_KEYS.NSB, String(reader.result));
           if (!Array.isArray(arr)) throw new Error('ожидается массив записей');
           const FW_KEYS = [
             'wasteGroup',
@@ -3073,14 +3094,14 @@ window.smeta = function smeta() {
     },
 
     suggestionsFor(field, item) {
-      const vals = new Set();
+      const vals = new Set<string>();
       for (const sec of this.data.sections) {
         for (const r of sec.resources) {
           const v = field === 'total' ? null : r[field];
           if (v !== '' && v !== null && !(Number(v) === 0)) vals.add(String(v));
         }
       }
-      let arr = [...vals].sort((a, b) => a.localeCompare(b, 'ru'));
+      let arr: string[] = [...vals].sort((a, b) => a.localeCompare(b, 'ru'));
       // для предшественника — номера существующих записей
       if (field === 'pred') {
         arr = this.flatRows.filter((i) => i.row.id !== item.row.id).map((i) => String(i.index));
@@ -3162,7 +3183,7 @@ window.ganttLinks = function ganttLinks() {
         });
       }
       // Превью рисования связи — отдельный слой поверх (обновляется каждый mousemove).
-      let pv = document.getElementById('gantt-link-preview-layer');
+      let pv = document.getElementById('gantt-link-preview-layer') as unknown as SVGGElement | null;
       if (!preview && !pv) return;
       if (!pv) {
         pv = document.createElementNS(NS, 'g');

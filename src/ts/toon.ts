@@ -287,7 +287,12 @@ export function decodeTable(src, fields) {
  * Блок: @name[field1,field2,...] + строки значений.
  * opts.childField — поле-массив дочерних объектов, сериализуется JSON-ячейкой.
  */
-function encodeBlock(name, fields, rows, opts = {}) {
+function encodeBlock(
+  name: string,
+  fields: string[],
+  rows: any[],
+  opts: { childField?: string; jsonFields?: string[] } = {}
+) {
   const cf = opts.childField;
   // поле-массив (дочерние разделы) сериализуем JSON-ячейкой прямо в схеме
   const jsonFields = new Set(opts.jsonFields || (cf ? [cf] : []));
@@ -329,7 +334,7 @@ function defaultFor(f) {
   return null; // days, startAt, parentId, id...
 }
 
-function decodeBlockRows(lines, fields, jsonCols) {
+function decodeBlockRows(lines, fields, jsonCols = []) {
   const jc = jsonCols || [];
   const out = [];
   for (const line of lines) {
@@ -452,7 +457,7 @@ export function decodeProject(payload) {
       const nm = b.header.slice(0, b.header.indexOf('['));
       return nm === name;
     });
-  const project = {};
+  const project: Record<string, any> = {};
   const metaB = find('meta');
   if (metaB) {
     const m = /^\[(.+)\]$/.exec(metaB.header.slice(4));
@@ -526,7 +531,31 @@ export function decodeProject(payload) {
   return project;
 }
 
-// ---- ключ-ориентированный API (для storage.js / app.js) --------------------
+// ---- файлы .toon (экспорт/импорт) ------------------------------------------
+
+/**
+ * Сериализует проект в формат файла .toon (префикс 'TOONP1:').
+ * @param {Object} project
+ * @returns {string}
+ */
+export function toFile(project) {
+  return encodeProject(project);
+}
+
+/**
+ * Разбирает содержимое файла .toon в объект проекта.
+ * Принимает как 'TOONP1:'-строку, так и классический JSON (обратная совместимость).
+ * @param {string} text - содержимое файла
+ * @returns {Object} проект
+ */
+export function fromFile(text) {
+  const s = String(text).replace(/^\ufeff/, '').trim();
+  if (s.startsWith('TOONP1:')) return decodeProject(s.slice('TOONP1:'.length));
+  if (s.startsWith('{')) return JSON.parse(s); // legacy: импорт .json всё ещё работает
+  throw new Error('TOON: неизвестный формат файла (ожидался .toon с префиксом TOONP1:)');
+}
+
+// ---- ключ-ориентированный API (для storage.ts / app.ts) --------------------
 
 /** Возвращает схему для ключа хранилища или null. */
 export function schemaFor(key) {

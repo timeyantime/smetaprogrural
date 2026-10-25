@@ -3,7 +3,7 @@
  * Представляет строку сметы (работа, машина, материал)
  */
 
-import { Project } from './Project.js';
+import { Project } from './Project.ts';
 
 /**
  * Типы ресурсов

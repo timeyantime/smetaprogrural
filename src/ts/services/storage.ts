@@ -3,13 +3,13 @@
  * Отвечает за сохранение, загрузку и миграцию данных
  */
 
-import { Project, migrateV3toV4 } from '../models/Project.js';
+import { Project, migrateV3toV4 } from '../models/Project.ts';
 import {
   encodeValue as toonEncode,
   decodeValue as toonDecode,
   encodeProject as toonEncodeProject,
   decodeProject as toonDecodeProject,
-} from '../toon.js';
+} from '../toon.ts';
 
 /**
  * Ключи для localStorage

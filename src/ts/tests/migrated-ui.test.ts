@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect } from 'vitest';
-import smetaModule from '../app.js';
+import smetaModule from '../app.ts';
 
-describe('src/js/app.js — перенесённые из legacy UI-функции', () => {
+describe('src/ts/app.ts — перенесённые из legacy UI-функции', () => {
   const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
 
   it('все бывшие заглушки теперь реализованы (не пустые)', () => {

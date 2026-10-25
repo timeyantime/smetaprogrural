@@ -1,10 +1,10 @@
 /**
- * Тесты фазы 1 миграции legacy → src/js/app.js (см. docs/MIGRATION.md).
+ * Тесты фазы 1 миграции legacy → src/ts/app.ts (см. docs/MIGRATION.md).
  * Зоны: форматирование/отображение, пагинация, редактирование строк.
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import smetaModule from '../app.js';
+import smetaModule from '../app.ts';
 
 // Вне Alpine-окружения $nextTick недоступен (node/jsdom); подменяем no-op'ом.
 const proto = smetaModule();

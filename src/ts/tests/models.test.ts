@@ -3,7 +3,7 @@
  * Проверка создания и валидации моделей
  */
 
-import { Project, Section, Resource, migrateV3toV4 } from '../models/Project.js';
+import { Project, Section, Resource, migrateV3toV4 } from '../models/Project.ts';
 
 describe('Models', () => {
   describe('Project', () => {

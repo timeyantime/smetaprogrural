@@ -45,15 +45,24 @@ describe('Расположение элементов в index.html', () => {
     expect(root.getAttribute('x-data')).toBe('smeta()');
     expect(root.getAttribute('x-init')).toBe('init()');
 
-    const topbar = root.querySelector(':scope > header.at-topbar');
-    const viewsBar = root.querySelector(':scope > nav.at-views-bar');
-    const main = root.querySelector(':scope > main.at-main');
+    // Главный экран (карточки инструментов) идёт первым, затем экран сметы
+    const home = root.querySelector(':scope > section.home-screen');
+    const smetaScreen = root.querySelector(':scope > div.smeta-screen');
+    expect(home, 'главный экран не найден').toBeTruthy();
+    expect(smetaScreen, 'экран сметы не найден').toBeTruthy();
+    expect([...root.children][0]).toBe(home);
+
+    const topbar = smetaScreen.querySelector(':scope > header.at-topbar');
+    const viewsBar = smetaScreen.querySelector(':scope > nav.at-views-bar');
+    const main = smetaScreen.querySelector(':scope > main.at-main');
     expect(topbar, 'шапка не найдена').toBeTruthy();
     expect(viewsBar, 'панель видов не найдена').toBeTruthy();
     expect(main, 'основная область не найдена').toBeTruthy();
 
     // Визуальный порядок сверху вниз: шапка, под ней табы видов, затем контент
-    const kids = [...root.children].filter((el) => ['HEADER', 'NAV', 'MAIN'].includes(el.tagName));
+    const kids = [...smetaScreen.children].filter((el) =>
+      ['HEADER', 'NAV', 'MAIN'].includes(el.tagName)
+    );
     expect(kids.map((el) => el.className)).toEqual(['at-topbar', 'at-views-bar', 'at-main']);
     expect(kids.indexOf(topbar)).toBeLessThan(kids.indexOf(viewsBar));
     expect(kids.indexOf(viewsBar)).toBeLessThan(kids.indexOf(main));
@@ -75,9 +84,10 @@ describe('Расположение элементов в index.html', () => {
     const titleInput = crumb.querySelector('input.at-title-input');
     expect(titleInput.getAttribute('x-model')).toBe('data.title');
 
-    // порядок действий: Сохранить → Undo → Redo → Меню
+    // порядок действий: Главная → Сохранить → Undo → Redo → Меню
     const btns = [...actions.querySelectorAll('button')].map((b) => b.className);
-    expect(btns[0]).toContain('gh-btn');
+    expect(btns[0]).toContain('at-home-btn');
+    expect(btns[1]).toContain('gh-btn');
     expect(actions.querySelectorAll('button').length).toBeGreaterThanOrEqual(4);
     const menuWrap = actions.querySelector('.gh-menu-wrap');
     expect(menuWrap).toBeTruthy();

@@ -12,12 +12,37 @@
        который происходит при старте CDN-скрипта ниже); app.js объявляет
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
        (единый источник округления — src/ts/rounding.ts). -->
+  <script src="./dist/assets/money.js"></script>
+  <script src="./dist/assets/app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-lmX_kHvH.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-0ZX6mBk0.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-YcqB9sLp.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
+
+    <!-- ===== Главный экран: карточки инструментов ===== -->
+    <section class="home-screen" x-show="screen === 'home'" x-cloak>
+      <div class="home-inner">
+        <div class="home-hero">
+          <span class="home-logo">🗄️</span>
+          <h1 class="home-title">СметаHome</h1>
+          <p class="home-subtitle">Инструменты для сметчика. Выберите инструмент, чтобы начать работу.</p>
+        </div>
+        <div class="home-grid">
+          <template x-for="tool in tools" :key="tool.id">
+            <button class="tool-card" @click="openTool(tool.id)">
+              <span class="tool-card-icon" x-text="tool.icon"></span>
+              <span class="tool-card-name" x-text="tool.name"></span>
+              <span class="tool-card-desc" x-text="tool.description"></span>
+              <span class="tool-card-meta" x-text="tool.meta"></span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Экран инструмента «Смета» ===== -->
+    <div class="smeta-screen" x-show="screen === 'app'" x-cloak>
 
     <!-- ===== Верхняя панель (как Airtable: иконки Базы/Таблицы + название) ===== -->
     <header class="at-topbar">
@@ -28,6 +53,7 @@
         <input class="at-title-input" x-model="data.title" placeholder="Наименование сметы" />
       </div>
       <div class="at-actions">
+        <button class="at-home-btn" @click="goHome()" title="К главному экрану">←</button>
         <!-- Быстрые действия (GitHub-style): только самое частое.
              «Добавить запись» — внизу таблицы и в табе раздела; здесь не дублируется. -->
         <button class="gh-btn" @click="manualSave()" :title="savedTimeText()">
@@ -1366,6 +1392,8 @@
         </div>
       </div>
     </div>
+
+    </div><!-- /.smeta-screen -->
   </div>
 </body>
 </html>

@@ -748,3 +748,39 @@ body.printing-gantt {
 }
 .at-drag-handle:hover { color: var(--accent); }
 .at-drag-handle:active { cursor: grabbing; }
+
+/* ===== Панель пакетного редактирования (#36) ===== */
+.at-batch-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid var(--line-strong, #d3d3d3);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(23, 43, 77, 0.18);
+}
+.at-batch-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted, #7f8590);
+}
+.at-batch-bar input {
+  width: 90px;
+  padding: 4px 6px;
+  border: 1px solid var(--line, #e6e6e6);
+  border-radius: 6px;
+  font-size: 12px;
+}
+.at-batch-count {
+  font-size: 12px;
+  color: var(--text, #172b4d);
+  white-space: nowrap;
+}

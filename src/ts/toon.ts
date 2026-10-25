@@ -549,7 +549,9 @@ export function toFile(project) {
  * @returns {Object} проект
  */
 export function fromFile(text) {
-  const s = String(text).replace(/^\ufeff/, '').trim();
+  const s = String(text)
+    .replace(/^\ufeff/, '')
+    .trim();
   if (s.startsWith('TOONP1:')) return decodeProject(s.slice('TOONP1:'.length));
   if (s.startsWith('{')) return JSON.parse(s); // legacy: импорт .json всё ещё работает
   throw new Error('TOON: неизвестный формат файла (ожидался .toon с префиксом TOONP1:)');

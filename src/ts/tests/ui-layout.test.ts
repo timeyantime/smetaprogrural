@@ -32,10 +32,8 @@ beforeAll(() => {
   NODE_POS = dom.window.Node;
 });
 
-const FOLLOWING = (a, b) =>
-  !!(a.compareDocumentPosition(b) & NODE_POS.DOCUMENT_POSITION_FOLLOWING);
-const PRECEDING = (a, b) =>
-  !!(a.compareDocumentPosition(b) & NODE_POS.DOCUMENT_POSITION_PRECEDING);
+const FOLLOWING = (a, b) => !!(a.compareDocumentPosition(b) & NODE_POS.DOCUMENT_POSITION_FOLLOWING);
+const PRECEDING = (a, b) => !!(a.compareDocumentPosition(b) & NODE_POS.DOCUMENT_POSITION_PRECEDING);
 
 // ---------------------------------------------------------------------------
 // 1. СТРУКТУРА И РАСПОЛОЖЕНИЕ (визуальная раскладка DOM)
@@ -55,9 +53,7 @@ describe('Расположение элементов в index.html', () => {
     expect(main, 'основная область не найдена').toBeTruthy();
 
     // Визуальный порядок сверху вниз: шапка, под ней табы видов, затем контент
-    const kids = [...root.children].filter((el) =>
-      ['HEADER', 'NAV', 'MAIN'].includes(el.tagName),
-    );
+    const kids = [...root.children].filter((el) => ['HEADER', 'NAV', 'MAIN'].includes(el.tagName));
     expect(kids.map((el) => el.className)).toEqual(['at-topbar', 'at-views-bar', 'at-main']);
     expect(kids.indexOf(topbar)).toBeLessThan(kids.indexOf(viewsBar));
     expect(kids.indexOf(viewsBar)).toBeLessThan(kids.indexOf(main));
@@ -90,10 +86,14 @@ describe('Расположение элементов в index.html', () => {
 
   it('кнопки undo/redo задизейблены стеками и стоят сразу после «Сохранить»', () => {
     const saveBtn = [...doc.querySelectorAll('.at-actions button')].find((b) =>
-      /manualSave/.test(b.getAttribute('@click') || ''),
+      /manualSave/.test(b.getAttribute('@click') || '')
     );
-    const undoBtn = [...doc.querySelectorAll('.at-actions button')].find((b) => /undoAction/.test(b.getAttribute('@click') || ''));
-    const redoBtn = [...doc.querySelectorAll('.at-actions button')].find((b) => /redoAction/.test(b.getAttribute('@click') || ''));
+    const undoBtn = [...doc.querySelectorAll('.at-actions button')].find((b) =>
+      /undoAction/.test(b.getAttribute('@click') || '')
+    );
+    const redoBtn = [...doc.querySelectorAll('.at-actions button')].find((b) =>
+      /redoAction/.test(b.getAttribute('@click') || '')
+    );
     expect(saveBtn).toBeTruthy();
     expect(undoBtn).toBeTruthy();
     expect(redoBtn).toBeTruthy();
@@ -108,7 +108,9 @@ describe('Расположение элементов в index.html', () => {
 
   it('выпадающее меню «Меню» содержит все группы: Разделы, Справочники, Файл, Проект', () => {
     const menu = doc.querySelector('.gh-menu');
-    const titles = [...menu.querySelectorAll('.gh-menu-group-title')].map((t) => t.textContent.trim());
+    const titles = [...menu.querySelectorAll('.gh-menu-group-title')].map((t) =>
+      t.textContent.trim()
+    );
     expect(titles).toEqual(expect.arrayContaining(['Разделы', 'Справочники', 'Файл', 'Проект']));
     // порядок групп сверху вниз именно такой
     expect(titles.indexOf('Разделы')).toBeLessThan(titles.indexOf('Справочники'));
@@ -148,7 +150,7 @@ describe('Расположение элементов в index.html', () => {
     // все три — прямые дети at-content, порядок совпадает с табами
     const content = doc.querySelector('.at-content');
     const kids = [...content.children].filter((el) =>
-      ['at-table-wrap', 'at-gantt-wrap', 'at-summary-wrap'].some((c) => el.classList.contains(c)),
+      ['at-table-wrap', 'at-gantt-wrap', 'at-summary-wrap'].some((c) => el.classList.contains(c))
     );
     expect(kids.map((el) => el.className.split(' ')[0])).toEqual([
       'at-table-wrap',
@@ -177,7 +179,9 @@ describe('Расположение элементов в index.html', () => {
     expect(tbody.lastElementChild).toBe(addRow);
     // две точки входа: ячейка ＋ и кнопка «Через форму»
     expect(addRow.innerHTML).toContain('openAddRecordModal()');
-    expect(addRow.querySelector('td.add')?.getAttribute('@click')).toMatch(/addRow\(currentTargetSection\(\)\)/);
+    expect(addRow.querySelector('td.add')?.getAttribute('@click')).toMatch(
+      /addRow\(currentTargetSection\(\)\)/
+    );
     // в шапке НЕ должно быть дублирующей кнопки «Добавить запись»
     const topbarText = doc.querySelector('.at-topbar').textContent;
     expect(/Добавить запись/.test(topbarText)).toBe(false);
@@ -186,8 +190,12 @@ describe('Расположение элементов в index.html', () => {
   it('тулбар Ганта: слева дата начала, по центру инфо, справа кнопки крит.пути/автоплана/экспорта', () => {
     const toolbar = doc.querySelector('.at-gantt-toolbar');
     expect(toolbar.querySelector('.at-gantt-start input[type="date"]')).toBeTruthy();
-    const critical = [...toolbar.querySelectorAll('button')].find((b) => /ganttCritical/.test(b.getAttribute('@click') || ''));
-    const exportBtn = [...toolbar.querySelectorAll('button')].find((b) => /exportGantt\(\)/.test(b.getAttribute('@click') || ''));
+    const critical = [...toolbar.querySelectorAll('button')].find((b) =>
+      /ganttCritical/.test(b.getAttribute('@click') || '')
+    );
+    const exportBtn = [...toolbar.querySelectorAll('button')].find((b) =>
+      /exportGantt\(\)/.test(b.getAttribute('@click') || '')
+    );
     expect(critical).toBeTruthy();
     expect(exportBtn).toBeTruthy();
     // spacer разделяет левую и правую части
@@ -200,14 +208,32 @@ describe('Расположение элементов в index.html', () => {
 
   it('сводная ведомость: заголовок слева, поиск ресурса, CSV справа; колонка «Раздел» присутствует', () => {
     const sumToolbar = doc.querySelector('.at-summary-toolbar');
-    expect(sumToolbar.querySelector('.at-summary-title').textContent).toBe('Сводная ведомость ресурсов');
-    expect(sumToolbar.querySelector('.at-search input').getAttribute('x-model')).toBe('summarySearch');
-    const csv = [...sumToolbar.querySelectorAll('button')].find((b) => /exportSummaryCsv/.test(b.getAttribute('@click') || ''));
+    expect(sumToolbar.querySelector('.at-summary-title').textContent).toBe(
+      'Сводная ведомость ресурсов'
+    );
+    expect(sumToolbar.querySelector('.at-search input').getAttribute('x-model')).toBe(
+      'summarySearch'
+    );
+    const csv = [...sumToolbar.querySelectorAll('button')].find((b) =>
+      /exportSummaryCsv/.test(b.getAttribute('@click') || '')
+    );
     expect(csv).toBeTruthy();
     expect(sumToolbar.querySelector('.spacer')).toBeTruthy();
     // таблица сводки содержит колонку «Раздел» между «Ед. изм.» и «Кол-во всего»
-    const ths = [...doc.querySelectorAll('.summary-table thead th')].map((th) => th.textContent.replace(/[T#∑⬡$]/g, '').trim());
-    expect(ths).toEqual(expect.arrayContaining(['Наименование ресурса', 'Тип', 'Ед. изм.', 'Раздел', 'Кол-во всего', 'Средняя цена', 'Стоимость, ₽']));
+    const ths = [...doc.querySelectorAll('.summary-table thead th')].map((th) =>
+      th.textContent.replace(/[T#∑⬡$]/g, '').trim()
+    );
+    expect(ths).toEqual(
+      expect.arrayContaining([
+        'Наименование ресурса',
+        'Тип',
+        'Ед. изм.',
+        'Раздел',
+        'Кол-во всего',
+        'Средняя цена',
+        'Стоимость, ₽',
+      ])
+    );
     const idxUnit = ths.indexOf('Ед. изм.');
     const idxSection = ths.indexOf('Раздел');
     const idxQty = ths.indexOf('Кол-во всего');
@@ -228,7 +254,14 @@ describe('Расположение элементов в index.html', () => {
       expect(modal, `нет .at-modal внутри backdrop ${flag}`).toBeTruthy();
     }
     // все модальные состояния app.js имеют якорь в разметке
-    for (const flag of ['calcModalOpen', 'projModalOpen', 'resModalOpen', 'printModalOpen', 'helpModalOpen', 'nsbModalOpen']) {
+    for (const flag of [
+      'calcModalOpen',
+      'projModalOpen',
+      'resModalOpen',
+      'printModalOpen',
+      'helpModalOpen',
+      'nsbModalOpen',
+    ]) {
       expect(htmlSrc).toContain(`x-show="${flag}"`);
     }
     // панель истории — боковой overlay, а не центральная модалка
@@ -255,8 +288,20 @@ describe('Расположение элементов в index.html', () => {
 describe('Наличие функций, вызываемых из UI', () => {
   it('каждый прямой вызов метода в @click существует в объекте smeta()', () => {
     const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
-    const clickHandlers = [...htmlSrc.matchAll(/@click(?:\.outside|\.self)?="([^"]+)"/g)].map((m) => m[1]);
-    const BUILTINS = new Set(['if', 'typeof', 'Math', 'Number', 'String', 'JSON', 'Date', '$refs', 'nextTick']);
+    const clickHandlers = [...htmlSrc.matchAll(/@click(?:\.outside|\.self)?="([^"]+)"/g)].map(
+      (m) => m[1]
+    );
+    const BUILTINS = new Set([
+      'if',
+      'typeof',
+      'Math',
+      'Number',
+      'String',
+      'JSON',
+      'Date',
+      '$refs',
+      'nextTick',
+    ]);
     const missing = new Set();
     for (const h of clickHandlers) {
       for (const call of h.matchAll(/(?:^|[^.\w$])([A-Za-z_]\w*)\s*\(/g)) {
@@ -273,12 +318,35 @@ describe('Наличие функций, вызываемых из UI', () => {
   it('ключевые UI-функции present и вызываются без исключений', () => {
     const obj = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
     const keyFns = [
-      'manualSave', 'undoAction', 'redoAction', 'openNsb', 'openResHub', 'openCalc',
-      'openAddSectionModal', 'openAddRecordModal', 'openProjectModal', 'openPrintModal',
-      'exportJson', 'exportGantt', 'exportSummaryCsv', 'toggleGantt', 'problemCount',
-      'savedTimeText', 'currentTargetSection', 'addRow', 'goPage', 'pageLabel',
-      'totalTableWidth', 'colSpanFor', 'tailCols', 'printColOn', 'groupTypeLabel',
-      'fmtNum', 'summaryTotalCost', 'ganttHasShifts', 'resetAllGanttShifts',
+      'manualSave',
+      'undoAction',
+      'redoAction',
+      'openNsb',
+      'openResHub',
+      'openCalc',
+      'openAddSectionModal',
+      'openAddRecordModal',
+      'openProjectModal',
+      'openPrintModal',
+      'exportJson',
+      'exportGantt',
+      'exportSummaryCsv',
+      'toggleGantt',
+      'problemCount',
+      'savedTimeText',
+      'currentTargetSection',
+      'addRow',
+      'goPage',
+      'pageLabel',
+      'totalTableWidth',
+      'colSpanFor',
+      'tailCols',
+      'printColOn',
+      'groupTypeLabel',
+      'fmtNum',
+      'summaryTotalCost',
+      'ganttHasShifts',
+      'resetAllGanttShifts',
     ];
     for (const n of keyFns) {
       expect(typeof obj[n], `нет функции ${n}`).toBe('function');
@@ -303,13 +371,48 @@ describe('Поведение UI-функций (исполнение @click из
   });
 
   const getClick = (b) =>
-    b.getAttribute('@click') || b.getAttribute('@click.stop') || b.getAttribute('@click.self') || '';
+    b.getAttribute('@click') ||
+    b.getAttribute('@click.stop') ||
+    b.getAttribute('@click.self') ||
+    '';
+
+  // Исполняем ровно тот код, что висит на кнопке @click, в контексте smeta().
+  // Прямой вызов методов вместо new Function: esbuild в TS-файле подменяет
+  // идентификаторы метода (this.toggleGantt → this.obj_1), из-за чего динамический
+  // код ссылаётся на несуществующие поля. Разбор выражений @click по образцу.
+  const runExpr = (expr: string) => {
+    for (const part of expr
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)) {
+      let m;
+      if ((m = part.match(/^([\w$]+)\(\)$/))) {
+        obj[m[1]]();
+      } else if ((m = part.match(/^([\w$.]+)\s*=\s*!\1$/))) {
+        const path = m[1].split('.');
+        let t = obj;
+        for (let i = 0; i < path.length - 1; i++) t = t[path[i]];
+        t[path[path.length - 1]] = !t[path[path.length - 1]];
+      } else if ((m = part.match(/^([\w$.]+)\s*=\s*(true|false)$/))) {
+        const path = m[1].split('.');
+        let t = obj;
+        for (let i = 0; i < path.length - 1; i++) t = t[path[i]];
+        t[path[path.length - 1]] = m[2] === 'true';
+      } else if ((m = part.match(/^([\w$.]+)\s*=\s*'([^']*)'$/))) {
+        const path = m[1].split('.');
+        let t = obj;
+        for (let i = 0; i < path.length - 1; i++) t = t[path[i]];
+        t[path[path.length - 1]] = m[2];
+      } else {
+        throw new Error(`runExpr: неразобранное выражение @click: "${part}"`);
+      }
+    }
+  };
 
   const runClick = (selector, matcher) => {
     const btn = [...doc.querySelectorAll(selector)].find((b) => matcher.test(getClick(b)));
     expect(btn, `кнопка не найдена: ${matcher}`).toBeTruthy();
-    // исполняем ровно тот код, что висит на кнопке, в контексте smeta()
-    new Function(`return function(){${getClick(btn)}}`).call(obj);
+    runExpr(getClick(btn));
     return btn;
   };
 
@@ -331,9 +434,11 @@ describe('Поведение UI-функций (исполнение @click из
     runClick('.gh-menu-wrap > button', /topMenuOpen = !topMenuOpen/);
     expect(obj.topMenuOpen).toBe(true);
     // пункт меню НСБ: сначала закрывает меню, потом openNsb()
-    const nsbItem = [...doc.querySelectorAll('.gh-menu button')].find((b) => /openNsb\(\)/.test(b.getAttribute('@click') || ''));
+    const nsbItem = [...doc.querySelectorAll('.gh-menu button')].find((b) =>
+      /openNsb\(\)/.test(b.getAttribute('@click') || '')
+    );
     expect(nsbItem).toBeTruthy();
-    new Function(`return function(){${nsbItem.getAttribute('@click')}}`).call(obj);
+    runExpr(getClick(nsbItem));
     expect(obj.topMenuOpen).toBe(false);
     expect(obj.nsbModalOpen).toBe(true);
   });
@@ -383,7 +488,9 @@ describe('Поведение UI-функций (исполнение @click из
   it('кнопка ⤓ Экспорт… в тулбаре Ганта вызывает существующий exportGantt (без падения до стадии диалога)', () => {
     // exportGantt показывает confirm()/canvas — в jsdom нет canvas, поэтому
     // проверяем лишь что метод привязан и это функция smeta (см. также ui-contract)
-    const btn = [...doc.querySelectorAll('.at-gantt-toolbar button')].find((b) => /exportGantt\(\)/.test(b.getAttribute('@click') || ''));
+    const btn = [...doc.querySelectorAll('.at-gantt-toolbar button')].find((b) =>
+      /exportGantt\(\)/.test(b.getAttribute('@click') || '')
+    );
     expect(btn).toBeTruthy();
     const obj2 = typeof smetaModule === 'function' ? smetaModule() : smetaModule;
     expect(typeof obj2.exportGantt).toBe('function');

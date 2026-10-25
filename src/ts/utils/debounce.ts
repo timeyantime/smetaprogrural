@@ -45,7 +45,8 @@ export function debounce(
   function invokeFunc(time) {
     const args = lastArgs;
     const thisArg = lastThis;
-    lastArgs = null; lastThis = null;
+    lastArgs = null;
+    lastThis = null;
     lastInvokeTime = time;
     return func.apply(thisArg, args);
   }
@@ -61,7 +62,8 @@ export function debounce(
     if (trailing && lastArgs) {
       return invokeFunc(time);
     }
-    lastArgs = null; lastThis = null;
+    lastArgs = null;
+    lastThis = null;
     return null;
   }
 
@@ -95,6 +97,7 @@ export function debounce(
     const isInvoking = shouldInvoke(time);
 
     lastArgs = args;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- классический паттерн debounce: контекст вызова сохраняется для последующего invokeFunc
     lastThis = this;
 
     if (isInvoking) {
@@ -151,6 +154,7 @@ export function debounce(
 export function simpleDebounce(fn, delay) {
   let timeout;
   return function (...args) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- контекст пробрасывается в setTimeout колбэк
     const context = this;
     clearTimeout(timeout);
     timeout = setTimeout(() => {
@@ -170,6 +174,7 @@ export function throttle(func, limit) {
   let lastRan;
 
   return function (...args) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias -- контекст пробрасывается в отложенный вызов
     const context = this;
 
     if (!lastRan) {

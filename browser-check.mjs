@@ -1,0 +1,15 @@
+import { JSDOM, VirtualConsole } from 'jsdom';
+const vc = new VirtualConsole();
+vc.on('jsdomError', e => console.log('JSDOM ERROR:', e.message.split('\n')[0]));
+vc.on('error', (...a) => console.log('CONSOLE ERROR:', String(a[0]).slice(0,200)));
+vc.on('log', (...a) => console.log('PAGE LOG:', String(a[0]).slice(0,150)));
+const dom = await JSDOM.fromURL('http://localhost:8123/', { runScripts: 'dangerously', resources: 'usable', virtualConsole: vc });
+await new Promise(r => setTimeout(r, 4000));
+const w = dom.window;
+console.log('window.smeta:', typeof w.smeta);
+console.log('window.ganttLinks:', typeof w.ganttLinks);
+console.log('window.Alpine:', typeof w.Alpine);
+const app = w.document.querySelector('.app');
+console.log('x-data resolved, table rows:', w.document.querySelectorAll('tbody tr').length);
+console.log('buttons:', w.document.querySelectorAll('button').length);
+dom.window.close();

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:assets && npm run build:scripts",
+    "build:assets": "vite build",
+    "build:scripts": "esbuild src/ts/money.ts src/ts/app.ts --bundle --format=iife --target=es2020 --outdir=dist/assets --out-extension:.js=.js",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.ts",
     "lint:fix": "eslint src --ext .js,.ts --fix",

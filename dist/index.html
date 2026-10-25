@@ -11,10 +11,10 @@
        money.js регистрирует Alpine-директиву x-money (слушает 'alpine:init',
        который происходит при старте CDN-скрипта ниже); app.js объявляет
        window.smeta для x-data="smeta()" и тянет за собой модели/сервисы
-       (единый источник округления — src/js/rounding.js). -->
+       (единый источник округления — src/ts/rounding.ts). -->
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <script type="module" crossorigin src="/assets/main-qjItyGhV.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-B7oSqL-K.css">
+  <script type="module" crossorigin src="/assets/main-lmX_kHvH.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-0ZX6mBk0.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -71,11 +71,11 @@
             <div class="gh-menu-group-title">Файл</div>
             <button @click="topMenuOpen = false; $nextTick(() => $refs.fileImport.click())">
               <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 1l3.5 3.5H9v6H7v-6H4.5L8 1zM2 12h12v2H2z"/></svg>
-              Импорт JSON
+              Импорт TOON
             </button>
             <button @click="topMenuOpen = false; exportJson()">
               <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M8 15L4.5 11.5H7v-6h2v6h2.5L8 15zM2 3h12V1H2z"/></svg>
-              Экспорт JSON
+              Экспорт TOON
             </button>
             <button @click="topMenuOpen = false; exportCsv()">
               <svg viewBox="0 0 16 16" width="14" height="14"><path fill="currentColor" d="M3 1h7l3 3v11H3V1zm7 0v3h3M5 8h6M5 11h6"/></svg>
@@ -99,8 +99,8 @@
             </button>
           </div>
         </div>
-        <input type="file" x-ref="fileImport" accept=".json" hidden @change="importJson($event)" />
-        <input type="file" x-ref="fileNsbImport" accept=".json" hidden @change="importNsb($event)" />
+        <input type="file" x-ref="fileImport" accept=".toon,.json" hidden @change="importJson($event)" />
+        <input type="file" x-ref="fileNsbImport" accept=".toon,.json" hidden @change="importNsb($event)" />
       </div>
     </header>
 
@@ -388,7 +388,7 @@
             <svg class="at-gantt-links" :width="ganttLinksSize.w" :height="ganttLinksSize.h" aria-hidden="true">
               <!-- Vite/parse5 не может сериализовать <template> внутри SVG-контекста
                    (сломанная сборка: "Cannot read properties of undefined (reading 'nodeName')").
-                   Эквивалент исходному x-for/x-if: Alpine-компонент ganttLinks() в src/js/app.js
+                   Эквивалент исходному x-for/x-if: Alpine-компонент ganttLinks() в src/ts/app.ts
                    перерисовывает этот <g> при изменениях ganttLinkLines / ganttLinkPath. -->
               <g x-data="ganttLinks()" x-init="init($el)" @cleanup="destroy()" x-effect="render($el, ganttLinkLines, ganttLinkPath)"></g>
               <defs>
@@ -1127,7 +1127,7 @@
 
           <h4>15. Нормативно-справочная база (НСБ)</h4>
           <p>Кнопка «НСБ» вверху открывает базу расценок: шифр, наименование, тип, ед. изм., цена.
-             Записи можно добавлять, редактировать, удалять, а также импортировать/экспортировать в JSON.
+             Записи можно добавлять, редактировать, удалять, а также импортировать/экспортировать в TOON (или legacy JSON).
              Кнопка «⇥ В смету» переносит расценку в выделенную строку таблицы
              (или создаёт новую запись в текущем разделе).</p>
 
@@ -1288,8 +1288,8 @@
         <div class="at-modal-body">
           <div class="nsb-toolbar">
             <button class="at-btn at-btn-primary at-btn-sm" @click="nsbAddNew()">＋ Добавить расценку</button>
-            <button class="at-btn at-btn-sm" @click="$refs.fileNsbImport.click()">⤓ Импорт JSON</button>
-            <button class="at-btn at-btn-sm" @click="exportNsb()">⤒ Экспорт JSON</button>
+            <button class="at-btn at-btn-sm" @click="$refs.fileNsbImport.click()">⤓ Импорт TOON</button>
+            <button class="at-btn at-btn-sm" @click="exportNsb()">⤒ Экспорт TOON</button>
             <button class="at-btn at-btn-sm at-btn-ghost" @click="nsbResetDefaults()">↺ Стартовый набор</button>
             <button class="at-btn at-btn-sm" @click="nsbApplyToSelected()"
                     title="Обновить цены в выделенных записях сметы по совпадению шифра или наименования">⟳ Обновить цены выделения из НСБ</button>

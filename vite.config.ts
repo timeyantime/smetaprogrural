@@ -4,7 +4,8 @@
  */
 
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
   root: '.',
@@ -16,7 +17,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
+        main: path.resolve(path.dirname(fileURLToPath(import.meta.url)), "index.html"),
       },
       output: {
         entryFileNames: 'assets/[name]-[hash].js',

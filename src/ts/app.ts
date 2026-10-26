@@ -338,6 +338,25 @@ function copyFrameworkFields(from, to) {
   }
 }
 
+/**
+ * Разбор строки предшественников в формате MS Project: «2», «FS:2», «SS:3,FF:5».
+ * Тип по умолчанию — FS (Finish-to-Start). Нераспознанные токены игнорируются.
+ */
+function parsePredRefs(text) {
+  const out = [];
+  for (const part of String(text || '').split(/[,\s;]+/)) {
+    if (!part) continue;
+    const m = part.match(/^(?:(FS|SS|FF|SF):)?(\d+)$/i);
+    if (m) out.push({ type: (m[1] || 'FS').toUpperCase(), num: parseInt(m[2]) });
+  }
+  return out;
+}
+
+/** Обратная сериализация связей в строку поля pred («3» для FS — компактно, как в MS Project) */
+function formatPredRefs(refs) {
+  return refs.map((r) => (r.type === 'FS' ? String(r.num) : `${r.type}:${r.num}`)).join(',');
+}
+
 /** Стартовая дата сметы по умолчанию (сегодня) */
 function defaultStartDate() {
   return new Date().toISOString().slice(0, 10);
@@ -440,6 +459,7 @@ window.smeta = function smeta() {
     ganttDrag: null,
     ganttLinkFrom: null,
     ganttLinkPath: null,
+    ganttLinkType: 'FS', // тип создаваемой связи (переключатель в тулбаре Ганта, как в MS Project)
     rowDropTarget: null, // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
     droppedRowId: null, // id переставленной строки — зелёная вспышка row-dropped после drop
 
@@ -1419,14 +1439,32 @@ window.smeta = function smeta() {
 
     /** Установка предшественника по его номеру (#49) */
     setPredByNumber(row, numText) {
-      const n = parseInt(numText);
-      if (!isFinite(n) || n <= 0) {
+      // Разрешаем несколько связей и типы: «2», «FS:2», «SS:3,FF:5» (формат MS Project)
+      const refs = parsePredRefs(numText);
+      if (!refs.length) {
         row.pred = '';
         return;
       }
-      const items = this.flatRows;
-      const target = items[n - 1];
-      row.pred = target ? String(this.rowNumber(target.row.id)) : '';
+      const parts = [];
+      for (const ref of refs) {
+        const target = this.flatRows[ref.num - 1];
+        if (!target || target.row.id === row.id) continue;
+        const n = this.rowNumber(target.row.id);
+        if (n === null || n === undefined) continue;
+        parts.push(ref.type === 'FS' ? String(n) : `${ref.type}:${n}`);
+      }
+      row.pred = parts.join(',');
+    },
+
+    /** Добавить тип связи к существующему предшественнику строки (цикл FS→SS→FF→SF, как в drawio/MS Project) */
+    cyclePredType(row) {
+      const refs = parsePredRefs(row.pred);
+      if (!refs.length) return false;
+      const order = ['FS', 'SS', 'FF', 'SF'];
+      const r = refs[0];
+      r.type = order[(order.indexOf(r.type) + 1) % 4];
+      row.pred = formatPredRefs(refs);
+      return true;
     },
 
     // ==========================================
@@ -2552,47 +2590,93 @@ window.smeta = function smeta() {
           .filter((e): e is [number, any] => e !== null)
       );
       const origLeft = rows.map((g) => g.leftDays);
-      const moved = rows.some((g) => Number(g.row.startAt) >= 0);
-      if (moved) {
-        rows.forEach((g, i) => {
+      // startAt — «закреплённая дата» (constraint Start No Earlier Than, как в MS Project):
+      // полоса стартует не раньше указанной позиции, но связи могут сдвинуть её позже.
+      if (rows.some((g) => Number(g.row.startAt) >= 0)) {
+        rows.forEach((g) => {
           if (Number(g.row.startAt) >= 0)
             g.leftDays = Math.max(0, Math.round(Number(g.row.startAt)));
         });
       }
       const links = [];
-      rows.forEach((g, i) => {
-        const n = parseInt(String(g.row.pred || '').trim());
-        if (!isFinite(n) || n <= 0 || n === numByRowId.get(g.row.id)) return;
-        const pred = byNum.get(n);
-        if (!pred) return;
-        links.push({ from: pred, to: g });
-        // каскад: преемник не может начинаться раньше окончания предшественника
-        const minStart = pred.leftDays + pred.spanDays;
-        if (moved) {
-          if (g.leftDays < minStart) {
-            const shift = minStart - g.leftDays;
-            g.leftDays = minStart;
-            for (let j = i; j < rows.length; j++) rows[j].leftDays += shift;
-          }
-        } else {
-          g.leftDays = Math.max(g.leftDays, minStart);
+      // Собираем все связи (несколько предшественников на строку допустимы, как в MS Project)
+      for (const g of rows) {
+        const selfNum = numByRowId.get(g.row.id);
+        for (const ref of parsePredRefs(g.row.pred)) {
+          if (ref.num === selfNum) continue;
+          const pred = byNum.get(ref.num);
+          if (!pred) continue;
+          links.push({ from: pred, to: g, type: ref.type });
         }
-      });
+      }
+      /* Каскад расписания — топологический обход (алгоритм MS Project):
+         каждая связь FS/SS/FF/SF задаёт нижнюю границу старта преемника.
+         Итерации повторяются, пока позиции не стабилизируются; если после
+         64 проходов остались нарушения — в цепочке цикл, связи помечаются красным. */
+      const constraintStart = (l) => {
+        const f = l.from,
+          t = l.to;
+        switch (l.type) {
+          case 'SS':
+            return f.leftDays; // старт от старта
+          case 'FF':
+            return f.leftDays + f.spanDays - t.spanDays; // финиш от финиша
+          case 'SF':
+            return f.leftDays - t.spanDays; // старт от финиша (экзотика, но из набора MS Project)
+          default:
+            return f.leftDays + f.spanDays; // FS: старт сразу после финиша
+        }
+      };
+      let changed = true;
+      let passes = 0;
+      while (changed && passes < 64) {
+        changed = false;
+        passes++;
+        for (const l of links) {
+          const minStart = Math.max(0, constraintStart(l));
+          if (l.to.leftDays < minStart) {
+            l.to.leftDays = minStart;
+            changed = true;
+          }
+        }
+      }
+      // циклы: нарушение ограничения после стабилизации → подсветка связи
+      for (const l of links) l.cyclic = constraintStart(l) > l.to.leftDays;
       const workedDays = rows.reduce((m, g) => Math.max(m, g.leftDays + g.spanDays), 0);
       const totalDays = Math.max(7, workedDays); // минимум — неделя шкалы
-      /* критический путь (#49): longest path по цепочкам предшественников */
+      /* критический путь (#49): longest path по цепочкам предшественников.
+         Длина зависит от типа связи (FS добавляет весь срок предшественника,
+         SS — только его старт и т.д.), поэтому считается отдельно по каждому типу. */
       const memo = new Map();
+      /* longest path с весами по типам связей (как в CPM MS Project):
+         FS: длина цепочки предш. + весь срок g; SS: старты совпадают →
+         max(цепочка предш., цепочка g без его срока + срок предш.); FF: финиши
+         совпадают → длины сравниваются напрямую; SF — редкий, считаем как FS-оценку. */
       const chainLen = (g) => {
         if (memo.has(g)) return memo.get(g);
         let best = 0;
-        const n = parseInt(String(g.row.pred || '').trim());
-        if (isFinite(n) && n > 0) {
-          const pred = byNum.get(n);
-          if (pred && pred !== g) best = chainLen(pred);
+        const selfNum = numByRowId.get(g.row.id);
+        for (const ref of parsePredRefs(g.row.pred)) {
+          if (ref.num === selfNum) continue;
+          const pred = byNum.get(ref.num);
+          if (!pred || memo.get(pred) === g) continue;
+          const pLen = chainLen(pred);
+          let v;
+          switch (ref.type) {
+            case 'SS':
+              v = Math.max(pLen, g.spanDays + pLen - pred.spanDays);
+              break;
+            case 'FF':
+              v = Math.max(pLen, g.spanDays);
+              break;
+            default: // FS и SF
+              v = pLen + g.spanDays;
+          }
+          if (v > best) best = v;
         }
-        const len = best + g.spanDays;
-        memo.set(g, len);
-        return len;
+        if (!best) best = g.spanDays; // старт цепочки без предшественников
+        memo.set(g, best);
+        return best;
       };
       const maxChain = rows.reduce((m, g) => Math.max(m, chainLen(g)), 0);
       rows.forEach((g) => {
@@ -2629,11 +2713,19 @@ window.smeta = function smeta() {
       // Alpine пересчитать линии связей после того, как DOM уже отрисован.
       void this.layoutTick;
       const tracks = document.querySelectorAll('.at-gantt .at-gantt-track');
+      // Точки крепления зависят от типа связи (как в MS Project):
+      // FS/SF — выход справа у предшественника; SS/SS — вход слева в преемник.
+      const anchorX = (g, side) => {
+        if (side === 'right') return g.leftDays * w + Math.max(6, g.spanDays * w - 4);
+        return g.leftDays * w;
+      };
       return this.ganttData.links
         .map((l) => {
           const fi = rows.indexOf(l.from);
           const ti = rows.indexOf(l.to);
           if (fi < 0 || ti < 0) return null;
+          const fromRight = l.type === 'FS' || l.type === 'SF'; // выход из финиша предш.
+          const toLeft = l.type === 'FS' || l.type === 'SS'; // вход в старт преемника
           // Координаты: из DOM (точно), фолбэк — формульная геометрия (вне браузера).
           let x1, y1, x2, y2;
           const trackT = tracks[ti];
@@ -2643,18 +2735,18 @@ window.smeta = function smeta() {
             const rf = barF.getBoundingClientRect();
             const rt = barT.getBoundingClientRect();
             const rc = trackT.getBoundingClientRect();
-            x1 = rf.right - rc.left;
+            x1 = fromRight ? rf.right - rc.left : rf.left - rc.left;
             y1 = rf.top + rf.height / 2 - rc.top;
-            x2 = rt.left - rc.left;
+            x2 = toLeft ? rt.left - rc.left : rt.right - rc.left;
             y2 = rt.top + rt.height / 2 - rc.top;
           } else {
-            x1 = l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
+            x1 = anchorX(l.from, fromRight ? 'right' : 'left');
             y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
-            x2 = l.to.leftDays * w;
+            x2 = anchorX(l.to, toLeft ? 'left' : 'right');
             y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
           }
           // drawio-style: ортогональный маршрутер со скруглёнными углами
-          // (правая точка предшественника → вправо → вертикаль → влево → стрелка в цель).
+          // (точка выхода предшественника → вправо → вертикаль → стрелка в цель).
           const r = 6;
           const midX = Math.max(x1 + 12, x2 - 16);
           const dy = y2 - y1;
@@ -2680,7 +2772,7 @@ window.smeta = function smeta() {
               (rr > 0.5 ? ` Q${midX},${y2} ${midX + rr},${y2}` : ` H${midX}`) +
               ` H${Math.max(midX, x2 - 7)}`;
           }
-          return d;
+          return { d, cls: 'lt-' + (l.type || 'FS') + (l.cyclic ? ' cyclic' : '') };
         })
         .filter(Boolean);
     },
@@ -2773,8 +2865,13 @@ window.smeta = function smeta() {
           if (fromNum === null || fromNum === undefined) {
             this.logActivity('Не удалось определить номер предшественника — связь не создана');
           } else {
-            g.row.pred = String(fromNum);
-            this.logActivity(`Связь: №${fromNum} → №${this.rowNumber(g.row.id) ?? '—'}`);
+            // несколько связей на строку + тип: «SS:3,5» (MS Project-style)
+            const refs = parsePredRefs(g.row.pred).filter((r) => r.num !== fromNum);
+            refs.push({ type: this.ganttLinkType || 'FS', num: fromNum });
+            g.row.pred = formatPredRefs(refs);
+            this.logActivity(
+              `Связь ${this.ganttLinkType}: №${fromNum} → №${this.rowNumber(g.row.id) ?? '—'}`
+            );
           }
         }
         this.ganttLinkFrom = null;
@@ -2807,8 +2904,13 @@ window.smeta = function smeta() {
             this.pushHistory('Создана связь Ганта');
             const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
             if (fromNum !== null && fromNum !== undefined) {
-              gTo.row.pred = String(fromNum);
-              this.logActivity(`Связь: №${fromNum} → №${this.rowNumber(gTo.row.id) ?? '—'}`);
+              // несколько связей + выбранный тип (FS/SS/FF/SF) — как в draw.io: перетащил = добавил
+              const refs = parsePredRefs(gTo.row.pred).filter((r) => r.num !== fromNum);
+              refs.push({ type: this.ganttLinkType || 'FS', num: fromNum });
+              gTo.row.pred = formatPredRefs(refs);
+              this.logActivity(
+                `Связь ${this.ganttLinkType}: №${fromNum} → №${this.rowNumber(gTo.row.id) ?? '—'}`
+              );
             }
           }
         }
@@ -2861,12 +2963,37 @@ window.smeta = function smeta() {
     /** Правый клик по полосе: убрать связь или ручной сдвиг */
     onBarContext(g) {
       if (g.row.pred) {
+        // Клик по стрелке связи — переключить тип FS→SS→FF→SF (жест из draw.io/MS Project),
+        // правый клик — удалить связь целиком.
         this.pushHistory('Удалена связь Ганта');
         g.row.pred = '';
         this.logActivity(`Снята связь у «${(g.name || '').slice(0, 30)}»`);
       } else if (Number(g.row.startAt) >= 0) {
         this.resetGanttShift(g.row);
       }
+    },
+
+    /** Переключатель типа создаваемой связи в тулбаре Ганта */
+    setGanttLinkType(t) {
+      this.ganttLinkType = t;
+    },
+
+    /** Чип предшественника: клик — сменить тип связи (FS→SS→FF→SF), alt+клик — удалить одну связь */
+    predChipClick(e, row) {
+      e.stopPropagation();
+      const refs = parsePredRefs(row.pred);
+      if (!refs.length) return;
+      if (e.altKey) {
+        this.pushHistory('Удалена связь Ганта');
+        refs.shift();
+        row.pred = formatPredRefs(refs);
+        return;
+      }
+      this.pushHistory('Изменён тип связи Ганта');
+      const order = ['FS', 'SS', 'FF', 'SF'];
+      const r = refs[0];
+      r.type = order[(order.indexOf(r.type) + 1) % 4];
+      row.pred = formatPredRefs(refs);
     },
 
     /** Экспорт Ганта в PNG (указатель №5: PNG/SVG слиты в одну кнопку — выбор формата в диалоге) */
@@ -3194,14 +3321,14 @@ window.ganttLinks = function ganttLinks() {
       // Связи: перерисовываем только при изменении набора путей (без ре-анимации
       // на каждое движение мыши). Ключ — содержимое, а не количество: при удалении
       // одной из нескольких связей тоже нужна перерисовка.
-      const key = lines.join('|');
+      const key = lines.map((l) => l.d + '#' + l.cls).join('|');
       if (key !== lastKey) {
         lastKey = key;
         el.replaceChildren(
-          ...lines.map((d) => {
+          ...lines.map((l) => {
             const p = document.createElementNS(NS, 'path');
-            p.setAttribute('d', d);
-            p.setAttribute('class', 'at-gantt-linkpath');
+            p.setAttribute('d', l.d);
+            p.setAttribute('class', 'at-gantt-linkpath ' + l.cls);
             p.setAttribute('marker-end', 'url(#arrowhead)');
             return p;
           })

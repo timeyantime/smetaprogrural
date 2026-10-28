@@ -346,20 +346,70 @@ export function parsePredRefs(text) {
   const out = [];
   for (const part of String(text || '').split(/[,\s;]+/)) {
     if (!part) continue;
-    const m = part.match(/^(?:(FS|SS|FF|SF):)?(\d+)$/i);
-    if (m) out.push({ type: (m[1] || 'FS').toUpperCase(), num: parseInt(m[2]) });
+    // «ОН»/«НН» — русские сокращения MS Project (Finish-to-Start / Start-to-Start);
+    // лаг: «2+3», «FS:2+3», «ОН-1» (+ задержка, − опережение в днях)
+    const m = part.match(/^(?:(FS|SS|FF|SF|ОН|НН|ФФ|СФ):)?(\d+)([+-]\d+)?$/i);
+    if (!m) continue;
+    let type = (m[1] || 'FS').toUpperCase();
+    if (type === 'ОН') type = 'FS';
+    if (type === 'НН') type = 'SS';
+    if (type === 'ФФ') type = 'FF';
+    if (type === 'СФ') type = 'SF';
+    out.push({ type, num: parseInt(m[2]), lag: m[3] ? parseInt(m[3]) : 0 });
   }
   return out;
 }
 
 /** Обратная сериализация связей в строку поля pred («3» для FS — компактно, как в MS Project) */
 function formatPredRefs(refs) {
-  return refs.map((r) => (r.type === 'FS' ? String(r.num) : `${r.type}:${r.num}`)).join(',');
+  return refs
+    .map((r) => {
+      let s = r.type === 'FS' ? String(r.num) : `${r.type}:${r.num}`;
+      if (r.lag) s += r.lag > 0 ? `+${r.lag}` : String(r.lag);
+      return s;
+    })
+    .join(',');
 }
 
 /** Стартовая дата сметы по умолчанию (сегодня) */
 function defaultStartDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+/* ── Календарные утилиты Ганта (рабочие дни, как в MS Project) ───────────────
+   ganttWorkDaysPerWeek: 7 — без выходных; 6 — только вс; 5 — сб+вс.
+   Holidays — список дат 'YYYY-MM-DD', исключаемых из расчёта. */
+export function isNonWorkingDay(dateMs, workDaysPerWeek, holidaysSet) {
+  const dow = new Date(dateMs).getUTCDay(); // 0=вс … 6=сб
+  if (workDaysPerWeek >= 7) return false;
+  if (dow === 0) return true; // воскресенье — выходной при 5/6-дневке
+  if (workDaysPerWeek <= 5 && dow === 6) return true; // суббота — выходной при 5-дневке
+  return !!(holidaysSet && holidaysSet.has(toISODateUTC(dateMs)));
+}
+
+function toISODateUTC(ms) {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** Число рабочих дней в интервале [from, to) с учётом выходных/праздников */
+export function countWorkdays(fromMs, toMs, workDaysPerWeek, holidaysSet) {
+  let n = 0;
+  for (let t = fromMs; t < toMs; t += 86400000) {
+    if (!isNonWorkingDay(t, workDaysPerWeek, holidaysSet)) n++;
+  }
+  return n;
+}
+
+/** Сместить дату на k рабочих дней (k может быть отрицательным) */
+export function addWorkdays(fromMs, k, workDaysPerWeek, holidaysSet) {
+  const step = k >= 0 ? 86400000 : -86400000;
+  let rem = Math.abs(k);
+  let t = fromMs;
+  while (rem > 0) {
+    t += step;
+    if (!isNonWorkingDay(t, workDaysPerWeek, holidaysSet)) rem--;
+  }
+  return t;
 }
 
 // ============================================
@@ -402,6 +452,12 @@ window.smeta = function smeta() {
 
     // Гант: подсветка критического пути (#49)
     ganttCritical: false,
+    /* Календарь Ганта: рабочих дней в неделе (5 = сб+вс выходные, 6 = вс, 7 = без выходных),
+       список праздничных дат ('YYYY-MM-DD'), состояние модального окна календаря */
+    ganttWorkDaysPerWeek: 5,
+    ganttHolidays: [],
+    calOpen: false,
+    calMonth: '', // 'YYYY-MM' — отображаемый месяц
 
     // Боковая панель истории: problems | log
     historyTab: 'problems',
@@ -912,6 +968,10 @@ window.smeta = function smeta() {
       // Состояние сводной панели: запоминаем; на первый запуск — открыта на широких экранах
       if (typeof ui.sidebarCollapsed === 'boolean') this.sidebarCollapsed = ui.sidebarCollapsed;
       else if (typeof window !== 'undefined') this.sidebarCollapsed = !(window.innerWidth >= 1200);
+      // Календарь Ганта: рабочие дни недели и праздники
+      if ([5, 6, 7].includes(Number(ui.ganttWorkDaysPerWeek)))
+        this.ganttWorkDaysPerWeek = Number(ui.ganttWorkDaysPerWeek);
+      if (Array.isArray(ui.ganttHolidays)) this.ganttHolidays = ui.ganttHolidays.map(String);
     },
 
     /**
@@ -923,6 +983,8 @@ window.smeta = function smeta() {
         hiddenCols: this.hiddenCols,
         viewTab: this.viewTab,
         sidebarCollapsed: this.sidebarCollapsed,
+        ganttWorkDaysPerWeek: this.ganttWorkDaysPerWeek,
+        ganttHolidays: this.ganttHolidays,
       });
     },
 
@@ -1462,9 +1524,9 @@ window.smeta = function smeta() {
         if (!target || target.row.id === row.id) continue;
         const n = this.rowNumber(target.row.id);
         if (n === null || n === undefined) continue;
-        parts.push(ref.type === 'FS' ? String(n) : `${ref.type}:${n}`);
+        parts.push({ type: ref.type, num: n, lag: ref.lag || 0 });
       }
-      row.pred = parts.join(',');
+      row.pred = formatPredRefs(parts);
     },
 
     /** Добавить тип связи к существующему предшественнику строки (цикл FS→SS→FF→SF, как в drawio/MS Project) */
@@ -2560,6 +2622,30 @@ window.smeta = function smeta() {
     _computeGanttData() {
       const DAY = 86400000;
       const start = new Date(this.data.startDate || defaultStartDate()).getTime();
+      /* Календарь (MS Project-style): длительности считаются в РАБОЧИХ днях —
+         полоса занимает столько календарных дней, сколько нужно для dur рабочих
+         с учётом выбранных выходных (сб/вс) и праздников. Индексы leftDays /
+         spanDays остаются «рабочими колонками»; отображение на календарную
+         шкалу — через ganttPosOf/ganttWidthOf. */
+      const wd = Math.max(5, Math.min(7, Number(this.ganttWorkDaysPerWeek) || 7));
+      const holSet = new Set((this.ganttHolidays || []).map(String));
+      const workCache = [start]; // workCache[i] — дата начала i-го рабочего дня
+      const ensureWork = (i) => {
+        while (workCache.length <= i) {
+          let t = workCache[workCache.length - 1] + DAY;
+          while (isNonWorkingDay(t, wd, holSet)) t += DAY;
+          workCache.push(t);
+        }
+        return workCache[i];
+      };
+      ensureWork(0);
+      if (isNonWorkingDay(start, wd, holSet)) {
+        // старт проекта попал на выходной/праздник — переносим на ближайший рабочий день
+        let t = start;
+        while (isNonWorkingDay(t, wd, holSet)) t += DAY;
+        workCache[0] = t;
+      }
+      const calendarIdx = (ms) => countWorkdays(start, ms, wd, holSet);
       // если активна вкладка раздела — диаграмма строится только по работам этого раздела
       const scoped =
         this.activeTab === null
@@ -2640,7 +2726,7 @@ window.smeta = function smeta() {
           if (ref.num === selfNum) continue;
           const pred = byNum.get(ref.num);
           if (!pred) continue;
-          links.push({ from: pred, to: g, type: ref.type });
+          links.push({ from: pred, to: g, type: ref.type, lag: ref.lag || 0 });
         }
       }
       /* ── Движок планирования (Wix/MS Project-style) ────────────────────────
@@ -2658,15 +2744,16 @@ window.smeta = function smeta() {
       const constraintStart = (l) => {
         const f = l.from,
           t = l.to;
+        const lag = l.lag || 0; // задержка/опережение в днях («ОН+3» — MS Project)
         switch (l.type) {
           case 'SS':
-            return f.leftDays; // старт от старта
+            return f.leftDays + lag; // старт от старта
           case 'FF':
-            return f.leftDays + f.spanDays - t.spanDays; // финиш от финиша
+            return f.leftDays + f.spanDays - t.spanDays + lag; // финиш от финиша
           case 'SF':
-            return f.leftDays - t.spanDays; // старт от финиша (экзотика, но из набора MS Project)
+            return f.leftDays - t.spanDays + lag; // старт от финиша (экзотика, но из набора MS Project)
           default:
-            return f.leftDays + f.spanDays; // FS: старт сразу после финиша
+            return f.leftDays + f.spanDays + lag; // FS: старт сразу после финиша
         }
       };
       // степени входа + граф предшественников (только связи внутри диаграммы)
@@ -2717,7 +2804,10 @@ window.smeta = function smeta() {
         g.leftDays = minStart;
       }
       const workedDays = rows.reduce((m, g) => Math.max(m, g.leftDays + g.spanDays), 0);
-      const totalDays = Math.max(7, workedDays); // минимум — неделя шкалы
+      /* Календарная ширина шкалы: последний рабочий день проекта → календарный индекс */
+      const calSpan =
+        workedDays > 0 ? calendarIdx(ensureWork(workedDays - 1)) + 1 : 0;
+      const totalDays = Math.max(7, calSpan); // минимум — неделя шкалы
       /* ── Критический путь (CPM, longest path в DAG с весами по типу связи):
          ES(g) = max по предшественникам нижней границ старта; EF = ES + dur.
          Путь критичен, когда его длина равна длине самой длинной цепочки. */
@@ -2737,15 +2827,16 @@ window.smeta = function smeta() {
       };
       function constraintStartLike(l, predEf) {
         // ограничение старта через FINISH предшественника (для рекурсивного CPM)
+        const lag = l.lag || 0;
         switch (l.type) {
           case 'SS':
-            return predEf - l.from.spanDays; // старт предшественника
+            return predEf - l.from.spanDays + lag; // старт предшественника
           case 'FF':
-            return predEf - l.to.spanDays; // финиш = финишу предш.
+            return predEf - l.to.spanDays + lag; // финиш = финишу предш.
           case 'SF':
-            return predEf - l.to.spanDays; // старт = финишу предш. (консервативно)
+            return predEf - l.to.spanDays + lag; // старт = финишу предш. (консервативно)
           default:
-            return predEf; // FS: сразу после финиша
+            return predEf + lag; // FS: сразу после финиша
         }
       }
       const projectFinish = rows.reduce((m, g) => Math.max(m, efOf(g)), 0);
@@ -2767,7 +2858,31 @@ window.smeta = function smeta() {
           total: this.sectionTotal(sec),
         });
       }
-      return { rows, sections, skipped, links, totalDays, workedDays, start, origLeft };
+      return {
+        rows,
+        sections,
+        skipped,
+        links,
+        totalDays,
+        workedDays,
+        start,
+        origLeft,
+        // календарный слой: преобразование «рабочей колонки» в календарную позицию
+        wd,
+        holSet,
+        posOf: (i) => calendarIdx(ensureWork(i)),
+        widthOf: (left, span) => calendarIdx(ensureWork(left + span)) - calendarIdx(ensureWork(left)),
+      };
+    },
+
+    /* ── Календарные помощники отображения (позиции полос/связей на шкале) ─── */
+    ganttPosOf(i) {
+      const g = this.ganttData;
+      return g.posOf ? g.posOf(i) : i;
+    },
+    ganttWidthOf(left, span) {
+      const g = this.ganttData;
+      return g.widthOf ? g.widthOf(left, span) : span;
     },
 
     get ganttLinkLines() {
@@ -2786,8 +2901,10 @@ window.smeta = function smeta() {
       // Точки крепления зависят от типа связи (как в MS Project):
       // FS/SF — выход справа у предшественника; SS/SS — вход слева в преемник.
       const anchorX = (g, side) => {
-        if (side === 'right') return g.leftDays * w + Math.max(6, g.spanDays * w - 4);
-        return g.leftDays * w;
+        // календарные колонки: полоса рисуется от posOf(left) на widthOf(span) дней
+        if (side === 'right')
+          return this.ganttPosOf(g.leftDays) * w + Math.max(6, this.ganttWidthOf(g.leftDays, g.spanDays) * w - 4);
+        return this.ganttPosOf(g.leftDays) * w;
       };
       return this.ganttData.links
         .map((l) => {
@@ -2871,6 +2988,39 @@ window.smeta = function smeta() {
       return this.ganttData.rows.find((r) => r.row && r.row.id === id) || null;
     },
 
+    /* ── Hit-test полос по координатам (Wix-style) ───────────────────────────
+       Цель под курсором определяется НЕ по e.target, а геометрически: какая
+       полоса работы реально находится под точкой. Это исключает два бага:
+       1) превью/стрелка «цепляется» за сводную полосу раздела (суммарные
+          полосы в hit-test не участвуют — как в MS Project связи живут
+          только между работами);
+       2) при наведении на край/ручку цели цель терялась и стрелка уходила
+          «в никуда» или в соседнюю строку. */
+    _barAtPoint(clientX, clientY) {
+      const bars = document.querySelectorAll('.at-gantt .at-gantt-bar[data-row]');
+      let best = null;
+      let bestArea = Infinity;
+      for (const b of Array.from(bars)) {
+        const r = b.getBoundingClientRect();
+        // увеличение зоны захвата: ±6px по вертикали — тянуть стрелку удобно даже мимо полосы
+        if (clientX >= r.left - 4 && clientX <= r.right + 8 && clientY >= r.top - 6 && clientY <= r.bottom + 6) {
+          const area = r.width * r.height;
+          if (area < bestArea) {
+            bestArea = area;
+            best = b.getAttribute('data-row');
+          }
+        }
+      }
+      return best;
+    },
+
+    /** Обновить цель подсветки и превью по позиции курсора (единый путь для drag и mousemove) */
+    _ganttUpdateHoverTarget(clientX, clientY) {
+      const hoverId = this._barAtPoint(clientX, clientY);
+      this.ganttHoverTargetId = hoverId !== this.ganttLinkFromId ? hoverId : null;
+      this._drawLinkPreview(clientX, clientY);
+    },
+
     /** Отрисовать превью связи от источника до точки курсора (координаты слоя = координаты .at-gantt) */
     _drawLinkPreview(clientX, clientY) {
       const fromG = this._ganttRowById(this.ganttLinkFromId);
@@ -2895,8 +3045,9 @@ window.smeta = function smeta() {
         y1 = rf.top + rf.height / 2 - rectG.top;
       } else {
         x1 = fromRight
-          ? fromG.leftDays * w + Math.max(6, fromG.spanDays * w - 4)
-          : fromG.leftDays * w;
+          ? this.ganttPosOf(fromG.leftDays) * w +
+            Math.max(6, this.ganttWidthOf(fromG.leftDays, fromG.spanDays) * w - 4)
+          : this.ganttPosOf(fromG.leftDays) * w;
         y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
       }
       // Цель под курсором — тянем стрелку ровно в полосу цели (Wix-style snap)
@@ -2959,19 +3110,20 @@ window.smeta = function smeta() {
       g.leftDays = Math.max(0, desiredLeft);
       for (const l of this.ganttData.links) {
         if (l.from !== g || l.cyclic) continue;
+        const lag = l.lag || 0;
         let req;
         switch (l.type) {
           case 'SS':
-            req = g.leftDays;
+            req = g.leftDays + lag;
             break;
           case 'FF':
-            req = g.leftDays + g.spanDays - l.to.spanDays;
+            req = g.leftDays + g.spanDays - l.to.spanDays + lag;
             break;
           case 'SF':
-            req = g.leftDays - l.to.spanDays;
+            req = g.leftDays - l.to.spanDays + lag;
             break;
           default: // FS
-            req = g.leftDays + g.spanDays;
+            req = g.leftDays + g.spanDays + lag;
         }
         req = Math.max(0, req);
         if (l.to.leftDays < req) this._ganttPushDown(l.to, req, seen);
@@ -2982,7 +3134,10 @@ window.smeta = function smeta() {
     _ganttRelayout() {
       const g = this.ganttData;
       g.workedDays = g.rows.reduce((m, r) => Math.max(m, r.leftDays + r.spanDays), 0);
-      g.totalDays = Math.max(7, g.workedDays);
+      // календарная ширина шкалы — через тот же календарь, что и при полном расчёте
+      const calSpan =
+        g.workedDays > 0 && g.posOf ? g.posOf(g.workedDays - 1) + 1 : g.workedDays;
+      g.totalDays = Math.max(7, calSpan);
       for (const s of g.sections) {
         const gr = g.rows.filter((r) => r.si === s.si);
         if (!gr.length) continue;
@@ -3005,13 +3160,17 @@ window.smeta = function smeta() {
     ganttBarStyle(g) {
       const w = this.ganttDayWidth();
       void this.layoutTick; // перерисовать при live-движении полос (см. _ganttRelayout)
-      return `left:${g.leftDays * w}px;width:${Math.max(6, g.spanDays * w - 4)}px`;
+      const left = this.ganttPosOf(g.leftDays) * w;
+      const width = Math.max(6, this.ganttWidthOf(g.leftDays, g.spanDays) * w - 4);
+      return `left:${left}px;width:${width}px`;
     },
 
     ganttSecBarStyle(s) {
       const w = this.ganttDayWidth();
       void this.layoutTick;
-      return `left:${s.leftDays * w}px;width:${Math.max(6, s.spanDays * w - 4)}px`;
+      const left = this.ganttPosOf(s.leftDays) * w;
+      const width = Math.max(6, this.ganttWidthOf(s.leftDays, s.spanDays) * w - 4);
+      return `left:${left}px;width:${width}px`;
     },
 
     startGanttDrag(e, g) {
@@ -3109,19 +3268,34 @@ window.smeta = function smeta() {
       }
     },
 
-    /** Движение мыши по дорожке: обновляет цель подсветки и живое превью связи */
+    /** Двойной клик по полосе работы — открыть ячейку «Предш.» её строки в таблице
+        (быстрый переход к текстовому заданию связи: ОН/НН + лаг). */
+    ganttBarDblClick(g) {
+      const item = this.flatRows.find((it) => it.row.id === g.row.id);
+      if (!item) return;
+      this.viewTab = 'table';
+      this.$nextTick(() => this.openCell('pred', item));
+    },
+
+    /** Правый клик по стрелке связи (клик по SVG-дорожке): удалить эту связь.
+        Индекс берётся из порядка отрисовки путей (тот же ganttLinkLines). */
+    removeLinkByPath(idx) {
+      const links = this.ganttData.links;
+      const l = links[idx];
+      if (!l) return;
+      this.pushHistory('Удалена связь Ганта');
+      const fromNum = this.rowNumber(l.from.row.id);
+      const refs = parsePredRefs(l.to.row.pred).filter((r) => r.num !== fromNum);
+      l.to.row.pred = formatPredRefs(refs);
+      this.logActivity(
+        `Снята связь №${fromNum} → №${this.rowNumber(l.to.row.id)}`
+      );
+    },
+
+    /** Движение мыши по диаграмме в режиме рисования: цель и превью — по hit-test'у полос */
     ganttTrackMove(e) {
       if (this.ganttLinkFromId === null || this.ganttLinkFromId === undefined) return;
-      const t = e.target && e.target.closest ? e.target.closest('.at-gantt-bar') : null;
-      let hoverId = null;
-      if (t) {
-        const tracks = document.querySelectorAll('.at-gantt .at-gantt-track');
-        const idx = Array.prototype.findIndex.call(tracks, (tr) => tr.contains(t));
-        const gr = idx >= 0 ? this.ganttData.rows[idx] : null;
-        if (gr && gr.row.id !== this.ganttLinkFromId) hoverId = gr.row.id;
-      }
-      this.ganttHoverTargetId = hoverId;
-      this._drawLinkPreview(e.clientX, e.clientY);
+      this._ganttUpdateHoverTarget(e.clientX, e.clientY);
     },
 
     /** Подсветка цели при наведении полосы во время рисования связи */
@@ -3150,33 +3324,19 @@ window.smeta = function smeta() {
         return;
       }
       if (!active) this.ganttLinkFromId = g.row.id;
-      const trackAt = (target) => {
-        const tracks = document.querySelectorAll('.at-gantt .at-gantt-track');
-        return Array.prototype.findIndex.call(tracks, (tr) => tr.contains(target));
-      };
       const onMove = (ev) => {
-        const t = ev.target && ev.target.closest ? ev.target.closest('.at-gantt-bar') : null;
-        let hoverId = null;
-        if (t) {
-          const idx = trackAt(t);
-          const gr = idx >= 0 ? this.ganttData.rows[idx] : null;
-          if (gr && gr.row.id !== this.ganttLinkFromId) hoverId = gr.row.id;
-        }
-        this.ganttHoverTargetId = hoverId;
-        this._drawLinkPreview(ev.clientX, ev.clientY);
+        // цель — полоса работы под курсором (hit-test), сводные полосы исключены
+        this._ganttUpdateHoverTarget(ev.clientX, ev.clientY);
       };
       const onUp = (ev) => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
-        const target = ev.target && ev.target.closest ? ev.target.closest('.at-gantt-bar') : null;
+        const hoverId = this._barAtPoint(ev.clientX, ev.clientY);
         let created = false;
-        if (target) {
-          const idx = trackAt(target);
-          const gTo = idx >= 0 ? this.ganttData.rows[idx] : null;
-          if (gTo && gTo.row.id !== this.ganttLinkFromId) {
-            const fromG = this._ganttRowById(this.ganttLinkFromId);
-            created = this._createLink(fromG ? fromG.row : null, gTo.row);
-          }
+        if (hoverId && hoverId !== this.ganttLinkFromId) {
+          const fromG = this._ganttRowById(this.ganttLinkFromId);
+          const toG = this._ganttRowById(hoverId);
+          created = this._createLink(fromG ? fromG.row : null, toG ? toG.row : null);
         }
         if (created) {
           this.cancelGanttLink();
@@ -3226,7 +3386,10 @@ window.smeta = function smeta() {
       // Ширина: правый край самой правой полосы + отступ. Иначе SVG-слой не дотягивается
       // до дальних полос и связи там обрезаются (выглядит как «связи не отображаются»).
       const w = this.ganttDayWidth();
-      const maxRight = g.rows.reduce((m, r) => Math.max(m, (r.leftDays + r.spanDays) * w), 0);
+      const maxRight = g.rows.reduce(
+        (m, r) => Math.max(m, (this.ganttPosOf(r.leftDays) + this.ganttWidthOf(r.leftDays, r.spanDays)) * w),
+        0
+      );
       let h = 34 + g.sections.length * 38 + g.rows.length * 34;
       if (g.rows.length) {
         const grid = document.querySelector('.at-gantt');
@@ -3238,22 +3401,85 @@ window.smeta = function smeta() {
       };
     },
 
-    /** Правый клик по полосе: убрать связь или ручной сдвиг */
+    /** Правый клик по полосе: снять связь или ручной сдвиг */
     onBarContext(g) {
-      if (g.row.pred) {
-        // Клик по стрелке связи — переключить тип FS→SS→FF→SF (жест из draw.io/MS Project),
-        // правый клик — удалить связь целиком.
-        this.pushHistory('Удалена связь Ганта');
-        g.row.pred = '';
-        this.logActivity(`Снята связь у «${(g.name || '').slice(0, 30)}»`);
-      } else if (Number(g.row.startAt) >= 0) {
+      if (Number(g.row.startAt) >= 0) {
+        this.pushHistory('Сброшен ручной сдвиг Ганта');
         this.resetGanttShift(g.row);
+      } else if (g.row.pred) {
+        // связи снимаются по одной — правым кликом по стрелке; здесь чистим все
+        this.pushHistory('Удалены все связи Ганта у работы');
+        g.row.pred = '';
+        this.logActivity(`Сняты все связи у «${(g.name || '').slice(0, 30)}»`);
       }
     },
 
     /** Переключатель типа создаваемой связи в тулбаре Ганта */
     setGanttLinkType(t) {
       this.ganttLinkType = t;
+    },
+
+    /* ── Календарь рабочих дней (модалка «📅 Праздники») ───────────────────── */
+    openCalendar() {
+      if (!this.calMonth) {
+        const d = new Date(this.ganttData.start);
+        this.calMonth = d.toISOString().slice(0, 7);
+      }
+      this.calOpen = true;
+    },
+    closeCalendar() {
+      this.calOpen = false;
+    },
+    calShift(delta) {
+      const [y, m] = this.calMonth.split('-').map(Number);
+      const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+      this.calMonth = d.toISOString().slice(0, 7);
+    },
+    calDays() {
+      // список ячеек месяца: пустые до первого дня + дни {iso, day, weekend, holiday}
+      const [y, m] = this.calMonth.split('-').map(Number);
+      const first = new Date(Date.UTC(y, m - 1, 1));
+      const lead = (first.getUTCDay() + 6) % 7; // Пн — первый столбец
+      const nDays = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const wd = Math.max(5, Math.min(7, Number(this.ganttWorkDaysPerWeek) || 7));
+      const hol = new Set((this.ganttHolidays || []).map(String));
+      const cells = [];
+      for (let i = 0; i < lead; i++) cells.push(null);
+      for (let day = 1; day <= nDays; day++) {
+        const iso = `${this.calMonth}-${String(day).padStart(2, '0')}`;
+        const dow = new Date(Date.UTC(y, m - 1, day)).getUTCDay();
+        cells.push({
+          iso,
+          day,
+          weekend: wd < 7 && (dow === 0 || (wd <= 5 && dow === 6)),
+          holiday: hol.has(iso),
+        });
+      }
+      return cells;
+    },
+    calMonthLabel() {
+      const [y, m] = this.calMonth.split('-').map(Number);
+      return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('ru-RU', {
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+      });
+    },
+    toggleCalDay(cell) {
+      if (!cell) return;
+      const arr = (this.ganttHolidays || []).map(String);
+      const i = arr.indexOf(cell.iso);
+      if (i >= 0) arr.splice(i, 1);
+      else arr.push(cell.iso);
+      arr.sort();
+      this.ganttHolidays = arr;
+      this.saveUI();
+      this.invalidateGantt();
+    },
+    clearHolidays() {
+      this.ganttHolidays = [];
+      this.saveUI();
+      this.invalidateGantt();
     },
 
     /** Чип предшественника: клик — сменить тип связи (FS→SS→FF→SF), alt+клик — удалить одну связь */
@@ -3272,6 +3498,18 @@ window.smeta = function smeta() {
       const r = refs[0];
       r.type = order[(order.indexOf(r.type) + 1) % 4];
       row.pred = formatPredRefs(refs);
+    },
+
+    /** Чипы предшественников для имени работы на диаграмме: «ОН №3», «НН №5+2» */
+    ganttDepChips(g) {
+      return parsePredRefs(g.row.pred).map((r) => ({
+        num: r.num,
+        ru: r.type === 'FS' ? 'ОН' : r.type === 'SS' ? 'НН' : r.type,
+        label:
+          '№' +
+          r.num +
+          (r.lag ? (r.lag > 0 ? '+' + r.lag : String(r.lag)) : ''),
+      }));
     },
 
     /** Экспорт Ганта в PNG (указатель №5: PNG/SVG слиты в одну кнопку — выбор формата в диалоге) */

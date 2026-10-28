@@ -621,6 +621,10 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-gantt-secrow .at-gantt-name b { font-size: 12px; }
 .at-gantt-secrow .at-gantt-bar { height: 8px; align-self: center; border-radius: 4px; }
 .at-gantt-secrow .at-gantt-bar-label { display: none; }
+/* Сводная полоса раздела — НЕ участвует в связях (как в MS Project):
+   стрелки начинаются/заканчиваются только на работах. Ручка скрыта, hit-test исключён. */
+.at-gantt-secrow .at-gantt-link-handle { display: none !important; }
+.at-gantt-secrow .at-gantt-bar { cursor: default; pointer-events: none; }
 
 .at-gantt-scroll { flex: 1; overflow: auto; }
 /* Абсолютный overlay поверх всей сетки .at-gantt: координаты путей считаются от
@@ -652,6 +656,7 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   background-image: linear-gradient(to right, var(--line) 1px, transparent 1px);
   background-size: var(--day-w) 100%;
 }
+/* data-row/data-type на полосах — для hit-test'а связей по координатам (app.ts) */
 .at-gantt-bar {
   position: absolute; top: 5px; height: 20px; border-radius: 4px; min-width: 8px;
   display: flex; align-items: center; justify-content: flex-end; padding: 0 6px;

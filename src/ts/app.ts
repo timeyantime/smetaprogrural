@@ -342,7 +342,7 @@ function copyFrameworkFields(from, to) {
  * Разбор строки предшественников в формате MS Project: «2», «FS:2», «SS:3,FF:5».
  * Тип по умолчанию — FS (Finish-to-Start). Нераспознанные токены игнорируются.
  */
-function parsePredRefs(text) {
+export function parsePredRefs(text) {
   const out = [];
   for (const part of String(text || '').split(/[,\s;]+/)) {
     if (!part) continue;
@@ -732,6 +732,9 @@ window.smeta = function smeta() {
       this.$watch(
         'data',
         () => {
+          // любое изменение сметы (работы, длительности, связи pred, даты) —
+          // пересчитываем диаграмму Ганта при следующем обращении (см. _ganttCache)
+          this.invalidateGantt();
           if (this.data.recalcMode === 'manual') {
             this.dirty = true;
           } else {
@@ -741,9 +744,15 @@ window.smeta = function smeta() {
         { deep: true }
       );
 
+      this.$watch('activeTab', () => this.invalidateGantt());
+      this.$watch('viewTab', () => this.invalidateGantt());
+      this.$watch('ganttCritical', () => this.invalidateGantt());
       this.$watch('columns', () => this.saveColWidths(), { deep: true });
       this.$watch('hiddenCols', () => this.saveUI());
       this.$watch('sidebarCollapsed', () => this.saveUI());
+      // загрузка/замена проекта целиком (deep-подписка на 'data' не срабатывает
+      // при замене ссылки на объект) — тоже инвалидируем кэш диаграммы
+      this.$watch('data', () => this.invalidateGantt());
 
       // Обработчики клавиш
       window.addEventListener('keydown', (e) => this.handleKeyDown(e));
@@ -2523,7 +2532,30 @@ window.smeta = function smeta() {
       this.viewTab = this.viewTab === 'gantt' ? 'table' : 'gantt';
     },
 
+    /* Кэш диаграммы (Wix-подход: тяжёлый пересчёт — только по событию данных).
+       Геттер ganttData раньше рекурсивно вызывался из ganttLinkLines,
+       ganttLinksSize, ganttDayWidth и т.д. на каждое движение мыши → вкладка
+       Ганта «не жила». Теперь расчёт выполняется один раз, а при любом
+       изменении сметы/связей/масштаба кэш сбрасывается ($watch в init). */
+    _ganttCache: null as any,
+    _ganttEpoch: 0,
+    _layoutTick: 0,
+    _ganttIndexById: new Map(),
+    _ganttIndexSig: '',
+
+    invalidateGantt() {
+      this._ganttCache = null;
+      this._ganttEpoch++;
+    },
+
     get ganttData() {
+      if (this._ganttCache) return this._ganttCache;
+      const cache = this._computeGanttData();
+      this._ganttCache = cache;
+      return cache;
+    },
+
+    _computeGanttData() {
       const DAY = 86400000;
       const start = new Date(this.data.startDate || defaultStartDate()).getTime();
       // если активна вкладка раздела — диаграмма строится только по работам этого раздела
@@ -2609,10 +2641,18 @@ window.smeta = function smeta() {
           links.push({ from: pred, to: g, type: ref.type });
         }
       }
-      /* Каскад расписания — топологический обход (алгоритм MS Project):
-         каждая связь FS/SS/FF/SF задаёт нижнюю границу старта преемника.
-         Итерации повторяются, пока позиции не стабилизируются; если после
-         64 проходов остались нарушения — в цепочке цикл, связи помечаются красным. */
+      /* ── Движок планирования (Wix/MS Project-style) ────────────────────────
+         1) Топологический порядок по DAG связей (Kahn). Связи, участвующие в
+            цикле, исключаются из каскада и помечаются красными — так же, как
+            MS Project отказывается считать зацикленные зависимости.
+         2) В топологическом порядке старт каждой работы = максимум из её
+            «закреплённой даты» (ручной сдвиг startAt — constraint SNET) и
+            ограничений всех активных предшественников (FS/SS/FF/SF).
+            Одна гарантия: каскад всегда сходится, полос никогда не «застревает».
+         3) Прямые обратные вызовы геттера запрещены: ganttData кэшируется
+            (см. _ganttCache) и инвалидируется при любом изменении данных —
+            это убирает рекурсивные циклы вычислений, из-за которых вкладка
+            раньше «не жила». */
       const constraintStart = (l) => {
         const f = l.from,
           t = l.to;
@@ -2627,60 +2667,88 @@ window.smeta = function smeta() {
             return f.leftDays + f.spanDays; // FS: старт сразу после финиша
         }
       };
-      let changed = true;
-      let passes = 0;
-      while (changed && passes < 64) {
-        changed = false;
-        passes++;
+      // степени входа + граф предшественников (только связи внутри диаграммы)
+      const indeg = new Map();
+      const predsOf = new Map();
+      for (const g of rows) {
+        indeg.set(g, 0);
+        predsOf.set(g, []);
+      }
+      for (const l of links) {
+        indeg.set(l.to, indeg.get(l.to) + 1);
+        predsOf.get(l.to).push(l);
+      }
+      const queue = rows.filter((g) => indeg.get(g) === 0);
+      const topo = [];
+      while (queue.length) {
+        const g = queue.shift();
+        topo.push(g);
         for (const l of links) {
-          const minStart = Math.max(0, constraintStart(l));
-          if (l.to.leftDays < minStart) {
-            l.to.leftDays = minStart;
-            changed = true;
-          }
+          if (l.from !== g) continue;
+          indeg.set(l.to, indeg.get(l.to) - 1);
+          if (indeg.get(l.to) === 0) queue.push(l.to);
         }
       }
-      // циклы: нарушение ограничения после стабилизации → подсветка связи
-      for (const l of links) l.cyclic = constraintStart(l) > l.to.leftDays;
+      const inTopo = new Set(topo);
+      for (const l of links) l.cyclic = !inTopo.has(l.from) || !inTopo.has(l.to);
+      const activeLinks = links.filter((l) => !l.cyclic);
+      // детерминированный старт каскада: автоплан + закреплённые даты
+      rows.forEach((g, i) => {
+        g.leftDays = origLeft[i];
+        if (Number(g.row.startAt) >= 0)
+          g.leftDays = Math.max(origLeft[i], Math.round(Number(g.row.startAt)));
+      });
+      const posInTopo = new Map(topo.map((g, i) => [g, i]));
+      // обрабатываем вершины DAG в топологическом порядке; хвост (циклы) — как есть
+      const order = rows.slice().sort((a, b) => {
+        const ia = posInTopo.has(a) ? posInTopo.get(a) : Number.MAX_SAFE_INTEGER;
+        const ib = posInTopo.has(b) ? posInTopo.get(b) : Number.MAX_SAFE_INTEGER;
+        return ia - ib;
+      });
+      for (const g of order) {
+        let minStart = g.leftDays;
+        for (const l of activeLinks) {
+          if (l.to !== g) continue;
+          const c = Math.max(0, constraintStart(l));
+          if (c > minStart) minStart = c;
+        }
+        g.leftDays = minStart;
+      }
       const workedDays = rows.reduce((m, g) => Math.max(m, g.leftDays + g.spanDays), 0);
       const totalDays = Math.max(7, workedDays); // минимум — неделя шкалы
-      /* критический путь (#49): longest path по цепочкам предшественников.
-         Длина зависит от типа связи (FS добавляет весь срок предшественника,
-         SS — только его старт и т.д.), поэтому считается отдельно по каждому типу. */
-      const memo = new Map();
-      /* longest path с весами по типам связей (как в CPM MS Project):
-         FS: длина цепочки предш. + весь срок g; SS: старты совпадают →
-         max(цепочка предш., цепочка g без его срока + срок предш.); FF: финиши
-         совпадают → длины сравниваются напрямую; SF — редкий, считаем как FS-оценку. */
-      const chainLen = (g) => {
-        if (memo.has(g)) return memo.get(g);
-        let best = 0;
-        const selfNum = numByRowId.get(g.row.id);
-        for (const ref of parsePredRefs(g.row.pred)) {
-          if (ref.num === selfNum) continue;
-          const pred = byNum.get(ref.num);
-          if (!pred || memo.get(pred) === g) continue;
-          const pLen = chainLen(pred);
-          let v;
-          switch (ref.type) {
-            case 'SS':
-              v = Math.max(pLen, g.spanDays + pLen - pred.spanDays);
-              break;
-            case 'FF':
-              v = Math.max(pLen, g.spanDays);
-              break;
-            default: // FS и SF
-              v = pLen + g.spanDays;
-          }
-          if (v > best) best = v;
+      /* ── Критический путь (CPM, longest path в DAG с весами по типу связи):
+         ES(g) = max по предшественникам нижней границ старта; EF = ES + dur.
+         Путь критичен, когда его длина равна длине самой длинной цепочки. */
+      const esMemo = new Map();
+      const efOf = (g) => {
+        if (esMemo.has(g)) return esMemo.get(g);
+        esMemo.set(g, Infinity); // защита от повторов (циклы уже исключены из DAG)
+        let es = 0;
+        for (const l of predsOf.get(g) || []) {
+          if (l.cyclic) continue;
+          const c = Math.max(0, constraintStartLike(l, efOf(l.from)));
+          if (c > es) es = c;
         }
-        if (!best) best = g.spanDays; // старт цепочки без предшественников
-        memo.set(g, best);
-        return best;
+        const ef = es + g.spanDays;
+        esMemo.set(g, ef);
+        return ef;
       };
-      const maxChain = rows.reduce((m, g) => Math.max(m, chainLen(g)), 0);
+      function constraintStartLike(l, predEf) {
+        // ограничение старта через FINISH предшественника (для рекурсивного CPM)
+        switch (l.type) {
+          case 'SS':
+            return predEf - l.from.spanDays; // старт предшественника
+          case 'FF':
+            return predEf - l.to.spanDays; // финиш = финишу предш.
+          case 'SF':
+            return predEf - l.to.spanDays; // старт = финишу предш. (консервативно)
+          default:
+            return predEf; // FS: сразу после финиша
+        }
+      }
+      const projectFinish = rows.reduce((m, g) => Math.max(m, efOf(g)), 0);
       rows.forEach((g) => {
-        g.isCritical = this.ganttCritical && chainLen(g) === maxChain;
+        g.isCritical = this.ganttCritical && efOf(g) === projectFinish;
       });
       const sections = [];
       for (const { sec, si } of scoped) {
@@ -2721,8 +2789,8 @@ window.smeta = function smeta() {
       };
       return this.ganttData.links
         .map((l) => {
-          const fi = rows.indexOf(l.from);
-          const ti = rows.indexOf(l.to);
+          const fi = this._ganttRowIndex(l.from);
+          const ti = this._ganttRowIndex(l.to);
           if (fi < 0 || ti < 0) return null;
           const fromRight = l.type === 'FS' || l.type === 'SF'; // выход из финиша предш.
           const toLeft = l.type === 'FS' || l.type === 'SS'; // вход в старт преемника
@@ -2784,7 +2852,8 @@ window.smeta = function smeta() {
       const rectG = grid.getBoundingClientRect();
       const w = this.ganttDayWidth();
       // Стартовая точка — правый край полосы источника (координаты слоя связей = координаты .at-gantt)
-      const fi = this.ganttData.rows.indexOf(this.ganttLinkFrom);
+      const g = this.ganttLinkFrom;
+      const fi = this._ganttRowIndex(g);
       const tracks = grid.querySelectorAll('.at-gantt-track');
       let x1, y1;
       const barF = fi >= 0 && tracks[fi] ? tracks[fi].querySelector('.at-gantt-bar') : null;
@@ -2793,7 +2862,7 @@ window.smeta = function smeta() {
         x1 = rf.right - rectG.left;
         y1 = rf.top + rf.height / 2 - rectG.top;
       } else {
-        x1 = this.ganttLinkFrom.leftDays * w + Math.max(6, this.ganttLinkFrom.spanDays * w - 4);
+        x1 = g.leftDays * w + Math.max(6, g.spanDays * w - 4);
         y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
       }
       const x2 = e.clientX - rectG.left;
@@ -2803,40 +2872,129 @@ window.smeta = function smeta() {
       this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
     },
 
+    /** Индекс строки диаграммы по объекту g. Кэш-сигнатура хранит id ВСЕХ строк
+        текущего кадра: при инвалидации кэша (любoloм изменении данных/раскладки)
+        сигнатура меняется и карта перестраивается заново. Раньше «сигнатура»
+        сверялась с id одной произвольной строки — карта устаревала молча,
+        индексы связей съезжали и каскад «не работал». */
+    _ganttRowIndex(g) {
+      if (!g) return -1;
+      const rows = this.ganttData.rows;
+      const sig = rows.map((r) => r.row.id).join('|');
+      if (this._ganttIndexSig !== sig) {
+        this._ganttIndexSig = sig;
+        this._ganttIndexById = new Map(rows.map((r, i) => [r.row.id, i]));
+      }
+      const byId = this._ganttIndexById.get(g.row.id);
+      if (byId !== undefined) return byId;
+      return rows.findIndex((r) => r.row && r.row.id === g.row.id);
+    },
+
     /** Клик по пустому месту дорожки — отменить рисование связи */
     cancelGanttLink() {
       this.ganttLinkFrom = null;
       this.ganttLinkPath = null;
     },
 
+    /* ── Live-каскад при перетаскивании (Wix/MS Project-style) ───────────────
+       Полоса двигается синхронно с мышью, а все её зависимые работы
+       «проталкиваются» сразу же — пользователь видит результат до отпускания.
+       Работает поверх кэша ganttData: позиции меняются напрямую в объекте
+       диаграммы, без пересмотра данных сметы.
+       ВАЖНО: ссылки на строки хранятся в Map по id объекта (не indexOf!) —
+       это исключает ложные индексы -1, из-за которых каскад и связи раньше
+       «не работали». */
+    _ganttPushDown(g, desiredLeft, seen = new Set()) {
+      if (seen.has(g)) return; // защита от зацикливания
+      seen.add(g);
+      if (desiredLeft === g.leftDays) return;
+      g.leftDays = Math.max(0, desiredLeft);
+      for (const l of this.ganttData.links) {
+        if (l.from !== g || l.cyclic) continue;
+        let req;
+        switch (l.type) {
+          case 'SS':
+            req = g.leftDays;
+            break;
+          case 'FF':
+            req = g.leftDays + g.spanDays - l.to.spanDays;
+            break;
+          case 'SF':
+            req = g.leftDays - l.to.spanDays;
+            break;
+          default: // FS
+            req = g.leftDays + g.spanDays;
+        }
+        req = Math.max(0, req);
+        if (l.to.leftDays < req) this._ganttPushDown(l.to, req, seen);
+      }
+    },
+
+    /** Пересчёт итогов раскладки после live-движения (без полного пересмотра) */
+    _ganttRelayout() {
+      const g = this.ganttData;
+      g.workedDays = g.rows.reduce((m, r) => Math.max(m, r.leftDays + r.spanDays), 0);
+      g.totalDays = Math.max(7, g.workedDays);
+      for (const s of g.sections) {
+        const gr = g.rows.filter((r) => r.si === s.si);
+        if (!gr.length) continue;
+        s.leftDays = Math.min(...gr.map((r) => r.leftDays));
+        s.spanDays = Math.max(...gr.map((r) => r.leftDays + r.spanDays)) - s.leftDays;
+      }
+      this.layoutTick++;
+    },
+
+    /* layoutTick: счётчик перерисовки раскладки. Хранится в приватном поле
+       _layoutTick (инициализировано выше) — геттер/сеттер без отдельного
+       ключа-поля, чтобы не создавать дубль в объекте smeta(). */
+    get layoutTick() {
+      return this._layoutTick || 0;
+    },
+    set layoutTick(v) {
+      this._layoutTick = v;
+    },
+
     ganttBarStyle(g) {
       const w = this.ganttDayWidth();
+      void this.layoutTick; // перерисовать при live-движении полос (см. _ganttRelayout)
       return `left:${g.leftDays * w}px;width:${Math.max(6, g.spanDays * w - 4)}px`;
     },
 
     ganttSecBarStyle(s) {
       const w = this.ganttDayWidth();
+      void this.layoutTick;
       return `left:${s.leftDays * w}px;width:${Math.max(6, s.spanDays * w - 4)}px`;
     },
 
     startGanttDrag(e, g) {
       e.preventDefault();
       e.stopPropagation();
+      // если идёт рисование связи — не мешаем ему
+      if (this.ganttLinkFrom) {
+        this.cancelGanttLink();
+        return;
+      }
       const startX = e.clientX;
       const startLeft = g.leftDays;
       const w = this.ganttDayWidth();
       this.ganttDrag = { row: g.row, days: g.leftDays };
+      let lastLeft = startLeft;
       const onMove = (ev) => {
         const d = Math.round((ev.clientX - startX) / w);
-        g.leftDays = Math.max(0, startLeft + d);
+        const desired = Math.max(0, startLeft + d);
+        if (desired === lastLeft) return;
+        lastLeft = desired;
+        // live-каскад: тянем полосу и мгновенно толкаем зависимые (Wix-style)
+        this._ganttPushDown(g, desired);
         this.ganttDrag.days = g.leftDays;
+        this._ganttRelayout();
       };
       const onUp = () => {
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
         if (g.leftDays !== startLeft) {
           this.pushHistory('Сдвиг работы на диаграмме');
-          g.row.startAt = g.leftDays;
+          g.row.startAt = g.leftDays; // фиксация в данные → deep-$watch инвалидирует кэш
           this.logActivity(`«${(g.name || '').slice(0, 30)}» начнётся на ${g.leftDays}-й день`);
         }
         this.ganttDrag = null;
@@ -2883,7 +3041,10 @@ window.smeta = function smeta() {
     startLinkDrag(e, g) {
       e.preventDefault();
       e.stopPropagation();
-      if (this.ganttLinkFrom && this.ganttLinkFrom !== g) {
+      if (
+        this.ganttLinkFrom &&
+        this._ganttRowIndex(this.ganttLinkFrom) !== this._ganttRowIndex(g)
+      ) {
         // уже рисуем другую связь — завершаем её на источнике нового mousedown
         this.ganttLinkClick(e, g);
         return;
@@ -2900,7 +3061,7 @@ window.smeta = function smeta() {
             (t) => t.contains(target)
           );
           const gTo = idx >= 0 ? rows[idx] : null;
-          if (gTo && gTo !== this.ganttLinkFrom) {
+          if (gTo && this._ganttRowIndex(gTo) !== this._ganttRowIndex(this.ganttLinkFrom)) {
             this.pushHistory('Создана связь Ганта');
             const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
             if (fromNum !== null && fromNum !== undefined) {
@@ -2918,6 +3079,12 @@ window.smeta = function smeta() {
         this.ganttLinkPath = null;
       };
       window.addEventListener('mouseup', onUp);
+    },
+
+    /** Удалить одну связь предшественника (по номеру строки-источника) */
+    removePredRef(row, num) {
+      const refs = parsePredRefs(row.pred).filter((r) => r.num !== num);
+      row.pred = formatPredRefs(refs);
     },
 
     removePred(row) {

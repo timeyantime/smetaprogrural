@@ -343,7 +343,14 @@
           <label class="at-gantt-start">Начало работ:
             <input type="date" x-model="data.startDate" />
           </label>
-          <span class="at-gantt-info">Полосы можно перетаскивать мышью · клик по краю полосы — рисование связи · правый клик — убрать связь/сдвиг. Записи с длительностью 0 на диаграмме не отображаются.</span>
+          <span class="at-gantt-type" title="Тип создаваемой связи (как в MS Project): FS — финиш→старт, SS — старт→старт, FF — финиш→финиш, SF — старт→финиш">
+            Связь:
+            <template x-for="t in ['FS','SS','FF','SF']" :key="t">
+              <button class="at-link-type-btn" :class="{ active: ganttLinkType === t }" @click="setGanttLinkType(t)"
+                      x-text="t"></button>
+            </template>
+          </span>
+          <span class="at-gantt-info">Тяните полосу — зависимые сдвигаются сразу · ручка ⤳ на полосе — рисование связи (или клик ⤳ по двум работам) · клик по чипу «→» меняет тип связи, alt+клик удаляет · правый клик — убрать связь/сдвиг. Длительность 0 — запись скрыта.</span>
           <span class="spacer"></span>
           <button class="at-btn at-btn-sm" :class="{ active: ganttCritical }" @click="ganttCritical = !ganttCritical"
                   title="Подсветка критического пути (#49)">⚑ Крит. путь</button>
@@ -395,8 +402,9 @@
                 <div class="at-gantt-name" :title="g.name">
                   <span class="at-gantt-sec" x-text="data.sections[g.si] ? (g.si + 1 + '.') : ''"></span>
                   <span x-text="g.name"></span>
-                  <span class="at-gantt-dep" x-show="g.row.pred" :title="'Предшественник: №' + g.row.pred"
-                        @click.stop="removePred(g.row)">→№<b x-text="g.row.pred"></b>✕</span>
+                  <span class="at-gantt-dep" x-show="g.row.pred"
+                        :title="'Предшественники: №' + g.row.pred + ' · клик — сменить тип, alt+клик — удалить'"
+                        @click.stop="predChipClick($event, g.row)">→<b x-text="g.row.pred"></b></span>
                 </div>
                 <div class="at-gantt-track" @mousemove="trackGanttLink($event)" @click.self="cancelGanttLink()">
                   <div class="at-gantt-bar" :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFrom === g }]"

@@ -28,7 +28,7 @@
         days: null,
         // Длительность, дни (для диаграммы Ганта)
         pred: "",
-        // Преемственность: номер записи (для связей в Гант)
+        // Преемственность: «№» или «FS:№», «SS:№», «FF:№», «SF:№» (несколько через запятую)
         startAt: null,
         // Принудительно начало в днях от старта сметы
         // --- Каркасный метод (framework v2.0): метаданные строки ---
@@ -2351,6 +2351,18 @@ ${metaCells.join(",")}`);
       if (from[k] !== void 0 && from[k] !== null) to[k] = from[k];
     }
   }
+  function parsePredRefs(text) {
+    const out = [];
+    for (const part of String(text || "").split(/[,\s;]+/)) {
+      if (!part) continue;
+      const m = part.match(/^(?:(FS|SS|FF|SF):)?(\d+)$/i);
+      if (m) out.push({ type: (m[1] || "FS").toUpperCase(), num: parseInt(m[2]) });
+    }
+    return out;
+  }
+  function formatPredRefs(refs) {
+    return refs.map((r) => r.type === "FS" ? String(r.num) : `${r.type}:${r.num}`).join(",");
+  }
   function defaultStartDate() {
     return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   }
@@ -2442,6 +2454,8 @@ ${metaCells.join(",")}`);
       ganttDrag: null,
       ganttLinkFrom: null,
       ganttLinkPath: null,
+      ganttLinkType: "FS",
+      // тип создаваемой связи (переключатель в тулбаре Ганта, как в MS Project)
       rowDropTarget: null,
       // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
       droppedRowId: null,
@@ -2682,6 +2696,7 @@ ${metaCells.join(",")}`);
         this.$watch(
           "data",
           () => {
+            this.invalidateGantt();
             if (this.data.recalcMode === "manual") {
               this.dirty = true;
             } else {
@@ -2690,9 +2705,13 @@ ${metaCells.join(",")}`);
           },
           { deep: true }
         );
+        this.$watch("activeTab", () => this.invalidateGantt());
+        this.$watch("viewTab", () => this.invalidateGantt());
+        this.$watch("ganttCritical", () => this.invalidateGantt());
         this.$watch("columns", () => this.saveColWidths(), { deep: true });
         this.$watch("hiddenCols", () => this.saveUI());
         this.$watch("sidebarCollapsed", () => this.saveUI());
+        this.$watch("data", () => this.invalidateGantt());
         window.addEventListener("keydown", (e) => this.handleKeyDown(e));
         window.addEventListener("beforeunload", (e) => this.handleBeforeUnload(e));
       },
@@ -3274,14 +3293,30 @@ ${metaCells.join(",")}`);
       },
       /** Установка предшественника по его номеру (#49) */
       setPredByNumber(row, numText) {
-        const n = parseInt(numText);
-        if (!isFinite(n) || n <= 0) {
+        const refs = parsePredRefs(numText);
+        if (!refs.length) {
           row.pred = "";
           return;
         }
-        const items = this.flatRows;
-        const target = items[n - 1];
-        row.pred = target ? String(this.rowNumber(target.row.id)) : "";
+        const parts = [];
+        for (const ref of refs) {
+          const target = this.flatRows[ref.num - 1];
+          if (!target || target.row.id === row.id) continue;
+          const n = this.rowNumber(target.row.id);
+          if (n === null || n === void 0) continue;
+          parts.push(ref.type === "FS" ? String(n) : `${ref.type}:${n}`);
+        }
+        row.pred = parts.join(",");
+      },
+      /** Добавить тип связи к существующему предшественнику строки (цикл FS→SS→FF→SF, как в drawio/MS Project) */
+      cyclePredType(row) {
+        const refs = parsePredRefs(row.pred);
+        if (!refs.length) return false;
+        const order = ["FS", "SS", "FF", "SF"];
+        const r = refs[0];
+        r.type = order[(order.indexOf(r.type) + 1) % 4];
+        row.pred = formatPredRefs(refs);
+        return true;
       },
       // ==========================================
       // Перенесено из legacy — фаза 1 (см. docs/MIGRATION.md)
@@ -4179,7 +4214,27 @@ ${metaCells.join(",")}`);
       toggleGantt() {
         this.viewTab = this.viewTab === "gantt" ? "table" : "gantt";
       },
+      /* Кэш диаграммы (Wix-подход: тяжёлый пересчёт — только по событию данных).
+         Геттер ganttData раньше рекурсивно вызывался из ganttLinkLines,
+         ganttLinksSize, ganttDayWidth и т.д. на каждое движение мыши → вкладка
+         Ганта «не жила». Теперь расчёт выполняется один раз, а при любом
+         изменении сметы/связей/масштаба кэш сбрасывается ($watch в init). */
+      _ganttCache: null,
+      _ganttEpoch: 0,
+      _layoutTick: 0,
+      _ganttIndexById: /* @__PURE__ */ new Map(),
+      _ganttIndexSig: "",
+      invalidateGantt() {
+        this._ganttCache = null;
+        this._ganttEpoch++;
+      },
       get ganttData() {
+        if (this._ganttCache) return this._ganttCache;
+        const cache = this._computeGanttData();
+        this._ganttCache = cache;
+        return cache;
+      },
+      _computeGanttData() {
         const DAY = 864e5;
         const start = new Date(this.data.startDate || defaultStartDate()).getTime();
         const scoped = this.activeTab === null ? (() => {
@@ -4234,49 +4289,110 @@ ${metaCells.join(",")}`);
           }).filter((e) => e !== null)
         );
         const origLeft = rows.map((g) => g.leftDays);
-        const moved = rows.some((g) => Number(g.row.startAt) >= 0);
-        if (moved) {
-          rows.forEach((g, i) => {
+        if (rows.some((g) => Number(g.row.startAt) >= 0)) {
+          rows.forEach((g) => {
             if (Number(g.row.startAt) >= 0)
               g.leftDays = Math.max(0, Math.round(Number(g.row.startAt)));
           });
         }
         const links = [];
-        rows.forEach((g, i) => {
-          const n = parseInt(String(g.row.pred || "").trim());
-          if (!isFinite(n) || n <= 0 || n === numByRowId.get(g.row.id)) return;
-          const pred = byNum.get(n);
-          if (!pred) return;
-          links.push({ from: pred, to: g });
-          const minStart = pred.leftDays + pred.spanDays;
-          if (moved) {
-            if (g.leftDays < minStart) {
-              const shift = minStart - g.leftDays;
-              g.leftDays = minStart;
-              for (let j = i; j < rows.length; j++) rows[j].leftDays += shift;
-            }
-          } else {
-            g.leftDays = Math.max(g.leftDays, minStart);
+        for (const g of rows) {
+          const selfNum = numByRowId.get(g.row.id);
+          for (const ref of parsePredRefs(g.row.pred)) {
+            if (ref.num === selfNum) continue;
+            const pred = byNum.get(ref.num);
+            if (!pred) continue;
+            links.push({ from: pred, to: g, type: ref.type });
           }
+        }
+        const constraintStart = (l) => {
+          const f = l.from, t = l.to;
+          switch (l.type) {
+            case "SS":
+              return f.leftDays;
+            case "FF":
+              return f.leftDays + f.spanDays - t.spanDays;
+            case "SF":
+              return f.leftDays - t.spanDays;
+            default:
+              return f.leftDays + f.spanDays;
+          }
+        };
+        const indeg = /* @__PURE__ */ new Map();
+        const predsOf = /* @__PURE__ */ new Map();
+        for (const g of rows) {
+          indeg.set(g, 0);
+          predsOf.set(g, []);
+        }
+        for (const l of links) {
+          indeg.set(l.to, indeg.get(l.to) + 1);
+          predsOf.get(l.to).push(l);
+        }
+        const queue = rows.filter((g) => indeg.get(g) === 0);
+        const topo = [];
+        while (queue.length) {
+          const g = queue.shift();
+          topo.push(g);
+          for (const l of links) {
+            if (l.from !== g) continue;
+            indeg.set(l.to, indeg.get(l.to) - 1);
+            if (indeg.get(l.to) === 0) queue.push(l.to);
+          }
+        }
+        const inTopo = new Set(topo);
+        for (const l of links) l.cyclic = !inTopo.has(l.from) || !inTopo.has(l.to);
+        const activeLinks = links.filter((l) => !l.cyclic);
+        rows.forEach((g, i) => {
+          g.leftDays = origLeft[i];
+          if (Number(g.row.startAt) >= 0)
+            g.leftDays = Math.max(origLeft[i], Math.round(Number(g.row.startAt)));
         });
+        const posInTopo = new Map(topo.map((g, i) => [g, i]));
+        const order = rows.slice().sort((a, b) => {
+          const ia = posInTopo.has(a) ? posInTopo.get(a) : Number.MAX_SAFE_INTEGER;
+          const ib = posInTopo.has(b) ? posInTopo.get(b) : Number.MAX_SAFE_INTEGER;
+          return ia - ib;
+        });
+        for (const g of order) {
+          let minStart = g.leftDays;
+          for (const l of activeLinks) {
+            if (l.to !== g) continue;
+            const c = Math.max(0, constraintStart(l));
+            if (c > minStart) minStart = c;
+          }
+          g.leftDays = minStart;
+        }
         const workedDays = rows.reduce((m, g) => Math.max(m, g.leftDays + g.spanDays), 0);
         const totalDays = Math.max(7, workedDays);
-        const memo = /* @__PURE__ */ new Map();
-        const chainLen = (g) => {
-          if (memo.has(g)) return memo.get(g);
-          let best = 0;
-          const n = parseInt(String(g.row.pred || "").trim());
-          if (isFinite(n) && n > 0) {
-            const pred = byNum.get(n);
-            if (pred && pred !== g) best = chainLen(pred);
+        const esMemo = /* @__PURE__ */ new Map();
+        const efOf = (g) => {
+          if (esMemo.has(g)) return esMemo.get(g);
+          esMemo.set(g, Infinity);
+          let es = 0;
+          for (const l of predsOf.get(g) || []) {
+            if (l.cyclic) continue;
+            const c = Math.max(0, constraintStartLike(l, efOf(l.from)));
+            if (c > es) es = c;
           }
-          const len = best + g.spanDays;
-          memo.set(g, len);
-          return len;
+          const ef = es + g.spanDays;
+          esMemo.set(g, ef);
+          return ef;
         };
-        const maxChain = rows.reduce((m, g) => Math.max(m, chainLen(g)), 0);
+        function constraintStartLike(l, predEf) {
+          switch (l.type) {
+            case "SS":
+              return predEf - l.from.spanDays;
+            case "FF":
+              return predEf - l.to.spanDays;
+            case "SF":
+              return predEf - l.to.spanDays;
+            default:
+              return predEf;
+          }
+        }
+        const projectFinish = rows.reduce((m, g) => Math.max(m, efOf(g)), 0);
         rows.forEach((g) => {
-          g.isCritical = this.ganttCritical && chainLen(g) === maxChain;
+          g.isCritical = this.ganttCritical && efOf(g) === projectFinish;
         });
         const sections = [];
         for (const { sec, si } of scoped) {
@@ -4302,10 +4418,16 @@ ${metaCells.join(",")}`);
         const secCount = this.ganttData.sections.length;
         void this.layoutTick;
         const tracks = document.querySelectorAll(".at-gantt .at-gantt-track");
+        const anchorX = (g, side) => {
+          if (side === "right") return g.leftDays * w + Math.max(6, g.spanDays * w - 4);
+          return g.leftDays * w;
+        };
         return this.ganttData.links.map((l) => {
-          const fi = rows.indexOf(l.from);
-          const ti = rows.indexOf(l.to);
+          const fi = this._ganttRowIndex(l.from);
+          const ti = this._ganttRowIndex(l.to);
           if (fi < 0 || ti < 0) return null;
+          const fromRight = l.type === "FS" || l.type === "SF";
+          const toLeft = l.type === "FS" || l.type === "SS";
           let x1, y1, x2, y2;
           const trackT = tracks[ti];
           const barF = trackT && tracks[fi] ? tracks[fi].querySelector(".at-gantt-bar") : null;
@@ -4314,14 +4436,14 @@ ${metaCells.join(",")}`);
             const rf = barF.getBoundingClientRect();
             const rt = barT.getBoundingClientRect();
             const rc = trackT.getBoundingClientRect();
-            x1 = rf.right - rc.left;
+            x1 = fromRight ? rf.right - rc.left : rf.left - rc.left;
             y1 = rf.top + rf.height / 2 - rc.top;
-            x2 = rt.left - rc.left;
+            x2 = toLeft ? rt.left - rc.left : rt.right - rc.left;
             y2 = rt.top + rt.height / 2 - rc.top;
           } else {
-            x1 = l.from.leftDays * w + Math.max(6, l.from.spanDays * w - 4);
+            x1 = anchorX(l.from, fromRight ? "right" : "left");
             y1 = TOP + secCount * SECH + fi * ROWH + ROWH / 2;
-            x2 = l.to.leftDays * w;
+            x2 = anchorX(l.to, toLeft ? "left" : "right");
             y2 = TOP + secCount * SECH + ti * ROWH + ROWH / 2;
           }
           const r = 6;
@@ -4342,7 +4464,7 @@ ${metaCells.join(",")}`);
             const sgn = dy >= 0 ? 1 : -1;
             d = `M${x1},${y1} H${midX - rr}` + (rr > 0.5 ? ` Q${midX},${y1} ${midX},${y1 + sgn * rr}` : "") + ` V${y2 - sgn * rr}` + (rr > 0.5 ? ` Q${midX},${y2} ${midX + rr},${y2}` : ` H${midX}`) + ` H${Math.max(midX, x2 - 7)}`;
           }
-          return d;
+          return { d, cls: "lt-" + (l.type || "FS") + (l.cyclic ? " cyclic" : "") };
         }).filter(Boolean);
       },
       trackGanttLink(e) {
@@ -4351,7 +4473,8 @@ ${metaCells.join(",")}`);
         if (!grid) return;
         const rectG = grid.getBoundingClientRect();
         const w = this.ganttDayWidth();
-        const fi = this.ganttData.rows.indexOf(this.ganttLinkFrom);
+        const g = this.ganttLinkFrom;
+        const fi = this._ganttRowIndex(g);
         const tracks = grid.querySelectorAll(".at-gantt-track");
         let x1, y1;
         const barF = fi >= 0 && tracks[fi] ? tracks[fi].querySelector(".at-gantt-bar") : null;
@@ -4360,7 +4483,7 @@ ${metaCells.join(",")}`);
           x1 = rf.right - rectG.left;
           y1 = rf.top + rf.height / 2 - rectG.top;
         } else {
-          x1 = this.ganttLinkFrom.leftDays * w + Math.max(6, this.ganttLinkFrom.spanDays * w - 4);
+          x1 = g.leftDays * w + Math.max(6, g.spanDays * w - 4);
           y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
         }
         const x2 = e.clientX - rectG.left;
@@ -4368,30 +4491,113 @@ ${metaCells.join(",")}`);
         const mx = (x1 + x2) / 2;
         this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
       },
+      /** Индекс строки диаграммы по объекту g. Кэш-сигнатура хранит id ВСЕХ строк
+          текущего кадра: при инвалидации кэша (любoloм изменении данных/раскладки)
+          сигнатура меняется и карта перестраивается заново. Раньше «сигнатура»
+          сверялась с id одной произвольной строки — карта устаревала молча,
+          индексы связей съезжали и каскад «не работал». */
+      _ganttRowIndex(g) {
+        if (!g) return -1;
+        const rows = this.ganttData.rows;
+        const sig = rows.map((r) => r.row.id).join("|");
+        if (this._ganttIndexSig !== sig) {
+          this._ganttIndexSig = sig;
+          this._ganttIndexById = new Map(rows.map((r, i) => [r.row.id, i]));
+        }
+        const byId = this._ganttIndexById.get(g.row.id);
+        if (byId !== void 0) return byId;
+        return rows.findIndex((r) => r.row && r.row.id === g.row.id);
+      },
       /** Клик по пустому месту дорожки — отменить рисование связи */
       cancelGanttLink() {
         this.ganttLinkFrom = null;
         this.ganttLinkPath = null;
       },
+      /* ── Live-каскад при перетаскивании (Wix/MS Project-style) ───────────────
+         Полоса двигается синхронно с мышью, а все её зависимые работы
+         «проталкиваются» сразу же — пользователь видит результат до отпускания.
+         Работает поверх кэша ganttData: позиции меняются напрямую в объекте
+         диаграммы, без пересмотра данных сметы.
+         ВАЖНО: ссылки на строки хранятся в Map по id объекта (не indexOf!) —
+         это исключает ложные индексы -1, из-за которых каскад и связи раньше
+         «не работали». */
+      _ganttPushDown(g, desiredLeft, seen = /* @__PURE__ */ new Set()) {
+        if (seen.has(g)) return;
+        seen.add(g);
+        if (desiredLeft === g.leftDays) return;
+        g.leftDays = Math.max(0, desiredLeft);
+        for (const l of this.ganttData.links) {
+          if (l.from !== g || l.cyclic) continue;
+          let req;
+          switch (l.type) {
+            case "SS":
+              req = g.leftDays;
+              break;
+            case "FF":
+              req = g.leftDays + g.spanDays - l.to.spanDays;
+              break;
+            case "SF":
+              req = g.leftDays - l.to.spanDays;
+              break;
+            default:
+              req = g.leftDays + g.spanDays;
+          }
+          req = Math.max(0, req);
+          if (l.to.leftDays < req) this._ganttPushDown(l.to, req, seen);
+        }
+      },
+      /** Пересчёт итогов раскладки после live-движения (без полного пересмотра) */
+      _ganttRelayout() {
+        const g = this.ganttData;
+        g.workedDays = g.rows.reduce((m, r) => Math.max(m, r.leftDays + r.spanDays), 0);
+        g.totalDays = Math.max(7, g.workedDays);
+        for (const s of g.sections) {
+          const gr = g.rows.filter((r) => r.si === s.si);
+          if (!gr.length) continue;
+          s.leftDays = Math.min(...gr.map((r) => r.leftDays));
+          s.spanDays = Math.max(...gr.map((r) => r.leftDays + r.spanDays)) - s.leftDays;
+        }
+        this.layoutTick++;
+      },
+      /* layoutTick: счётчик перерисовки раскладки. Хранится в приватном поле
+         _layoutTick (инициализировано выше) — геттер/сеттер без отдельного
+         ключа-поля, чтобы не создавать дубль в объекте smeta(). */
+      get layoutTick() {
+        return this._layoutTick || 0;
+      },
+      set layoutTick(v) {
+        this._layoutTick = v;
+      },
       ganttBarStyle(g) {
         const w = this.ganttDayWidth();
+        void this.layoutTick;
         return `left:${g.leftDays * w}px;width:${Math.max(6, g.spanDays * w - 4)}px`;
       },
       ganttSecBarStyle(s) {
         const w = this.ganttDayWidth();
+        void this.layoutTick;
         return `left:${s.leftDays * w}px;width:${Math.max(6, s.spanDays * w - 4)}px`;
       },
       startGanttDrag(e, g) {
         e.preventDefault();
         e.stopPropagation();
+        if (this.ganttLinkFrom) {
+          this.cancelGanttLink();
+          return;
+        }
         const startX = e.clientX;
         const startLeft = g.leftDays;
         const w = this.ganttDayWidth();
         this.ganttDrag = { row: g.row, days: g.leftDays };
+        let lastLeft = startLeft;
         const onMove = (ev) => {
           const d = Math.round((ev.clientX - startX) / w);
-          g.leftDays = Math.max(0, startLeft + d);
+          const desired = Math.max(0, startLeft + d);
+          if (desired === lastLeft) return;
+          lastLeft = desired;
+          this._ganttPushDown(g, desired);
           this.ganttDrag.days = g.leftDays;
+          this._ganttRelayout();
         };
         const onUp = () => {
           window.removeEventListener("mousemove", onMove);
@@ -4421,8 +4627,12 @@ ${metaCells.join(",")}`);
             if (fromNum === null || fromNum === void 0) {
               this.logActivity("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u043D\u043E\u043C\u0435\u0440 \u043F\u0440\u0435\u0434\u0448\u0435\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A\u0430 \u2014 \u0441\u0432\u044F\u0437\u044C \u043D\u0435 \u0441\u043E\u0437\u0434\u0430\u043D\u0430");
             } else {
-              g.row.pred = String(fromNum);
-              this.logActivity(`\u0421\u0432\u044F\u0437\u044C: \u2116${fromNum} \u2192 \u2116${this.rowNumber(g.row.id) ?? "\u2014"}`);
+              const refs = parsePredRefs(g.row.pred).filter((r) => r.num !== fromNum);
+              refs.push({ type: this.ganttLinkType || "FS", num: fromNum });
+              g.row.pred = formatPredRefs(refs);
+              this.logActivity(
+                `\u0421\u0432\u044F\u0437\u044C ${this.ganttLinkType}: \u2116${fromNum} \u2192 \u2116${this.rowNumber(g.row.id) ?? "\u2014"}`
+              );
             }
           }
           this.ganttLinkFrom = null;
@@ -4433,7 +4643,7 @@ ${metaCells.join(",")}`);
       startLinkDrag(e, g) {
         e.preventDefault();
         e.stopPropagation();
-        if (this.ganttLinkFrom && this.ganttLinkFrom !== g) {
+        if (this.ganttLinkFrom && this._ganttRowIndex(this.ganttLinkFrom) !== this._ganttRowIndex(g)) {
           this.ganttLinkClick(e, g);
           return;
         }
@@ -4448,12 +4658,16 @@ ${metaCells.join(",")}`);
               (t) => t.contains(target)
             );
             const gTo = idx >= 0 ? rows[idx] : null;
-            if (gTo && gTo !== this.ganttLinkFrom) {
+            if (gTo && this._ganttRowIndex(gTo) !== this._ganttRowIndex(this.ganttLinkFrom)) {
               this.pushHistory("\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0441\u0432\u044F\u0437\u044C \u0413\u0430\u043D\u0442\u0430");
               const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
               if (fromNum !== null && fromNum !== void 0) {
-                gTo.row.pred = String(fromNum);
-                this.logActivity(`\u0421\u0432\u044F\u0437\u044C: \u2116${fromNum} \u2192 \u2116${this.rowNumber(gTo.row.id) ?? "\u2014"}`);
+                const refs = parsePredRefs(gTo.row.pred).filter((r) => r.num !== fromNum);
+                refs.push({ type: this.ganttLinkType || "FS", num: fromNum });
+                gTo.row.pred = formatPredRefs(refs);
+                this.logActivity(
+                  `\u0421\u0432\u044F\u0437\u044C ${this.ganttLinkType}: \u2116${fromNum} \u2192 \u2116${this.rowNumber(gTo.row.id) ?? "\u2014"}`
+                );
               }
             }
           }
@@ -4461,6 +4675,11 @@ ${metaCells.join(",")}`);
           this.ganttLinkPath = null;
         };
         window.addEventListener("mouseup", onUp);
+      },
+      /** Удалить одну связь предшественника (по номеру строки-источника) */
+      removePredRef(row, num) {
+        const refs = parsePredRefs(row.pred).filter((r) => r.num !== num);
+        row.pred = formatPredRefs(refs);
       },
       removePred(row) {
         row.pred = "";
@@ -4503,6 +4722,27 @@ ${metaCells.join(",")}`);
         } else if (Number(g.row.startAt) >= 0) {
           this.resetGanttShift(g.row);
         }
+      },
+      /** Переключатель типа создаваемой связи в тулбаре Ганта */
+      setGanttLinkType(t) {
+        this.ganttLinkType = t;
+      },
+      /** Чип предшественника: клик — сменить тип связи (FS→SS→FF→SF), alt+клик — удалить одну связь */
+      predChipClick(e, row) {
+        e.stopPropagation();
+        const refs = parsePredRefs(row.pred);
+        if (!refs.length) return;
+        if (e.altKey) {
+          this.pushHistory("\u0423\u0434\u0430\u043B\u0435\u043D\u0430 \u0441\u0432\u044F\u0437\u044C \u0413\u0430\u043D\u0442\u0430");
+          refs.shift();
+          row.pred = formatPredRefs(refs);
+          return;
+        }
+        this.pushHistory("\u0418\u0437\u043C\u0435\u043D\u0451\u043D \u0442\u0438\u043F \u0441\u0432\u044F\u0437\u0438 \u0413\u0430\u043D\u0442\u0430");
+        const order = ["FS", "SS", "FF", "SF"];
+        const r = refs[0];
+        r.type = order[(order.indexOf(r.type) + 1) % 4];
+        row.pred = formatPredRefs(refs);
       },
       /** Экспорт Ганта в PNG (указатель №5: PNG/SVG слиты в одну кнопку — выбор формата в диалоге) */
       exportGantt() {
@@ -4781,14 +5021,14 @@ ${metaCells.join(",")}`);
       },
       render(el, lines, preview) {
         this.layoutTick++;
-        const key = lines.join("|");
+        const key = lines.map((l) => l.d + "#" + l.cls).join("|");
         if (key !== lastKey) {
           lastKey = key;
           el.replaceChildren(
-            ...lines.map((d) => {
+            ...lines.map((l) => {
               const p = document.createElementNS(NS, "path");
-              p.setAttribute("d", d);
-              p.setAttribute("class", "at-gantt-linkpath");
+              p.setAttribute("d", l.d);
+              p.setAttribute("class", "at-gantt-linkpath " + l.cls);
               p.setAttribute("marker-end", "url(#arrowhead)");
               return p;
             })

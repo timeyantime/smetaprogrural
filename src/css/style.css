@@ -679,6 +679,9 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-gantt-bar:hover .at-gantt-link-handle { opacity: 1; }
 .at-gantt-link-handle:hover { transform: translateY(-50%) scale(1.25); background: #ddf4ff; }
 .at-gantt-bar.link-source .at-gantt-link-handle { opacity: 1; background: #0969da; }
+/* Активный режим рисования связи: источник подсвечен, цель — рамка при наведении */
+.at-gantt-bar.link-source { box-shadow: 0 0 0 3px rgba(9, 105, 218, .35), 0 1px 2px rgba(23,43,77,.2); }
+.at-gantt-bar.link-target { outline: 2px dashed #0969da; outline-offset: 1px; cursor: crosshair; }
 /* Живая связь при рисовании — пунктир */
 .gantt-link-draft { stroke-dasharray: 4 3; }
 /* Стили SVG-слоя связей (drawio-style): стрелки с анимацией появления и живым превью */

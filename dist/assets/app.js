@@ -2452,7 +2452,10 @@ ${metaCells.join(",")}`);
       resources: loadResources(),
       dirty: false,
       ganttDrag: null,
-      ganttLinkFrom: null,
+      ganttLinkFromId: null,
+      // id строки-источника рисования связи (id, а не прокси-объект — сравнение через === с Alpine-прокси было ненадёжным)
+      ganttHoverTargetId: null,
+      // id работы под курсором при рисовании (подсветка цели)
       ganttLinkPath: null,
       ganttLinkType: "FS",
       // тип создаваемой связи (переключатель в тулбаре Ганта, как в MS Project)
@@ -2734,7 +2737,8 @@ ${metaCells.join(",")}`);
           this.resModalOpen = false;
           this.historyOpen = false;
           this.batchBar = false;
-          this.ganttLinkFrom = null;
+          this.ganttLinkFromId = null;
+          this.ganttHoverTargetId = null;
           this.ganttLinkPath = null;
           if (this.nsbModalOpen) this.cancelNsbEdit();
           this.nsbModalOpen = false;
@@ -4467,30 +4471,6 @@ ${metaCells.join(",")}`);
           return { d, cls: "lt-" + (l.type || "FS") + (l.cyclic ? " cyclic" : "") };
         }).filter(Boolean);
       },
-      trackGanttLink(e) {
-        if (!this.ganttLinkFrom) return;
-        const grid = e.currentTarget.closest(".at-gantt");
-        if (!grid) return;
-        const rectG = grid.getBoundingClientRect();
-        const w = this.ganttDayWidth();
-        const g = this.ganttLinkFrom;
-        const fi = this._ganttRowIndex(g);
-        const tracks = grid.querySelectorAll(".at-gantt-track");
-        let x1, y1;
-        const barF = fi >= 0 && tracks[fi] ? tracks[fi].querySelector(".at-gantt-bar") : null;
-        if (barF) {
-          const rf = barF.getBoundingClientRect();
-          x1 = rf.right - rectG.left;
-          y1 = rf.top + rf.height / 2 - rectG.top;
-        } else {
-          x1 = g.leftDays * w + Math.max(6, g.spanDays * w - 4);
-          y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
-        }
-        const x2 = e.clientX - rectG.left;
-        const y2 = e.clientY - rectG.top;
-        const mx = (x1 + x2) / 2;
-        this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
-      },
       /** Индекс строки диаграммы по объекту g. Кэш-сигнатура хранит id ВСЕХ строк
           текущего кадра: при инвалидации кэша (любoloм изменении данных/раскладки)
           сигнатура меняется и карта перестраивается заново. Раньше «сигнатура»
@@ -4508,9 +4488,56 @@ ${metaCells.join(",")}`);
         if (byId !== void 0) return byId;
         return rows.findIndex((r) => r.row && r.row.id === g.row.id);
       },
+      /** Строка диаграммы по id записи (поиск без привязки к прокси-объектам Alpine) */
+      _ganttRowById(id) {
+        if (id === null || id === void 0) return null;
+        return this.ganttData.rows.find((r) => r.row && r.row.id === id) || null;
+      },
+      /** Отрисовать превью связи от источника до точки курсора (координаты слоя = координаты .at-gantt) */
+      _drawLinkPreview(clientX, clientY) {
+        const fromG = this._ganttRowById(this.ganttLinkFromId);
+        if (!fromG) {
+          this.ganttLinkPath = null;
+          return;
+        }
+        const grid = document.querySelector(".at-gantt");
+        if (!grid) return;
+        const rectG = grid.getBoundingClientRect();
+        const w = this.ganttDayWidth();
+        const fromRight = this.ganttLinkType === "FS" || this.ganttLinkType === "SF";
+        let x1, y1;
+        const fi = this._ganttRowIndex(fromG);
+        const tracks = grid.querySelectorAll(".at-gantt-track");
+        const barF = fi >= 0 && tracks[fi] ? tracks[fi].querySelector(".at-gantt-bar") : null;
+        if (barF) {
+          const rf = barF.getBoundingClientRect();
+          x1 = (fromRight ? rf.right : rf.left) - rectG.left;
+          y1 = rf.top + rf.height / 2 - rectG.top;
+        } else {
+          x1 = fromRight ? fromG.leftDays * w + Math.max(6, fromG.spanDays * w - 4) : fromG.leftDays * w;
+          y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
+        }
+        let x2 = clientX - rectG.left;
+        let y2 = clientY - rectG.top;
+        const toG = this.ganttHoverTargetId ? this._ganttRowById(this.ganttHoverTargetId) : null;
+        if (toG) {
+          const ti = this._ganttRowIndex(toG);
+          const trackT = ti >= 0 ? tracks[ti] : null;
+          const barT = trackT ? trackT.querySelector(".at-gantt-bar") : null;
+          if (barT) {
+            const rt = barT.getBoundingClientRect();
+            const toLeft = this.ganttLinkType === "FS" || this.ganttLinkType === "SS";
+            x2 = (toLeft ? rt.left : rt.right) - rectG.left;
+            y2 = rt.top + rt.height / 2 - rectG.top;
+          }
+        }
+        const mx = (x1 + x2) / 2;
+        this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+      },
       /** Клик по пустому месту дорожки — отменить рисование связи */
       cancelGanttLink() {
-        this.ganttLinkFrom = null;
+        this.ganttLinkFromId = null;
+        this.ganttHoverTargetId = null;
         this.ganttLinkPath = null;
       },
       /* ── Live-каскад при перетаскивании (Wix/MS Project-style) ───────────────
@@ -4581,7 +4608,7 @@ ${metaCells.join(",")}`);
       startGanttDrag(e, g) {
         e.preventDefault();
         e.stopPropagation();
-        if (this.ganttLinkFrom) {
+        if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== void 0) {
           this.cancelGanttLink();
           return;
         }
@@ -4616,64 +4643,131 @@ ${metaCells.join(",")}`);
         row.startAt = null;
         this.logActivity("\u0421\u0431\u0440\u043E\u0441 \u0440\u0443\u0447\u043D\u043E\u0433\u043E \u0441\u0434\u0432\u0438\u0433\u0430 \u0440\u0430\u0431\u043E\u0442\u044B");
       },
+      /** Ядро создания связи: fromRow → toRow (тип из переключателя тулбара).
+          Единая точка для обоих жестов (drag-drag и клик-по-клику): валидация,
+          история, запись в pred в нумерации ТАБЛИЦЫ (rowNumber), лог. */
+      _createLink(fromRow, toRow) {
+        if (!fromRow || !toRow || fromRow.id === toRow.id) return false;
+        const fromNum = this.rowNumber(fromRow.id);
+        if (fromNum === null || fromNum === void 0) {
+          this.logActivity("\u041F\u0440\u0435\u0434\u0448\u0435\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A \u043D\u0435 \u0432\u0438\u0434\u0435\u043D \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0435 (\u0444\u0438\u043B\u044C\u0442\u0440?) \u2014 \u0441\u0432\u044F\u0437\u044C \u043D\u0435 \u0441\u043E\u0437\u0434\u0430\u043D\u0430");
+          return false;
+        }
+        const toNum = this.rowNumber(toRow.id);
+        if (toNum === null || toNum === void 0) {
+          this.logActivity("\u041F\u0440\u0435\u0435\u043C\u043D\u0438\u043A \u043D\u0435 \u0432\u0438\u0434\u0435\u043D \u0432 \u0442\u0430\u0431\u043B\u0438\u0446\u0435 (\u0444\u0438\u043B\u044C\u0442\u0440?) \u2014 \u0441\u0432\u044F\u0437\u044C \u043D\u0435 \u0441\u043E\u0437\u0434\u0430\u043D\u0430");
+          return false;
+        }
+        this.pushHistory("\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0441\u0432\u044F\u0437\u044C \u0413\u0430\u043D\u0442\u0430");
+        const refs = parsePredRefs(toRow.pred).filter((r) => r.num !== fromNum);
+        refs.push({ type: this.ganttLinkType || "FS", num: fromNum });
+        toRow.pred = formatPredRefs(refs);
+        this.logActivity(`\u0421\u0432\u044F\u0437\u044C ${this.ganttLinkType}: \u2116${fromNum} \u2192 \u2116${toNum}`);
+        return true;
+      },
+      /** Клик по полосе в режиме рисования связи (клик-по-клику): первый клик — источник,
+          второй — цель. Источник хранится по id строки: ссылки на прокси-объекты Alpine
+          ненадёжны (после пересмотра x-for это другие объекты) — сравнение только по id. */
       ganttLinkClick(e, g) {
         e.stopPropagation();
-        if (!this.ganttLinkFrom) {
-          this.ganttLinkFrom = g;
-        } else {
-          if (this.ganttLinkFrom !== g) {
-            this.pushHistory("\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0441\u0432\u044F\u0437\u044C \u0413\u0430\u043D\u0442\u0430");
-            const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
-            if (fromNum === null || fromNum === void 0) {
-              this.logActivity("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u043F\u0440\u0435\u0434\u0435\u043B\u0438\u0442\u044C \u043D\u043E\u043C\u0435\u0440 \u043F\u0440\u0435\u0434\u0448\u0435\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A\u0430 \u2014 \u0441\u0432\u044F\u0437\u044C \u043D\u0435 \u0441\u043E\u0437\u0434\u0430\u043D\u0430");
-            } else {
-              const refs = parsePredRefs(g.row.pred).filter((r) => r.num !== fromNum);
-              refs.push({ type: this.ganttLinkType || "FS", num: fromNum });
-              g.row.pred = formatPredRefs(refs);
-              this.logActivity(
-                `\u0421\u0432\u044F\u0437\u044C ${this.ganttLinkType}: \u2116${fromNum} \u2192 \u2116${this.rowNumber(g.row.id) ?? "\u2014"}`
-              );
-            }
-          }
-          this.ganttLinkFrom = null;
-          this.ganttLinkPath = null;
+        const active = this.ganttLinkFromId !== null && this.ganttLinkFromId !== void 0;
+        if (!active) {
+          this.ganttLinkFromId = g.row.id;
+          this.layoutTick++;
+          this.logActivity("\u0412\u044B\u0431\u0440\u0430\u043D \u043F\u0440\u0435\u0434\u0448\u0435\u0441\u0442\u0432\u0435\u043D\u043D\u0438\u043A \u2014 \u043A\u043B\u0438\u043A\u043D\u0438\u0442\u0435 \u043F\u043E \u0440\u0430\u0431\u043E\u0442\u0435-\u043F\u0440\u0435\u0435\u043C\u043D\u0438\u043A\u0443");
+          return;
+        }
+        if (this.ganttLinkFromId !== g.row.id) {
+          const fromG = this._ganttRowById(this.ganttLinkFromId);
+          this._createLink(fromG ? fromG.row : null, g.row);
+        }
+        this.cancelGanttLink();
+      },
+      /** Клик по полосе: в режиме рисования — завершить связь на этой работе;
+          иначе ничего (перемещение делает mousedown-драг). */
+      ganttBarClick(e, g) {
+        e.stopPropagation();
+        if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== void 0) {
+          this.ganttLinkClick(e, g);
         }
       },
-      /** Начало рисования связи перетаскиванием (drawio-style): зажать ручку и тянуть к цели */
+      /** Движение мыши по дорожке: обновляет цель подсветки и живое превью связи */
+      ganttTrackMove(e) {
+        if (this.ganttLinkFromId === null || this.ganttLinkFromId === void 0) return;
+        const t = e.target && e.target.closest ? e.target.closest(".at-gantt-bar") : null;
+        let hoverId = null;
+        if (t) {
+          const tracks = document.querySelectorAll(".at-gantt .at-gantt-track");
+          const idx = Array.prototype.findIndex.call(tracks, (tr) => tr.contains(t));
+          const gr = idx >= 0 ? this.ganttData.rows[idx] : null;
+          if (gr && gr.row.id !== this.ganttLinkFromId) hoverId = gr.row.id;
+        }
+        this.ganttHoverTargetId = hoverId;
+        this._drawLinkPreview(e.clientX, e.clientY);
+      },
+      /** Подсветка цели при наведении полосы во время рисования связи */
+      ganttBarHoverEnter(g) {
+        if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== void 0) {
+          this.ganttHoverTargetId = g.row.id;
+        }
+      },
+      ganttBarHoverLeave() {
+        this.ganttHoverTargetId = null;
+      },
+      /** Начало рисования связи перетаскиванием (drawio/Wix-style): зажать ручку ⤳
+          и тянуть к другой работе. На движении — snap-превью к цели; на отпускании —
+          связь создаётся, только если курсор над полосой другой работы. Иначе режим
+          остаётся активным (можно завершить вторым кликом). */
       startLinkDrag(e, g) {
         e.preventDefault();
         e.stopPropagation();
-        if (this.ganttLinkFrom && this._ganttRowIndex(this.ganttLinkFrom) !== this._ganttRowIndex(g)) {
-          this.ganttLinkClick(e, g);
+        const active = this.ganttLinkFromId !== null && this.ganttLinkFromId !== void 0;
+        if (active && this.ganttLinkFromId !== g.row.id) {
+          const fromG = this._ganttRowById(this.ganttLinkFromId);
+          this._createLink(fromG ? fromG.row : null, g.row);
+          this.cancelGanttLink();
           return;
         }
-        if (!this.ganttLinkFrom) this.ganttLinkFrom = g;
+        if (!active) this.ganttLinkFromId = g.row.id;
+        const trackAt = (target) => {
+          const tracks = document.querySelectorAll(".at-gantt .at-gantt-track");
+          return Array.prototype.findIndex.call(tracks, (tr) => tr.contains(target));
+        };
+        const onMove = (ev) => {
+          const t = ev.target && ev.target.closest ? ev.target.closest(".at-gantt-bar") : null;
+          let hoverId = null;
+          if (t) {
+            const idx = trackAt(t);
+            const gr = idx >= 0 ? this.ganttData.rows[idx] : null;
+            if (gr && gr.row.id !== this.ganttLinkFromId) hoverId = gr.row.id;
+          }
+          this.ganttHoverTargetId = hoverId;
+          this._drawLinkPreview(ev.clientX, ev.clientY);
+        };
         const onUp = (ev) => {
+          window.removeEventListener("mousemove", onMove);
           window.removeEventListener("mouseup", onUp);
           const target = ev.target && ev.target.closest ? ev.target.closest(".at-gantt-bar") : null;
-          if (target && this.ganttLinkFrom) {
-            const rows = this.ganttData.rows;
-            const idx = Array.prototype.findIndex.call(
-              document.querySelectorAll(".at-gantt .at-gantt-track"),
-              (t) => t.contains(target)
-            );
-            const gTo = idx >= 0 ? rows[idx] : null;
-            if (gTo && this._ganttRowIndex(gTo) !== this._ganttRowIndex(this.ganttLinkFrom)) {
-              this.pushHistory("\u0421\u043E\u0437\u0434\u0430\u043D\u0430 \u0441\u0432\u044F\u0437\u044C \u0413\u0430\u043D\u0442\u0430");
-              const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
-              if (fromNum !== null && fromNum !== void 0) {
-                const refs = parsePredRefs(gTo.row.pred).filter((r) => r.num !== fromNum);
-                refs.push({ type: this.ganttLinkType || "FS", num: fromNum });
-                gTo.row.pred = formatPredRefs(refs);
-                this.logActivity(
-                  `\u0421\u0432\u044F\u0437\u044C ${this.ganttLinkType}: \u2116${fromNum} \u2192 \u2116${this.rowNumber(gTo.row.id) ?? "\u2014"}`
-                );
-              }
+          let created = false;
+          if (target) {
+            const idx = trackAt(target);
+            const gTo = idx >= 0 ? this.ganttData.rows[idx] : null;
+            if (gTo && gTo.row.id !== this.ganttLinkFromId) {
+              const fromG = this._ganttRowById(this.ganttLinkFromId);
+              created = this._createLink(fromG ? fromG.row : null, gTo.row);
             }
           }
-          this.ganttLinkFrom = null;
-          this.ganttLinkPath = null;
+          if (created) {
+            this.cancelGanttLink();
+          } else {
+            this.ganttHoverTargetId = null;
+            this.ganttLinkPath = null;
+            if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== void 0) {
+              this.logActivity("\u041E\u0442\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0441\u0442\u0440\u0435\u043B\u043A\u0443 \u043D\u0430 \u0434\u0440\u0443\u0433\u043E\u0439 \u0440\u0430\u0431\u043E\u0442\u0435 \u2014 \u0438\u043B\u0438 \u043A\u043B\u0438\u043A\u043D\u0438\u0442\u0435 \u043F\u043E \u043D\u0435\u0439");
+            }
+          }
         };
+        window.addEventListener("mousemove", onMove);
         window.addEventListener("mouseup", onUp);
       },
       /** Удалить одну связь предшественника (по номеру строки-источника) */

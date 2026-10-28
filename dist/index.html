@@ -15,7 +15,7 @@
   <script src="./dist/assets/money.js"></script>
   <script src="./dist/assets/app.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-CPh8DsgK.css">
+  <link rel="stylesheet" crossorigin href="/assets/main-BJeKIgyb.css">
 </head>
 <body>
   <div x-data="smeta()" x-init="init()" class="app">
@@ -350,7 +350,7 @@
                       x-text="t"></button>
             </template>
           </span>
-          <span class="at-gantt-info">Тяните полосу — зависимые сдвигаются сразу · ручка ⤳ на полосе — рисование связи (или клик ⤳ по двум работам) · клик по чипу «→» меняет тип связи, alt+клик удаляет · правый клик — убрать связь/сдвиг. Длительность 0 — запись скрыта.</span>
+          <span class="at-gantt-info">Тяните полосу — зависимые сдвигаются сразу · тяните ручку ⤳ к другой работе ИЛИ кликните ⤳ по предшественнику, затем по преемнику · тип связи — переключатель FS/SS/FF/SF · клик по чипу «→» меняет тип, alt+клик удаляет · правый клик по полосе — снять связь. Длительность 0 — запись скрыта.</span>
           <span class="spacer"></span>
           <button class="at-btn at-btn-sm" :class="{ active: ganttCritical }" @click="ganttCritical = !ganttCritical"
                   title="Подсветка критического пути (#49)">⚑ Крит. путь</button>
@@ -406,13 +406,16 @@
                         :title="'Предшественники: №' + g.row.pred + ' · клик — сменить тип, alt+клик — удалить'"
                         @click.stop="predChipClick($event, g.row)">→<b x-text="g.row.pred"></b></span>
                 </div>
-                <div class="at-gantt-track" @mousemove="trackGanttLink($event)" @click.self="cancelGanttLink()">
-                  <div class="at-gantt-bar" :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFrom === g }]"
+                <div class="at-gantt-track" @mousemove="ganttTrackMove($event)" @click.self="cancelGanttLink()">
+                  <div class="at-gantt-bar" :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFromId === g.row.id, 'link-target': ganttHoverTargetId === g.row.id }]"
                        :style="ganttBarStyle(g)"
                        @mousedown="startGanttDrag($event, g)"
+                       @click="ganttBarClick($event, g)"
+                       @mouseenter="ganttBarHoverEnter(g)" @mouseleave="ganttBarHoverLeave()"
                        @contextmenu.prevent="onBarContext(g)">
                     <span class="at-gantt-bar-label" x-text="g.days + ' дн.'"></span>
                     <span class="at-gantt-link-handle" @mousedown.stop.prevent="startLinkDrag($event, g)"
+                          @click.stop.prevent="ganttLinkClick($event, g)"
                           title="Потяните к другой работе или кликните по ручкам двух работ — связь">⤳</span>
                   </div>
                 </div>

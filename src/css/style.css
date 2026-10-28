@@ -679,6 +679,9 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 .at-gantt-bar:hover .at-gantt-link-handle { opacity: 1; }
 .at-gantt-link-handle:hover { transform: translateY(-50%) scale(1.25); background: #ddf4ff; }
 .at-gantt-bar.link-source .at-gantt-link-handle { opacity: 1; background: #0969da; }
+/* Активный режим рисования связи: источник подсвечен, цель — рамка при наведении */
+.at-gantt-bar.link-source { box-shadow: 0 0 0 3px rgba(9, 105, 218, .35), 0 1px 2px rgba(23,43,77,.2); }
+.at-gantt-bar.link-target { outline: 2px dashed #0969da; outline-offset: 1px; cursor: crosshair; }
 /* Живая связь при рисовании — пунктир */
 .gantt-link-draft { stroke-dasharray: 4 3; }
 /* Стили SVG-слоя связей (drawio-style): стрелки с анимацией появления и живым превью */
@@ -698,6 +701,23 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
 @keyframes link-marching { to { stroke-dashoffset: -9; } }
 #arrowhead polygon { fill: #59636e; }
 #gantt-link-preview-layer .at-gantt-linkpath.preview { stroke: #0969da; }
+/* Цвет линий по типу связи (MS Project-style) + красная подсветка циклов */
+.at-gantt-linkpath.lt-FS  { stroke: #59636e; }
+.at-gantt-linkpath.lt-SS  { stroke: #8250df; }
+.at-gantt-linkpath.lt-FF  { stroke: #bf8700; }
+.at-gantt-linkpath.lt-SF  { stroke: #0969da; }
+.at-gantt-linkpath.cyclic { stroke: #cf222e; stroke-dasharray: 4 3; }
+/* Переключатель типа создаваемой связи в тулбаре Ганта */
+.at-gantt-type { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.at-link-type-btn {
+  border: 1px solid var(--border, #d0d7de); background: #fff; color: var(--muted);
+  font-size: 11px; padding: 2px 7px; cursor: pointer;
+}
+.at-link-type-btn:first-of-type { border-radius: 6px 0 0 6px; }
+.at-link-type-btn:last-of-type  { border-radius: 0 6px 6px 0; }
+.at-link-type-btn + .at-link-type-btn { border-left: none; }
+.at-link-type-btn.active { background: #0969da; border-color: #0969da; color: #fff; font-weight: 600; }
+.at-gantt-dep { cursor: pointer; }
 .at-gantt-empty { padding: 24px; color: var(--muted); text-align: center; }
 
 /* ============ Модалки: Справочник и НСБ ============ */

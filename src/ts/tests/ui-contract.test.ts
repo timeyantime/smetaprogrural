@@ -127,8 +127,21 @@ describe('UI-контракт: index.html ↔ smeta()', () => {
       // «if» — ветвления кода с 4-пробельным отступом, не ключ объекта smeta()
       if (m[1] !== 'if') keys.push(m[1]);
     }
-    const dups = keys.filter((k, i) => {
-      return keys.indexOf(k) !== i;
+    // get+set одной пары — это один аксессор, а не дубль (layoutTick)
+    const accessors = new Set();
+    for (const m of appSrc.matchAll(/^ {4}(get|set) ([A-Za-z_][\w]*)\s*\(/gm)) {
+      accessors.add(m[2]);
+    }
+    const seenOnce = new Set();
+    const dups = keys.filter((k) => {
+      if (accessors.has(k)) {
+        if (seenOnce.has(k)) return false; // пропускаем вторую половину пары get/set
+        seenOnce.add(k);
+        return false;
+      }
+      const dup = seenOnce.has(k);
+      seenOnce.add(k);
+      return dup;
     });
     expect([...new Set(dups)]).toEqual([]);
   });

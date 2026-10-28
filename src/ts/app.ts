@@ -342,7 +342,7 @@ function copyFrameworkFields(from, to) {
  * Разбор строки предшественников в формате MS Project: «2», «FS:2», «SS:3,FF:5».
  * Тип по умолчанию — FS (Finish-to-Start). Нераспознанные токены игнорируются.
  */
-function parsePredRefs(text) {
+export function parsePredRefs(text) {
   const out = [];
   for (const part of String(text || '').split(/[,\s;]+/)) {
     if (!part) continue;
@@ -457,9 +457,10 @@ window.smeta = function smeta() {
     resources: loadResources(),
     dirty: false,
     ganttDrag: null,
-    ganttLinkFrom: null,
-    ganttLinkPath: null,
-    ganttLinkType: 'FS', // тип создаваемой связи (переключатель в тулбаре Ганта, как в MS Project)
+    ganttLinkFromId: null as number | string | null, // id строки-источника рисования связи (id, а не прокси-объект — сравнение через === с Alpine-прокси было ненадёжным)
+    ganttHoverTargetId: null as number | string | null, // id работы под курсором при рисовании (подсветка цели)
+    ganttLinkPath: null as string | null,
+    ganttLinkType: 'FS' as 'FS' | 'SS' | 'FF' | 'SF', // тип создаваемой связи (переключатель в тулбаре Ганта, как в MS Project)
     rowDropTarget: null, // { key: 'si|id', pos: 'above'|'below' } — подсветка drop-зоны строки
     droppedRowId: null, // id переставленной строки — зелёная вспышка row-dropped после drop
 
@@ -783,7 +784,8 @@ window.smeta = function smeta() {
         this.resModalOpen = false;
         this.historyOpen = false;
         this.batchBar = false;
-        this.ganttLinkFrom = null;
+        this.ganttLinkFromId = null;
+        this.ganttHoverTargetId = null;
         this.ganttLinkPath = null;
         if (this.nsbModalOpen) this.cancelNsbEdit();
         this.nsbModalOpen = false;
@@ -2539,6 +2541,9 @@ window.smeta = function smeta() {
        изменении сметы/связей/масштаба кэш сбрасывается ($watch в init). */
     _ganttCache: null as any,
     _ganttEpoch: 0,
+    _layoutTick: 0,
+    _ganttIndexById: new Map(),
+    _ganttIndexSig: '',
 
     invalidateGantt() {
       this._ganttCache = null;
@@ -2842,29 +2847,75 @@ window.smeta = function smeta() {
         .filter(Boolean);
     },
 
-    trackGanttLink(e) {
-      if (!this.ganttLinkFrom) return;
-      const grid = e.currentTarget.closest('.at-gantt');
+    /** Индекс строки диаграммы по объекту g. Кэш-сигнатура хранит id ВСЕХ строк
+        текущего кадра: при инвалидации кэша (любoloм изменении данных/раскладки)
+        сигнатура меняется и карта перестраивается заново. Раньше «сигнатура»
+        сверялась с id одной произвольной строки — карта устаревала молча,
+        индексы связей съезжали и каскад «не работал». */
+    _ganttRowIndex(g) {
+      if (!g) return -1;
+      const rows = this.ganttData.rows;
+      const sig = rows.map((r) => r.row.id).join('|');
+      if (this._ganttIndexSig !== sig) {
+        this._ganttIndexSig = sig;
+        this._ganttIndexById = new Map(rows.map((r, i) => [r.row.id, i]));
+      }
+      const byId = this._ganttIndexById.get(g.row.id);
+      if (byId !== undefined) return byId;
+      return rows.findIndex((r) => r.row && r.row.id === g.row.id);
+    },
+
+    /** Строка диаграммы по id записи (поиск без привязки к прокси-объектам Alpine) */
+    _ganttRowById(id) {
+      if (id === null || id === undefined) return null;
+      return this.ganttData.rows.find((r) => r.row && r.row.id === id) || null;
+    },
+
+    /** Отрисовать превью связи от источника до точки курсора (координаты слоя = координаты .at-gantt) */
+    _drawLinkPreview(clientX, clientY) {
+      const fromG = this._ganttRowById(this.ganttLinkFromId);
+      if (!fromG) {
+        this.ganttLinkPath = null;
+        return;
+      }
+      const grid = document.querySelector('.at-gantt');
       if (!grid) return;
       const rectG = grid.getBoundingClientRect();
       const w = this.ganttDayWidth();
-      // Стартовая точка — правый край полосы источника (координаты слоя связей = координаты .at-gantt)
-      const g = this.ganttLinkFrom;
-      const fi = this._ganttRowIndex(g);
-      const tracks = grid.querySelectorAll('.at-gantt-track');
+      // Точка выхода зависит от типа создаваемой связи (MS Project):
+      // FS/SF — из правого края предшественника, SS/FF — из левого.
+      const fromRight = this.ganttLinkType === 'FS' || this.ganttLinkType === 'SF';
       let x1, y1;
+      const fi = this._ganttRowIndex(fromG);
+      const tracks = grid.querySelectorAll('.at-gantt-track');
       const barF = fi >= 0 && tracks[fi] ? tracks[fi].querySelector('.at-gantt-bar') : null;
       if (barF) {
         const rf = barF.getBoundingClientRect();
-        x1 = rf.right - rectG.left;
+        x1 = (fromRight ? rf.right : rf.left) - rectG.left;
         y1 = rf.top + rf.height / 2 - rectG.top;
       } else {
-        x1 = g.leftDays * w + Math.max(6, g.spanDays * w - 4);
+        x1 = fromRight
+          ? fromG.leftDays * w + Math.max(6, fromG.spanDays * w - 4)
+          : fromG.leftDays * w;
         y1 = 34 + this.ganttData.sections.length * 38 + fi * 34 + 17;
       }
-      const x2 = e.clientX - rectG.left;
-      const y2 = e.clientY - rectG.top;
-      // превью связи тоже рисоваем кривой drawio-style
+      // Цель под курсором — тянем стрелку ровно в полосу цели (Wix-style snap)
+      let x2 = clientX - rectG.left;
+      let y2 = clientY - rectG.top;
+      const toG = this.ganttHoverTargetId
+        ? this._ganttRowById(this.ganttHoverTargetId)
+        : null;
+      if (toG) {
+        const ti = this._ganttRowIndex(toG);
+        const trackT = ti >= 0 ? tracks[ti] : null;
+        const barT = trackT ? trackT.querySelector('.at-gantt-bar') : null;
+        if (barT) {
+          const rt = barT.getBoundingClientRect();
+          const toLeft = this.ganttLinkType === 'FS' || this.ganttLinkType === 'SS';
+          x2 = (toLeft ? rt.left : rt.right) - rectG.left;
+          y2 = rt.top + rt.height / 2 - rectG.top;
+        }
+      }
       const mx = (x1 + x2) / 2;
       this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
     },
@@ -2888,7 +2939,8 @@ window.smeta = function smeta() {
 
     /** Клик по пустому месту дорожки — отменить рисование связи */
     cancelGanttLink() {
-      this.ganttLinkFrom = null;
+      this.ganttLinkFromId = null;
+      this.ganttHoverTargetId = null;
       this.ganttLinkPath = null;
     },
 
@@ -2940,13 +2992,15 @@ window.smeta = function smeta() {
       this.layoutTick++;
     },
 
+    /* layoutTick: счётчик перерисовки раскладки. Хранится в приватном поле
+       _layoutTick (инициализировано выше) — геттер/сеттер без отдельного
+       ключа-поля, чтобы не создавать дубль в объекте smeta(). */
     get layoutTick() {
-      return this._layoutTick;
+      return this._layoutTick || 0;
     },
     set layoutTick(v) {
       this._layoutTick = v;
     },
-    _layoutTick: 0,
 
     ganttBarStyle(g) {
       const w = this.ganttDayWidth();
@@ -2964,7 +3018,7 @@ window.smeta = function smeta() {
       e.preventDefault();
       e.stopPropagation();
       // если идёт рисование связи — не мешаем ему
-      if (this.ganttLinkFrom) {
+      if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== undefined) {
         this.cancelGanttLink();
         return;
       }
@@ -3002,73 +3056,139 @@ window.smeta = function smeta() {
       this.logActivity('Сброс ручного сдвига работы');
     },
 
+    /** Ядро создания связи: fromRow → toRow (тип из переключателя тулбара).
+        Единая точка для обоих жестов (drag-drag и клик-по-клику): валидация,
+        история, запись в pred в нумерации ТАБЛИЦЫ (rowNumber), лог. */
+    _createLink(fromRow, toRow) {
+      if (!fromRow || !toRow || fromRow.id === toRow.id) return false;
+      const fromNum = this.rowNumber(fromRow.id);
+      if (fromNum === null || fromNum === undefined) {
+        this.logActivity('Предшественник не виден в таблице (фильтр?) — связь не создана');
+        return false;
+      }
+      const toNum = this.rowNumber(toRow.id);
+      if (toNum === null || toNum === undefined) {
+        this.logActivity('Преемник не виден в таблице (фильтр?) — связь не создана');
+        return false;
+      }
+      this.pushHistory('Создана связь Ганта');
+      // несколько связей на строку + тип: «SS:3,5» (MS Project-style);
+      // повторная связь между теми же работами перезаписывает тип, а не дублируется
+      const refs = parsePredRefs(toRow.pred).filter((r) => r.num !== fromNum);
+      refs.push({ type: this.ganttLinkType || 'FS', num: fromNum });
+      toRow.pred = formatPredRefs(refs);
+      this.logActivity(`Связь ${this.ganttLinkType}: №${fromNum} → №${toNum}`);
+      return true;
+    },
+
+    /** Клик по полосе в режиме рисования связи (клик-по-клику): первый клик — источник,
+        второй — цель. Источник хранится по id строки: ссылки на прокси-объекты Alpine
+        ненадёжны (после пересмотра x-for это другие объекты) — сравнение только по id. */
     ganttLinkClick(e, g) {
       e.stopPropagation();
-      if (!this.ganttLinkFrom) {
-        this.ganttLinkFrom = g;
-      } else {
-        if (this.ganttLinkFrom !== g) {
-          this.pushHistory('Создана связь Ганта');
-          // Номер предшественника — в нумерации ТАБЛИЦЫ (rowNumber), т.к. именно так
-          // связи разбираются в геттере ganttData (byNum строится по индексам flatRows).
-          // Раньше здесь использовался индекс строки Ганта (в другой раскладке и с другим
-          // счётом) → связь указывала не на ту работу или терялась («связи не отображаются»).
-          const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
-          if (fromNum === null || fromNum === undefined) {
-            this.logActivity('Не удалось определить номер предшественника — связь не создана');
-          } else {
-            // несколько связей на строку + тип: «SS:3,5» (MS Project-style)
-            const refs = parsePredRefs(g.row.pred).filter((r) => r.num !== fromNum);
-            refs.push({ type: this.ganttLinkType || 'FS', num: fromNum });
-            g.row.pred = formatPredRefs(refs);
-            this.logActivity(
-              `Связь ${this.ganttLinkType}: №${fromNum} → №${this.rowNumber(g.row.id) ?? '—'}`
-            );
-          }
-        }
-        this.ganttLinkFrom = null;
-        this.ganttLinkPath = null;
+      const active = this.ganttLinkFromId !== null && this.ganttLinkFromId !== undefined;
+      if (!active) {
+        this.ganttLinkFromId = g.row.id;
+        this.layoutTick++;
+        this.logActivity('Выбран предшественник — кликните по работе-преемнику');
+        return;
+      }
+      if (this.ganttLinkFromId !== g.row.id) {
+        const fromG = this._ganttRowById(this.ganttLinkFromId);
+        this._createLink(fromG ? fromG.row : null, g.row);
+      }
+      this.cancelGanttLink();
+    },
+
+    /** Клик по полосе: в режиме рисования — завершить связь на этой работе;
+        иначе ничего (перемещение делает mousedown-драг). */
+    ganttBarClick(e, g) {
+      e.stopPropagation();
+      if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== undefined) {
+        this.ganttLinkClick(e, g);
       }
     },
 
-    /** Начало рисования связи перетаскиванием (drawio-style): зажать ручку и тянуть к цели */
+    /** Движение мыши по дорожке: обновляет цель подсветки и живое превью связи */
+    ganttTrackMove(e) {
+      if (this.ganttLinkFromId === null || this.ganttLinkFromId === undefined) return;
+      const t = e.target && e.target.closest ? e.target.closest('.at-gantt-bar') : null;
+      let hoverId = null;
+      if (t) {
+        const tracks = document.querySelectorAll('.at-gantt .at-gantt-track');
+        const idx = Array.prototype.findIndex.call(tracks, (tr) => tr.contains(t));
+        const gr = idx >= 0 ? this.ganttData.rows[idx] : null;
+        if (gr && gr.row.id !== this.ganttLinkFromId) hoverId = gr.row.id;
+      }
+      this.ganttHoverTargetId = hoverId;
+      this._drawLinkPreview(e.clientX, e.clientY);
+    },
+
+    /** Подсветка цели при наведении полосы во время рисования связи */
+    ganttBarHoverEnter(g) {
+      if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== undefined) {
+        this.ganttHoverTargetId = g.row.id;
+      }
+    },
+    ganttBarHoverLeave() {
+      this.ganttHoverTargetId = null;
+    },
+
+    /** Начало рисования связи перетаскиванием (drawio/Wix-style): зажать ручку ⤳
+        и тянуть к другой работе. На движении — snap-превью к цели; на отпускании —
+        связь создаётся, только если курсор над полосой другой работы. Иначе режим
+        остаётся активным (можно завершить вторым кликом). */
     startLinkDrag(e, g) {
       e.preventDefault();
       e.stopPropagation();
-      if (this.ganttLinkFrom && this._ganttRowIndex(this.ganttLinkFrom) !== this._ganttRowIndex(g)) {
+      const active = this.ganttLinkFromId !== null && this.ganttLinkFromId !== undefined;
+      if (active && this.ganttLinkFromId !== g.row.id) {
         // уже рисуем другую связь — завершаем её на источнике нового mousedown
-        this.ganttLinkClick(e, g);
+        const fromG = this._ganttRowById(this.ganttLinkFromId);
+        this._createLink(fromG ? fromG.row : null, g.row);
+        this.cancelGanttLink();
         return;
       }
-      if (!this.ganttLinkFrom) this.ganttLinkFrom = g;
+      if (!active) this.ganttLinkFromId = g.row.id;
+      const trackAt = (target) => {
+        const tracks = document.querySelectorAll('.at-gantt .at-gantt-track');
+        return Array.prototype.findIndex.call(tracks, (tr) => tr.contains(target));
+      };
+      const onMove = (ev) => {
+        const t = ev.target && ev.target.closest ? ev.target.closest('.at-gantt-bar') : null;
+        let hoverId = null;
+        if (t) {
+          const idx = trackAt(t);
+          const gr = idx >= 0 ? this.ganttData.rows[idx] : null;
+          if (gr && gr.row.id !== this.ganttLinkFromId) hoverId = gr.row.id;
+        }
+        this.ganttHoverTargetId = hoverId;
+        this._drawLinkPreview(ev.clientX, ev.clientY);
+      };
       const onUp = (ev) => {
+        window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
-        // Если отпустили над полосой другой работы — создать связь; иначе оставить режим ожидания клика
         const target = ev.target && ev.target.closest ? ev.target.closest('.at-gantt-bar') : null;
-        if (target && this.ganttLinkFrom) {
-          const rows = this.ganttData.rows;
-          const idx = Array.prototype.findIndex.call(
-            document.querySelectorAll('.at-gantt .at-gantt-track'),
-            (t) => t.contains(target)
-          );
-          const gTo = idx >= 0 ? rows[idx] : null;
-          if (gTo && this._ganttRowIndex(gTo) !== this._ganttRowIndex(this.ganttLinkFrom)) {
-            this.pushHistory('Создана связь Ганта');
-            const fromNum = this.rowNumber(this.ganttLinkFrom.row.id);
-            if (fromNum !== null && fromNum !== undefined) {
-              // несколько связей + выбранный тип (FS/SS/FF/SF) — как в draw.io: перетащил = добавил
-              const refs = parsePredRefs(gTo.row.pred).filter((r) => r.num !== fromNum);
-              refs.push({ type: this.ganttLinkType || 'FS', num: fromNum });
-              gTo.row.pred = formatPredRefs(refs);
-              this.logActivity(
-                `Связь ${this.ganttLinkType}: №${fromNum} → №${this.rowNumber(gTo.row.id) ?? '—'}`
-              );
-            }
+        let created = false;
+        if (target) {
+          const idx = trackAt(target);
+          const gTo = idx >= 0 ? this.ganttData.rows[idx] : null;
+          if (gTo && gTo.row.id !== this.ganttLinkFromId) {
+            const fromG = this._ganttRowById(this.ganttLinkFromId);
+            created = this._createLink(fromG ? fromG.row : null, gTo.row);
           }
         }
-        this.ganttLinkFrom = null;
-        this.ganttLinkPath = null;
+        if (created) {
+          this.cancelGanttLink();
+        } else {
+          this.ganttHoverTargetId = null;
+          this.ganttLinkPath = null;
+          if (this.ganttLinkFromId !== null && this.ganttLinkFromId !== undefined) {
+            this.logActivity('Отпустите стрелку на другой работе — или кликните по ней');
+          }
+        }
       };
+      window.addEventListener('mousemove', onMove);
       window.addEventListener('mouseup', onUp);
     },
 

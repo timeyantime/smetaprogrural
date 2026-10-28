@@ -2920,6 +2920,23 @@ window.smeta = function smeta() {
       this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
     },
 
+    /** Индекс строки диаграммы по объекту g (Map по id — надёжнее indexOf:
+        Alpine оборачивает элементы x-for в прокси, и строгое сравнение ссылок
+        в них не совпадает — из-за этого связи «не создавались»). */
+    _ganttRowIndex(g) {
+      if (!g) return -1;
+      const rows = this.ganttData.rows;
+      const map = this._ganttIndexById || (this._ganttIndexById = new Map());
+      if (map.get('sig') !== g.row.id) {
+        map.clear();
+        map.set('sig', g.row.id);
+        rows.forEach((r, i) => map.set(r.row.id, i));
+      }
+      const byId = map.get(g.row.id);
+      if (byId !== undefined) return byId;
+      return rows.findIndex((r) => r.row && r.row.id === g.row.id);
+    },
+
     /** Клик по пустому месту дорожки — отменить рисование связи */
     cancelGanttLink() {
       this.ganttLinkFromId = null;

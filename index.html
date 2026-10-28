@@ -385,6 +385,10 @@
             <div class="at-gantt-scale">
               <div class="at-gantt-scale-name">Работа</div>
               <div class="at-gantt-scale-track">
+                <template x-for="i in ganttNonWorkingCells()" :key="'nw-' + i">
+                  <span class="at-gantt-weekend" :style="'left: calc(' + i + ' * var(--day-w)); width: var(--day-w)'"
+                        :title="ganttDateLabel(i) + ' — нерабочий день'"></span>
+                </template>
                 <template x-for="t in ganttTicks()" :key="t">
                   <span class="at-gantt-tick" :style="'left: calc(' + t + ' * var(--day-w))'"
                         x-text="ganttDateLabel(t)"></span>
@@ -419,6 +423,9 @@
                   </template>
                 </div>
                 <div class="at-gantt-track" @mousemove="ganttTrackMove($event)" @click.self="cancelGanttLink()">
+                  <template x-for="i in ganttNonWorkingCells()" :key="'nwt-' + g.row.id + '-' + i">
+                    <span class="at-gantt-weekend" :style="'left: calc(' + i + ' * var(--day-w)); width: var(--day-w)'"></span>
+                  </template>
                   <div class="at-gantt-bar" :data-row="g.row.id"
                        :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFromId === g.row.id, 'link-target': ganttHoverTargetId === g.row.id }]"
                        :style="ganttBarStyle(g)"
@@ -1413,6 +1420,54 @@
         <div class="at-modal-foot">
           <span class="muted" style="margin-right:auto">База хранится локально в браузере и не зависит от файла сметы.</span>
           <button class="at-btn at-btn-primary" @click="cancelNsbEdit(); nsbModalOpen = false">Готово</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно: Календарь рабочих дней (выходные + праздники) -->
+    <div class="at-modal-backdrop" x-show="calOpen" x-cloak @click.self="closeCalendar()">
+      <div class="at-modal at-modal-cal" x-show="calOpen" x-transition>
+        <div class="at-modal-head">
+          <span class="at-modal-title">📅 Календарь нерабочих дней</span>
+          <button class="at-btn" @click="closeCalendar()">✕</button>
+        </div>
+        <div class="at-modal-body">
+          <div class="at-cal-weekdays">
+            <label class="at-cal-toggle" title="Считать субботу выходным днём">
+              <input type="checkbox" :checked="ganttWorkDaysPerWeek <= 5"
+                     @change="ganttWorkDaysPerWeek = $event.target.checked ? Math.min(ganttWorkDaysPerWeek, 5) : (ganttWorkDaysPerWeek === 5 ? 7 : Math.max(ganttWorkDaysPerWeek, 6)); invalidateGantt(); saveUI()" />
+              <span>Сб — выходной</span>
+            </label>
+            <label class="at-cal-toggle" title="Считать воскресенье выходным днём">
+              <input type="checkbox" :checked="ganttWorkDaysPerWeek <= 6"
+                     @change="ganttWorkDaysPerWeek = $event.target.checked ? Math.min(ganttWorkDaysPerWeek, 6) : (ganttWorkDaysPerWeek === 5 ? 6 : 7); invalidateGantt(); saveUI()" />
+              <span>Вс — выходной</span>
+            </label>
+          </div>
+          <div class="at-cal-nav">
+            <button class="at-btn at-btn-sm" @click="calShift(-1)" title="Предыдущий месяц">←</button>
+            <b x-text="calMonthLabel()"></b>
+            <button class="at-btn at-btn-sm" @click="calShift(1)" title="Следующий месяц">→</button>
+            <span class="spacer" style="flex:1"></span>
+            <button class="at-btn at-btn-sm" @click="clearHolidays()" x-show="ganttHolidays.length">Очистить праздники</button>
+          </div>
+          <div class="at-cal-grid">
+            <span class="at-cal-dow">Пн</span><span class="at-cal-dow">Вт</span><span class="at-cal-dow">Ср</span>
+            <span class="at-cal-dow">Чт</span><span class="at-cal-dow">Пт</span><span class="at-cal-dow">Сб</span><span class="at-cal-dow">Вс</span>
+            <template x-for="(cell, ci) in calDays()" :key="'cal-' + calMonth + '-' + ci">
+              <button class="at-cal-day" x-show="cell" x-cloak
+                      :class="{ weekend: cell && cell.weekend, holiday: cell && cell.holiday }"
+                      @click="toggleCalDay(cell)"
+                      :title="cell ? (cell.holiday ? 'Праздник — снять отметку' : 'Отметить праздничным днём') : ''">
+                <span x-text="cell ? cell.day : ''"></span>
+              </button>
+            </template>
+          </div>
+          <p class="at-modal-hint muted">Серые дни — выходные по выбранной неделе. Кликните по дню, чтобы отметить/снять праздник — такие дни исключаются из расчёта длительностей и связей Ганта.</p>
+        </div>
+        <div class="at-modal-foot">
+          <span class="muted" x-text="'Отмечено праздников: ' + ganttHolidays.length"></span>
+          <button class="at-btn at-btn-primary" @click="closeCalendar()">Готово</button>
         </div>
       </div>
     </div>

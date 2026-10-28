@@ -656,6 +656,12 @@ table.at-table { border-collapse: separate; border-spacing: 0; width: 100%; tabl
   background-image: linear-gradient(to right, var(--line) 1px, transparent 1px);
   background-size: var(--day-w) 100%;
 }
+/* Серые колонки нерабочих дней (выходные по 5/6-дневке + праздники из календаря) */
+.at-gantt-weekend {
+  position: absolute; top: 0; bottom: 0; z-index: 0; pointer-events: none;
+  background: rgba(140, 148, 158, 0.14);
+}
+.at-gantt-scale-track .at-gantt-weekend { background: rgba(140, 148, 158, 0.20); }
 /* data-row/data-type на полосах — для hit-test'а связей по координатам (app.ts) */
 .at-gantt-bar {
   position: absolute; top: 5px; height: 20px; border-radius: 4px; min-width: 8px;
@@ -851,3 +857,20 @@ body.printing-gantt {
   color: var(--text, #172b4d);
   white-space: nowrap;
 }
+
+/* ── Модалка «Календарь нерабочих дней» (#52) ─────────────────────────────── */
+.at-modal-cal { width: 360px; }
+.at-cal-weekdays { display: flex; gap: 14px; margin-bottom: 10px; }
+.at-cal-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; user-select: none; }
+.at-cal-toggle input[type="checkbox"] { width: auto; accent-color: #0969da; }
+.at-cal-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; text-transform: capitalize; }
+.at-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.at-cal-dow { text-align: center; font-size: 11px; color: var(--muted); padding: 2px 0; }
+.at-cal-day {
+  height: 34px; border: 1px solid transparent; border-radius: 6px; background: #f6f8fa;
+  font-size: 12.5px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.at-cal-day:hover { border-color: #0969da; }
+.at-cal-day.weekend { background: rgba(140, 148, 158, 0.25); color: var(--muted); }
+.at-cal-day.holiday { background: #cf222e; color: #fff; font-weight: 600; }
+.at-cal-day.holiday:hover { border-color: #8b1a22; }

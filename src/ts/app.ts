@@ -3071,23 +3071,6 @@ window.smeta = function smeta() {
       this.ganttLinkPath = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
     },
 
-    /** Индекс строки диаграммы по объекту g (Map по id — надёжнее indexOf:
-        Alpine оборачивает элементы x-for в прокси, и строгое сравнение ссылок
-        в них не совпадает — из-за этого связи «не создавались»). */
-    _ganttRowIndex(g) {
-      if (!g) return -1;
-      const rows = this.ganttData.rows;
-      const map = this._ganttIndexById || (this._ganttIndexById = new Map());
-      if (map.get('sig') !== g.row.id) {
-        map.clear();
-        map.set('sig', g.row.id);
-        rows.forEach((r, i) => map.set(r.row.id, i));
-      }
-      const byId = map.get(g.row.id);
-      if (byId !== undefined) return byId;
-      return rows.findIndex((r) => r.row && r.row.id === g.row.id);
-    },
-
     /** Клик по пустому месту дорожки — отменить рисование связи */
     cancelGanttLink() {
       this.ganttLinkFromId = null;
@@ -3252,9 +3235,21 @@ window.smeta = function smeta() {
         this.logActivity('Выбран предшественник — кликните по работе-преемнику');
         return;
       }
-      if (this.ganttLinkFromId !== g.row.id) {
-        const fromG = this._ganttRowById(this.ganttLinkFromId);
-        this._createLink(fromG ? fromG.row : null, g.row);
+      if (this.ganttLinkFromId === g.row.id) {
+        // клик по тому же источнику — отмена режима (как отмена кликом в Wix)
+        this.cancelGanttLink();
+        this.logActivity('Рисование связи отменено');
+        return;
+      }
+      const fromG = this._ganttRowById(this.ganttLinkFromId);
+      const created = this._createLink(fromG ? fromG.row : null, g.row);
+      if (!created) {
+        // связь не создана — остаёмся в режиме и меняем источник на эту работу
+        // (пользователь мог кликнуть по преемнику раньше предшественника)
+        this.ganttLinkFromId = g.row.id;
+        this.layoutTick++;
+        this.logActivity('Кликните по работе-преемнику для связи');
+        return;
       }
       this.cancelGanttLink();
     },
@@ -3365,6 +3360,19 @@ window.smeta = function smeta() {
     ganttDateLabel(offsetDays) {
       const d = new Date(this.ganttData.start + offsetDays * 86400000);
       return d.toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' });
+    },
+
+    /** Календарные индексы нерабочих дней (выходные по выбранной 5/6/7-дневке
+     *  и отмеченные праздники) — для серых колонок на шкале и треках Ганта. */
+    ganttNonWorkingCells() {
+      const g = this.ganttData;
+      const DAY = 86400000;
+      const out = [];
+      if (!g || !g.wd) return out; // режим без выходных — ничего не закрашиваем
+      for (let i = 0; i < g.totalDays; i++) {
+        if (isNonWorkingDay(g.start + i * DAY, g.wd, g.holSet)) out.push(i);
+      }
+      return out;
     },
 
     ganttTicks() {

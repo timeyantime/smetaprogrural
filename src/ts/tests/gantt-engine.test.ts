@@ -10,18 +10,22 @@ import { parsePredRefs } from '../app';
 
 describe('parsePredRefs / формат связей MS Project', () => {
   it('простой номер = FS (обратная совместимость)', () => {
-    expect(parsePredRefs('3')).toEqual([{ type: 'FS', num: 3 }]);
+    expect(parsePredRefs('3')).toEqual([{ type: 'FS', num: 3, lag: 0 }]);
   });
   it('несколько связей с типами', () => {
     expect(parsePredRefs('SS:2,FF:5')).toEqual([
-      { type: 'SS', num: 2 },
-      { type: 'FF', num: 5 },
+      { type: 'SS', num: 2, lag: 0 },
+      { type: 'FF', num: 5, lag: 0 },
     ]);
+  });
+  it('лаг в днях: «ОН+3» / «НН-2»', () => {
+    expect(parsePredRefs('3+3')).toEqual([{ type: 'FS', num: 3, lag: 3 }]);
+    expect(parsePredRefs('SS:5-2')).toEqual([{ type: 'SS', num: 5, lag: -2 }]);
   });
   it('игнорирует мусор и пустые токены', () => {
     expect(parsePredRefs('2, abc, SS:, , 7')).toEqual([
-      { type: 'FS', num: 2 },
-      { type: 'FS', num: 7 },
+      { type: 'FS', num: 2, lag: 0 },
+      { type: 'FS', num: 7, lag: 0 },
     ]);
   });
   it('пустая строка/undefined → []', () => {

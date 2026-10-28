@@ -350,7 +350,17 @@
                       x-text="t"></button>
             </template>
           </span>
-          <span class="at-gantt-info">Тяните полосу — зависимые сдвигаются сразу · тяните ручку ⤳ к другой работе ИЛИ кликните ⤳ по предшественнику, затем по преемнику · тип связи — переключатель FS/SS/FF/SF · клик по чипу «→» меняет тип, alt+клик удаляет · правый клик по полосе — снять связь. Длительность 0 — запись скрыта.</span>
+          <label class="at-gantt-start" title="Календарный режим: работать по 5-дневке (сб/вс — выходные) или без выходных">
+            Рабочих дней в неделе:
+            <select class="at-gantt-daysinweek" x-model.number="ganttWorkDaysPerWeek" @change="invalidateGantt()">
+              <option :value="7">7 (без выходных)</option>
+              <option :value="6">6 (вс — выходной)</option>
+              <option :value="5">5 (сб и вс — выходные)</option>
+            </select>
+          </label>
+          <button class="at-btn at-btn-sm" @click="openCalendar()"
+                  title="Отметить праздничные (нерабочие) дни — они исключаются из расчёта Ганта">📅 Праздники<span x-show="ganttHolidays.length"> (<b x-text="ganttHolidays.length"></b>)</span></button>
+          <span class="at-gantt-info">Сводные полосы разделов связей не имеют — стрелки только между работами. Тяните ручку ⤳ к другой работе ИЛИ кликните ⤳ по предшественнику, затем по преемнику · тип связи — переключатель FS/SS/FF/SF · столбец «Преемств.» принимает «ОН», «НН», «ОН+3» (лаг в днях) · правый клик по полосе — снять связь. Длительность 0 — запись скрыта.</span>
           <span class="spacer"></span>
           <button class="at-btn at-btn-sm" :class="{ active: ganttCritical }" @click="ganttCritical = !ganttCritical"
                   title="Подсветка критического пути (#49)">⚑ Крит. путь</button>
@@ -402,12 +412,15 @@
                 <div class="at-gantt-name" :title="g.name">
                   <span class="at-gantt-sec" x-text="data.sections[g.si] ? (g.si + 1 + '.') : ''"></span>
                   <span x-text="g.name"></span>
-                  <span class="at-gantt-dep" x-show="g.row.pred"
-                        :title="'Предшественники: №' + g.row.pred + ' · клик — сменить тип, alt+клик — удалить'"
-                        @click.stop="predChipClick($event, g.row)">→<b x-text="g.row.pred"></b></span>
+                  <template x-for="d in ganttDepChips(g)" :key="'dep-' + g.row.id + '-' + d.num">
+                    <span class="at-gantt-dep" :title="'Предшественник №' + d.num + ' (' + d.ru + ') · клик — сменить тип, alt+клик — удалить'"
+                          @click.stop="predChipClick($event, g.row)"
+                          x-text="d.ru + ' ' + d.label"></span>
+                  </template>
                 </div>
                 <div class="at-gantt-track" @mousemove="ganttTrackMove($event)" @click.self="cancelGanttLink()">
-                  <div class="at-gantt-bar" :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFromId === g.row.id, 'link-target': ganttHoverTargetId === g.row.id }]"
+                  <div class="at-gantt-bar" :data-row="g.row.id"
+                       :class="['gb-' + g.type, { critical: ganttCritical && g.isCritical, dragging: ganttDrag && ganttDrag.row === g.row, 'link-source': ganttLinkFromId === g.row.id, 'link-target': ganttHoverTargetId === g.row.id }]"
                        :style="ganttBarStyle(g)"
                        @mousedown="startGanttDrag($event, g)"
                        @click="ganttBarClick($event, g)"
